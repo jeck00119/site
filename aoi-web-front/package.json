@@ -1,0 +1,35 @@
+{
+  "name": "frontend",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@coreui/vue": "^5.5.0",
+    "@fortawesome/fontawesome-svg-core": "^7.0.0",
+    "@fortawesome/free-solid-svg-icons": "^7.0.0",
+    "@fortawesome/vue-fontawesome": "^3.1.1",
+    "@imengyu/vue3-context-menu": "^1.5.1",
+    "exceljs": "^4.4.0",
+    "fabric": "^6.7.1",
+    "oh-vue-icons": "^1.0.0-rc3",
+    "serve": "^10.0.2",
+    "vue": "^3.5.18",
+    "vue-json-pretty": "^2.5.0",
+    "vue-json-viewer": "^3.0.4",
+    "vue-multiselect": "^3.3.1",
+    "vue-pdf-embed": "^1.1.6",
+    "vue-router": "^4.5.1",
+    "vue3-carousel": "^0.16.0",
+    "vue3-uuid": "^1.0.0",
+    "vuex": "^4.1.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^6.0.1",
+    "vite": "^7.0.6"
+  }
+}

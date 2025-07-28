@@ -1,0 +1,1198 @@
+<template>
+    <div class="main-ct">
+        <transition name="placeholder-anim" mode="out-in">
+            <div class="settings-loaded" v-if="currentImageSource">
+                <div class="top-buttons">
+                    <div class="image-source" id="left-control">
+                        <base-button-rectangle :class="[cameraActive ? 'toggle-active' : '']" id="toggle-source-button"
+                            @state-changed="toggleImageSource">
+
+                            <div v-if="cameraActive === false">
+                                <font-awesome-icon icon="fa-toggle-off" size="2xl" />
+                            </div>
+                            <div v-else>
+                                <font-awesome-icon icon="fa-toggle-on" size="2xl" />
+                            </div>
+
+                        </base-button-rectangle>
+                        <!-- <label id="toggle-source-label">
+                            <font-awesome-icon icon="fa-images" />
+                            Image Source: {{ currentImageSource.name }}
+                        </label> -->
+                    </div>
+                    <div class="image-source" id="right-control">
+                        <base-button-rectangle @state-changed="savePhoto" class="save-control">
+                            <font-awesome-icon icon="fa-floppy-disk" />
+                            Save Photo
+                        </base-button-rectangle>
+                        <base-button-rectangle @state-changed="saveConfig" class="save-control">
+                            <font-awesome-icon icon="fa-floppy-disk" />
+                            Save Config
+                        </base-button-rectangle>
+                    </div>
+                </div>
+
+                <div class="settings-container">
+                    <button :class="{ disabled: type === 'static' }" @click="toggleSetting('Camera')" class="setting">
+                        <font-awesome-icon icon="fa-video-camera" />
+                        Camera
+                    </button>
+
+                    <div class="settings-submenu" v-if="selectedSetting === 'Camera' && type === 'dynamic'">
+                        <div class="submenu-input">
+                            <div class="sub-submenu">
+                                <label>
+                                    Camera:
+                                </label>
+                                <div class="input-container">
+                                    <select v-model="selectedCameraUid">
+                                        <option v-for="camera in camerasList" :key="camera.uid" :value="camera.uid">
+                                            {{ camera.name }}
+                                        </option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="camera-control">
+                            <button class="submenu-button" @click="showAddCamDialog = true">
+                                <font-awesome-icon icon="fa-plus" size="xl"/>
+                                Add Camera
+                            </button>
+                            <button class="submenu-button" @click="deleteCamera">
+                                <font-awesome-icon icon="fa-trash" size="l"/>
+                                Delete
+                            </button>
+                            <base-dialog :show="showAddCamDialog" :title="'Add Camera'" @close="closeDialog">
+                                <div class="dialog-input-container">
+                                    <label>Name: </label>
+                                    <input type="text" v-model="newCamera.name">
+                                    <label>Type:</label>
+                                    <select v-model="newCamera.cameraType">
+                                        <option value="" disabled hidden>
+                                        </option>
+                                        <option v-for="type in cameraTypesList" :value=type>
+                                            {{ type }}
+                                        </option>
+
+                                    </select>
+                                    <label>OpenCV Index:</label>
+                                    <input type="text" v-model="newCamera.openCvIndexId">
+                                </div>
+                                <div class="dialog-ctrl-buttons-container">
+                                    <base-button :width="'25%'" @click="closeDialog">Cancel</base-button>
+                                    <base-button :width="'25%'" class="dialog-add-button"
+                                        @click="addCamera">Add</base-button>
+                                </div>
+                            </base-dialog>
+
+                        </div>
+                    </div>
+
+                    <button :class="{ disabled: type === 'static' || selectedCameraUid === '' }" @click="toggleSetting('Camera Settings')"
+                        class="setting">
+                        <font-awesome-icon icon="fa-gear" />
+                        Camera Settings
+                    </button>
+
+                    <div class="settings-submenu" v-if="selectedSetting === 'Camera Settings' && type === 'dynamic'">
+                        <div class="submenu-input">
+                            <div class="sub-submenu">
+                                <label class="settings-label">
+                                    <font-awesome-icon icon="fa-gear" size="2xl"></font-awesome-icon>
+                                    Settings:
+                                </label>
+                                <div class="input-container">
+                                    <select v-if="selectedCameraUid === ''"></select>
+                                    <select v-else v-model="currentCameraSettingsUid">
+                                        <option v-for="cameraSettings in cameraSettingsList" :key="cameraSettings.uid"
+                                            :value="cameraSettings.uid">
+                                            {{ cameraSettings.name }}
+                                        </option>
+                                    </select>
+                                </div>
+                                <div class="submenu-button-container">
+                                    <button class="cs-button" @click="newCameraSettings">
+                                        <font-awesome-icon icon="fa-plus" size="xl"></font-awesome-icon>
+                                    </button>
+                                </div>
+                            </div>
+                            <div v-if="newCameraSettingsFlag === true" class="new-settings-container">
+                                <label id="new-name">
+                                    <font-awesome-icon icon="fa-file-circle-plus" size="xl"></font-awesome-icon>
+                                    New settings name:
+                                </label>
+                                <input type="text" id="new-camera-settings-name" @keyup.enter="setCameraSettingsVisibility"
+                                    @blur="setCameraSettingsVisibility" v-model.trim="newCameraSettingsName">
+                            </div>
+
+                            <div class="camera-controls-container" v-if="showCameraControls === true">
+                                <!-- <button class="cs-button" @click="loadSettingsToCamera">Load</button> -->
+                                <button class="cs-button" @click="saveCameraSettings(currentCameraSettings)">
+                                    <font-awesome-icon icon="fa-floppy-disk"></font-awesome-icon>
+                                    Save Config
+                                </button>
+                                <button class="cs-button" @click="deleteCameraSettings(currentCameraSettings)">
+                                    <font-awesome-icon icon="fa-trash"></font-awesome-icon>
+                                    Delete
+                                </button>
+
+                                <div class="settings-list" v-for="(setting, index) in cameraControls" :key="setting.name">
+                                    <div class="settings-label">
+                                        <font-awesome-icon :icon="icon[setting.name]" size="2xl" id="setting-icon" />
+                                        {{ setting.name[0].toUpperCase() + setting.name.slice(- (setting.name.length - 1))
+                                        }}
+                                    </div>
+                                    <div class="cs-wrapper" v-if="setting.type === 'dropdown'">
+                                        <div class="cs-container">
+                                            <base-dropdown id="camera-type" name="resolution" :values="setting.values"
+                                                :current="currentCameraSettings[setting.name]"
+                                                @update-value="updateCurrentValue">
+                                            </base-dropdown>
+                                        </div>
+                                    </div>
+                                    <div class="cs-wrapper" v-else-if="setting.type === 'range'">
+                                        <div class="cs-container">
+                                            <div class="container">
+                                                <base-integer-input :min="setting.values[0]" :max="setting.values[1]"
+                                                    :current="currentCameraSettings[setting.name]" :step="setting.step"
+                                                    :name="setting.name.toUpperCase()" @update-value="updateCurrentValue">
+                                                </base-integer-input>
+                                                <base-slider :min="setting.values[0]" :max="setting.values[1]"
+                                                    :current="currentCameraSettings[setting.name]" :step="setting.step"
+                                                    :name="setting.name.toUpperCase()" :icon="icon[setting.name]"
+                                                    @update-value="updateCurrentValue">
+                                                </base-slider>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="cs-wrapper" v-else-if="setting.type === 'bool'">
+                                        <div class="cs-container">
+                                            <base-checkbox :current="getCheckBoxValue(currentCameraSettings[setting.name])"
+                                                :name="setting.name.toUpperCase()"
+                                                @update-value="updateCheckBoxValue"></base-checkbox>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+
+                    <button :class="{ disabled: type === 'dynamic' }" @click="toggleSetting('Images Path')" class="setting">
+                        <font-awesome-icon icon="fa-folder-open" />
+                        Images Path
+                    </button>
+                    <div class="settings-submenu" id="images-path" v-if="selectedSetting === 'Images Path' && type === 'static'">
+                        <div class="submenu-input">
+                            <div class="directory-name">
+                                <label id="dir-label">
+                                    Current Directory:
+                                </label>
+                                <div id="path-container">
+                                    {{ currentGenerator.dirPath }}
+                                </div>
+                            </div>
+                        </div>
+                        <div class="submenu-button-container">
+                            <button class="submenu-button" @click="$refs.browseDirectory.click()">
+                                <font-awesome-icon icon="fa-magnifying-glass" />
+                                Browse Directory
+                            </button>
+                            <ul id="listing"></ul>
+                        </div>
+                        <input type="file" ref="browseDirectory" style="display:none" name="select-image-path"
+                            id="imagePathDirectory" webkitdirectory multiple @change="onFolderSelected" />
+                    </div>
+
+                    <button @click="toggleSetting('CNC Locations')" class="setting">
+                        <font-awesome-icon icon="fa-location-dot" />
+                        CNC Locations
+                    </button>
+                    <div class="settings-submenu" v-if="selectedSetting === 'CNC Locations'">
+                        <div class="submenu-input">
+                            <div class="sub-submenu">
+                                <label class="settings-label">
+                                    <font-awesome-icon icon="fa-location-dot" size="2xl"/>
+                                    Location: 
+                                </label>
+                                <div class="input-container">
+                                    <select class="dropdown-select" v-model="location">
+                                        <option v-for="loc in locationsList"
+                                            :key="loc.name"
+                                            :value="loc.name"
+                                        >
+                                        {{ loc.name }}
+                                        </option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="submenu-input">
+                            <div class="sub-submenu">
+                                <label class="settings-label">
+                                    <font-awesome-icon icon="fa-clock" size="2xl"/>
+                                    Settle Time: 
+                                </label>
+                                <div class="input-container">
+                                    <input type="number" step="0.01" class="number-input" v-model="settleTime">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="submenu-input">
+                            <div class="sub-submenu">
+                                <label class="settings-label">
+                                    <font-awesome-icon icon="fa-check" size="2xl"></font-awesome-icon>
+                                    Activate Location:
+                                </label>
+                                <div class="input-container">
+                                    <base-checkbox v-model="activateLocation"></base-checkbox>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <button @click="toggleSetting('Additional Settings')" class="setting">
+                        <font-awesome-icon icon="fa-gears" />
+                        Additional Settings
+                    </button>
+                    <div class="settings-submenu" v-if="selectedSetting === 'Additional Settings'">
+                        <div class="submenu-input">
+                            <div class="sub-submenu">
+                                <label class="settings-label">
+                                    <font-awesome-icon icon="fa-crop" size="2xl"></font-awesome-icon>
+                                    FPS:
+                                </label>
+                                <div class="input-container">
+                                    <input type="number" class="number-input" v-model="fps">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div v-else class="not-loaded">
+                <div class="warning">
+                    <font-awesome-icon icon="exclamation-circle" style="color:rgba(204, 161, 82)" size="10x" />
+                    <h1>No image source loaded.</h1>
+                </div>
+            </div>
+        </transition>
+        <base-notification
+            :show="showNotification"
+            :timeout="null"
+            height="15vh"
+            color="#CCA152"
+            @close="clearNotification"
+        >
+            <div class="message-wrapper">
+                <div class="icon-wrapper">
+                    <v-icon :name="notificationIcon" scale="2.5" animation="pulse"/>
+                </div>
+                <div class="text-wrapper">
+                    {{ notificationMessage }}
+                </div>
+            </div>
+        </base-notification>
+    </div>
+</template>
+
+<script>
+import { computed, onMounted, ref, toRef, watch } from 'vue';
+import { useStore } from 'vuex';
+
+import useNotification from '../../hooks/notifications.js';
+
+
+export default {
+
+    props: ['type', 'currentImageSource', 'currentImageGenerator'],
+
+    emits: ['generator-updated', 'camera-updated', 'camera-settings-updated', 'fps-updated', 'show-camera', 'save-photo', 'save-src-status', 'save-settings-status'],
+
+    setup(props, context) {
+
+        const cameraSettings = ref({
+            resolution: '',
+            brightness: 0,
+            contrast: 0,
+            saturation: 0,
+            sharpness: 0,
+            gain: 0,
+            autoExposure: false,
+            exposure: 0,
+            pan: 0,
+            tilt: 0,
+            zoom: 0,
+            focus: 0,
+            autoFocus: false
+        });
+
+        const showAddCamDialog = ref(false);
+
+        const selectedSetting = ref('Additional Settings');
+
+        const cameraActive = ref(false);
+
+        const newCamera = ref({
+            name: '',
+            cameraType: '',
+            openCvIndexId: 0
+        });
+
+        const {showNotification, notificationMessage, notificationIcon, notificationTimeout, 
+            setNotification, clearNotification} = useNotification();
+
+        const store = useStore();
+
+        const selectedCameraUid = ref("")
+        const currentCameraSettingsUid = ref("");
+
+        const location = ref("");
+        const settleTime = ref(0.0);
+        const activateLocation = ref(false);
+        const fps = ref(1);
+
+        const selectedDirectory = ref("");
+
+        const currentImageSource = toRef(props, 'currentImageSource');
+
+        const folderExistsFlag = ref(false);
+        const newFolderFlag = ref(false);
+
+        const showCameraControls = ref(false);
+
+        const newCameraSettingsFlag = ref(false);
+        const newCameraSettingsName = ref('');
+        const ignoreSettingsChange = ref(false);
+
+        const icon = {
+            resolution: "fa-arrows-up-down-left-right",
+            brightness: "fa-sun",
+            contrast: "fa-circle-half-stroke",
+            saturation: "fa-droplet",
+            sharpness: "fa-gem",
+            gain: "fa-chart-line",
+            auto_exposure: "fa-wand-magic-sparkles",
+            exposure: "fa-plus-minus",
+            pan: "fa-arrows-left-right",
+            tilt: "fa-camera-rotate",
+            zoom: "fa-magnifying-glass",
+            focus: "fa-expand",
+            auto_focus: "fa-wand-magic-sparkles"
+        };
+
+        const imageGeneratorsList = computed(function () {
+            return store.getters["imageSources/getImageGenerators"];
+        })
+
+        const camerasList = computed(function () {
+            return store.getters["cameraSettings/allCameras"];
+        });
+
+        const cameraSettingsList = computed(function () {
+            return store.getters["cameraSettings/allCameraSettings"];
+        });
+
+        const currentCameraSettings = computed(function () {
+            return store.getters["cameraSettings/getCurrentCameraSettings"];
+        });
+
+        const currentCamera = computed(function() {
+            return store.getters["cameraSettings/getCurrentCamera"];
+        });
+
+        function getCheckBoxValue(value) {
+            if(value)
+                return true;
+            else
+                return false;
+        }
+
+        function addCamera() {
+            store.dispatch("cameraSettings/addCamera", newCamera.value);
+            closeDialog();
+        }
+
+        function deleteCamera() {
+            store.dispatch("cameraSettings/removeCamera", selectedCamera.value);
+        }
+
+        function setCameraSettingsVisibility() {
+            if (newCameraSettingsName.value != "") {
+                currentCameraSettingsUid.value = "";
+
+                showCameraControls.value = true;
+
+                const defaultSettings = store.getters["cameraSettings/getCurrentCameraDefaultSettings"];
+
+                store.dispatch("cameraSettings/setCurrentCameraConfig", defaultSettings);
+
+                store.dispatch("cameraSettings/loadCameraSettingsFromObject", {
+                    cameraUid: selectedCameraUid.value,
+                    settings: defaultSettings
+                });
+
+                store.dispatch("cameraSettings/setCurrentCameraConfigName", newCameraSettingsName.value);
+                store.dispatch("cameraSettings/setCurrentCameraConfigCameraType", currentCamera.value.cameraType);
+            }
+        }
+
+        async function loadCameraSettings(cameraUid) {
+            await store.dispatch("cameraSettings/fetchCameraSettingsList", cameraUid);
+        }
+
+        function loadSettingsToCamera() {
+            const payload = {
+                cameraUid: selectedCameraUid.value,
+                cameraSettingUid: currentCameraSettingsUid.value
+            }
+            store.dispatch("cameraSettings/loadCameraSettingsToCamera", payload)
+        }
+
+        function toggleSetting(setting) {
+            selectedSetting.value = setting;
+        }
+
+        function closeDialog() {
+
+            newCamera.value = {
+                name: '',
+                cameraType: ''
+            }
+            showAddCamDialog.value = false;
+        }
+
+        async function onFolderSelected(event) {
+
+            if (event.target.files.length === 0) {
+                setNotification(4000, "The chosen folder is empty.", 'bi-exclamation-circle-fill');
+            }
+            else {
+                selectedDirectory.value = event.target.files;
+
+                const dirName = selectedDirectory.value[0].webkitRelativePath.slice(0, selectedDirectory.value[0].webkitRelativePath.indexOf("/"));
+                let foundDirName = imageGeneratorsList.value.map(generator => generator.dir_path.includes(dirName));
+
+                let foundIdx = foundDirName.findIndex(el => el === true);
+
+                if (foundIdx != -1) {
+                    folderExistsFlag.value = true;
+                }
+                else {
+                    for (const file of selectedDirectory.value) {
+                        if (file.type.startsWith("image")) {
+                            const formData = new FormData();
+                            formData.append('file', file);
+                            await store.dispatch("imageSources/uploadImagesFromGenerator", formData);
+                        }
+                        else {
+                            setNotification(3000, `${file.name} is not an image.`, 'bi-exclamation-circle-fill');
+                        }
+                    }
+                }
+
+                if (folderExistsFlag.value === true) {
+                    const gen = imageGeneratorsList.value[foundIdx];
+                    generatorChanged(gen.uid);
+
+                    store.dispatch("imageSources/setCurrentImageGenerator", gen);
+
+                    store.dispatch("imageSources/setCurrentImageGeneratorProp", {
+                        key: "dir_path",
+                        value: gen.dir_path
+                    });
+                    
+                    folderExistsFlag.value = false;
+                }
+                else {
+                    await store.dispatch("imageSources/addImageGenerator");
+                    store.dispatch("imageSources/loadImageGeneratorAsCurrent", props.currentImageGenerator.uid);
+                    newFolderFlag.value = !newFolderFlag.value;
+                }
+            }
+        }
+
+        watch(newFolderFlag, () => {
+            generatorChanged(props.currentImageGenerator.uid);
+        });
+
+        watch(currentImageSource, async (newValue) => {
+            if(newValue)
+            {
+                fps.value = newValue.fps;
+                location.value = newValue.locationName;
+                settleTime.value = newValue.settleTime;
+                activateLocation.value = newValue.activateLocation;
+
+                if (newValue.imageSourceType === "dynamic") {
+                    selectedCameraUid.value = newValue.cameraUid;
+
+                    if (newValue.cameraSettingsUid != "" && newValue.cameraUid != "") {
+                        await loadCameraSettings(newValue.cameraUid);
+
+                        selectedCameraUid.value = newValue.cameraUid;
+                        currentCameraSettingsUid.value = newValue.cameraSettingsUid;
+                    }
+                }
+            }
+        });
+
+        watch(fps, (newValue) => {
+            fpsChanged(newValue);
+        });
+
+        watch(selectedCameraUid, (newValue) => {
+            store.dispatch("cameraSettings/fetchCameraSettingsList", newValue);
+            store.dispatch('cameraSettings/fetchCamera', newValue);
+            showCameraControls.value = false;
+            currentCameraSettingsUid.value = "";
+            cameraChanged(newValue);
+        });
+
+        watch(currentCameraSettingsUid, async (newValue) => {
+            if (newValue != "" && !ignoreSettingsChange.value) {
+                await store.dispatch("cameraSettings/fetchCameraSettings", newValue)
+                await store.dispatch("cameraSettings/loadCameraSettingsToCamera", { 'cameraUid': selectedCameraUid.value, 'cameraSettingUid': newValue });
+                showCameraControls.value = true;
+            }
+            ignoreSettingsChange.value = false;
+        });
+
+        function newCameraSettings() {
+            newCameraSettingsFlag.value = !newCameraSettingsFlag.value;
+            showCameraControls.value = false;
+        };
+
+        async function saveCameraSettings(settings) {
+            cameraSettings.value = settings;
+            if (newCameraSettingsFlag.value) {
+                store.dispatch('cameraSettings/postCameraSettings', cameraSettings.value).then(() => {
+                    currentCameraSettingsUid.value = cameraSettings.value.uid;
+                    ignoreSettingsChange.value = true;
+                    newCameraSettingsFlag.value = false;
+                    newCameraSettingsName.value = '';
+                    context.emit('save-settings-status', true);
+                }).catch(() => {
+                    context.emit('save-settings-status', false);
+                });
+            }
+            else {
+                await store.dispatch('cameraSettings/putCameraSettings', cameraSettings.value).then(() => {
+                    context.emit('save-settings-status', true);
+                }).catch(() => {
+                    context.emit('save-settings-status', false);
+                });
+            }
+
+        }
+
+        async function deleteCameraSettings(settings) {
+            cameraSettings.value = settings;
+            if (newCameraSettingsFlag.value) {
+                showCameraControls.value = false;
+                newCameraSettingsFlag.value = false;
+                currentCameraSettingsUid.value = '';
+            }
+            else {
+                store.dispatch('cameraSettings/removeCameraSettings', cameraSettings.value.uid);
+                showCameraControls.value = false;
+                newCameraSettingsFlag.value = false;
+            }
+        }
+
+        function savePhoto() {
+            context.emit('save-photo');
+        }
+
+        function saveConfig() {
+            if (props.type === "static") {
+                const newStaticConfig = {
+                    camera_settings_uid: "",
+                    camera_uid: "",
+                    image_generator_uid: props.currentImageGenerator.uid,
+                    image_source_type: props.type,
+                    location_name: location.value,
+                    settle_time: settleTime.value,
+                    activate_location: activateLocation.value,
+                    name: props.currentImageSource.name,
+                    uid: props.currentImageSource.uid,
+                    fps: fps.value
+                };
+                store.dispatch("imageSources/updateImageSource", newStaticConfig).then(() => {
+                    context.emit('save-src-status', true);
+                }).catch(() => {
+                    context.emit('save-src-status', false);
+                });
+
+            } else if (props.type === "dynamic") {
+                const newDynamicConfig = {
+                    camera_settings_uid: currentCameraSettingsUid.value,
+                    camera_uid: selectedCameraUid.value,
+                    image_generator_uid: "",
+                    image_source_type: props.type,
+                    location_name: location.value,
+                    name: props.currentImageSource.name,
+                    uid: props.currentImageSource.uid,
+                    fps: fps.value,
+                    settle_time: settleTime.value,
+                    activate_location: activateLocation.value,
+                };
+
+                store.dispatch("imageSources/updateImageSource", newDynamicConfig).then(() => {
+                    context.emit('save-src-status', true);
+                }).catch(() => {
+                    context.emit('save-src-status', false);
+                });
+            }
+        }
+
+        function fpsChanged(newFps) {
+            context.emit('fps-updated', newFps);
+        }
+
+        function generatorChanged(uid) {
+            context.emit('generator-updated', uid);
+        }
+
+        function cameraChanged(uid) {
+            context.emit('camera-updated', uid);
+        }
+
+        function cameraSettingsChanged(uid) {
+            context.emit('camera-settings-updated', uid);
+        }
+
+        function toggleImageSource() {
+            cameraActive.value = !cameraActive.value;
+            context.emit('show-camera', cameraActive.value);
+        }
+
+        async function updateCurrentValue(name, newVal) {
+            await store.dispatch("cameraSettings/patchCameraSetting", {
+                name: name.toLowerCase(),
+                value: newVal,
+                cameraUid: selectedCameraUid.value
+            });
+        }
+
+        async function updateCheckBoxValue(name, newVal) {
+            await store.dispatch("cameraSettings/patchCameraSetting", {
+                name: name.toLowerCase(),
+                value: newVal? 1 : 0,
+                cameraUid: selectedCameraUid.value
+            });
+        }
+
+        onMounted(() => {
+            store.dispatch("imageSources/getAllImageGenerators", null);
+            store.dispatch("cameraSettings/fetchCamerasList", null);
+            store.dispatch("cameraSettings/readCameraTypes", null);
+            store.dispatch("cnc/loadLocations", null);
+        });
+
+        return {
+            camerasList,
+            cameraTypesList: computed(() => store.getters["cameraSettings/getCameraTypes"]),
+            cameraSettingsList,
+            locationsList: computed(() => store.getters["cnc/locations"]),
+            cameraControls: computed(() => store.getters["cameraSettings/getcameraControls"]),
+            currentCameraSettings,
+            selectedCameraUid,
+            selectedSetting,
+            showAddCamDialog,
+            newCamera,
+            cameraActive,
+            selectedDirectory,
+            activateLocation,
+            location,
+            settleTime,
+            fps,
+            currentImageSource,
+            imageGeneratorsList,
+            folderExistsFlag,
+            newFolderFlag,
+            cameraSettings,
+            showCameraControls,
+            currentCameraSettingsUid,
+            newCameraSettingsFlag,
+            newCameraSettingsName,
+            icon,
+            showNotification,
+            notificationMessage,
+            notificationIcon,
+            notificationTimeout,
+            newCameraSettings,
+            addCamera,
+            toggleSetting,
+            closeDialog,
+            addCamera,
+            deleteCamera,
+            getCheckBoxValue,
+            loadSettingsToCamera,
+            onFolderSelected,
+            saveConfig,
+            savePhoto,
+            toggleImageSource,
+            generatorChanged,
+            cameraChanged,
+            cameraSettingsChanged,
+            fpsChanged,
+            updateCurrentValue,
+            updateCheckBoxValue,
+            saveCameraSettings,
+            deleteCameraSettings,
+            setCameraSettingsVisibility,
+            clearNotification
+        }
+    }
+}
+</script>
+
+<style scoped>
+.settings-container {
+    display: block;
+    width: 100%;
+    height: 84.3%;
+    color: white;
+}
+
+.setting {
+    border: none;
+    color: rgba(204, 161, 82);
+    width: 100%;
+    margin: 3px;
+}
+
+.setting:hover {
+    background-color: rgba(204, 161, 82);
+    color: white;
+    transform: scale(1.02);
+}
+
+.number-input {
+    width: 80%;
+    margin: 7px;
+    outline: none;
+}
+
+label {
+    margin: 7px;
+    color: rgba(204, 161, 82);
+    width:50%;
+    display:flex;
+    justify-content: space-between;
+    align-items:center;
+}
+
+select {
+    width: 80%;
+    margin: 5px;
+    color: rgba(204, 161, 82);
+    height: 100%;
+
+}
+
+.cnc-label {
+    width: 60%;
+    display: flex;
+    justify-content: flex-start;
+}
+
+.cnc-value {
+    width: 40%;
+}
+
+.settings-submenu {
+    display: block;
+    background-color: rgb(37, 36, 36);
+    color: rgba(204, 161, 82);
+    height: 52.7%;
+    margin: 2%;
+    position: relative;
+    overflow-y: auto;
+}
+
+.submenu-input {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+}
+
+.camera-control {
+    display: flex;
+    width: 60%;
+    margin: auto;
+    justify-content: space-around;
+}
+
+.sub-submenu {
+    display: flex;
+    padding-left: 3px;
+    align-items: center;
+    width: 100%;
+}
+
+.input-container{
+    width:100%;
+    height:100%;
+    background-color:rgb(77, 75, 75);
+    border-radius:15px;
+    margin:2%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+#images-path {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+}
+
+.directory-name {
+    display:flex;
+    align-items: center;
+    width:100%;
+}
+
+#path-container{
+    background-color:rgb(77, 75, 75);
+    width:100%;
+    border-radius:10px;
+    padding:5px;
+}
+
+.slidecontainer {
+    display: flex;
+    justify-content: right;
+    width: 60%;
+}
+
+.slider {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    background-color: rgba(204, 161, 82);
+    height: 5px;
+    border-radius: 25px;
+    outline: none;
+    cursor: pointer;
+}
+
+.submenu-checkbox {
+    display: flex;
+    justify-content: center;
+}
+
+
+.top-buttons {
+    display: flex;
+    width: 100%;
+    height: 5%;
+    justify-content: space-between;
+    margin-bottom: 1%;
+}
+
+.image-source {
+    display: inline-flex;
+    width: 50%;
+}
+
+#left-control {
+    display: flex;
+    justify-content: flex-start;
+    width: 30%;
+}
+
+#right-control {
+    display: flex;
+    justify-content: flex-end;
+    width: 40%;
+}
+
+.save-control {
+    width: 49%;
+    margin-left: 1%;
+}
+
+#toggle-source-button {
+    width: 50%;
+    height: 100%;
+}
+
+.toggle-active {
+    background-color: rgba(204, 161, 82);
+    color: white;
+}
+
+.toggle-active:hover {
+    background-color: rgb(215, 171, 90);
+    color: white;
+}
+
+#toggle-source-label {
+    width: 100%;
+    overflow: hidden;
+    margin: 0;
+    font-size: 90%;
+    display: flex;
+    justify-content: space-around;
+}
+
+.main-ct {
+    width: 100%;
+    height: 100%;
+    display: block;
+    border-radius: 20px;
+}
+
+.submenu-button {
+    color: rgba(204, 161, 82);
+    outline: none;
+    border: none;
+    height: 100%;
+}
+
+h1 {
+    color: rgba(204, 161, 82);
+}
+
+.warning {
+    /* opacity:0.7; */
+    width: 100%;
+}
+
+.not-loaded {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: rgb(37, 36, 36);
+    height: 100%;
+    width: 100%;
+    border-radius: 20px;
+}
+
+.settings-loaded {
+    display: block;
+    height: 100%;
+    width: 100%;
+}
+
+.disabled {
+    pointer-events: none;
+    color: gray;
+    background-color: rgb(69, 68, 68);
+}
+
+input {
+    width: 80%;
+    margin: 5px;
+    margin: none;
+    outline: none;
+}
+
+.dropdown-select{
+    background-color: rgb(37, 36, 36);
+    border:none;
+    margin:1vh;
+}
+
+#camera-type {
+    background-color: rgb(37, 36, 36);
+    border: none;
+    margin: 4px;
+}
+
+label {
+    margin-right: 15%;
+}
+
+.dialog-input-container {
+    display: flexbox;
+    margin: 2%;
+}
+
+.dialog-ctrl-buttons-container {
+    display: flex;
+    justify-content: end;
+    margin: 5%;
+}
+
+.dialog-add-button {
+    background-color: rgba(204, 161, 82);
+    color: white;
+}
+
+
+.placeholder-anim-leave-from,
+.placeholder-anim-enter-to {
+    opacity: 1;
+    /* transform: translateX(0); */
+}
+
+.placeholder-anim-leave-to,
+.placeholder-anim-enter-from {
+    opacity: 0;
+    /* transform: translateX(20px); */
+}
+
+.placeholder-anim-leave-active,
+.placeholder-anim-enter-active {
+    transition: all 0.5s ease-in;
+}
+
+
+.switch {
+    position: relative;
+    display: inline-block;
+    width: 50px;
+    height: 25px;
+}
+
+.switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.toggle {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgb(35, 34, 34);
+    -webkit-transition: .4s;
+    transition: .4s;
+}
+
+.toggle:before {
+    position: absolute;
+    content: "";
+    height: 17px;
+    width: 17px;
+    left: 4px;
+    bottom: 4px;
+    background-color: rgba(204, 161, 82);
+    -webkit-transition: .4s;
+    transition: .4s;
+}
+
+
+input:checked+.toggle {
+    background-color: rgba(204, 161, 82);
+}
+
+input:focus+.toggle {
+    box-shadow: 0 0 1px #2196F3;
+}
+
+input:checked+.toggle:before {
+    -webkit-transform: translateX(26px);
+    -ms-transform: translateX(26px);
+    transform: translateX(26px);
+    background-color: white;
+}
+
+.toggle.round {
+    border-radius: 34px;
+}
+
+.toggle.round:before {
+    border-radius: 50%;
+}
+
+.camera-controls-container {
+    width: 100%;
+}
+
+.cs-button {
+    background-color: rgb(0, 0, 0);
+    margin: 0.5vw;
+    color: rgba(204, 161, 82);
+    border: none;
+}
+
+.cs-button:hover {
+    background-color: rgb(23, 22, 22);
+}
+
+button:disabled,
+button[disabled] {
+    border: 1px solid #999999;
+    background-color: #cccccc;
+    color: #666666;
+    cursor: not-allowed;
+}
+
+.settings-list {
+    display: flex;
+}
+
+.settings-label {
+    margin:7px;
+    margin-right:15%;
+    color: rgba(204, 161, 82);
+    width:50%;
+    display:flex;
+    justify-content: space-between;
+    align-items:center;
+
+}
+
+.new-settings-container {
+    display: flex;
+    height: 10%;
+    width: 100%;
+}
+
+#new-name{
+    display:flex;
+    justify-content: space-around;
+    width: 30%;
+}
+
+#new-camera-settings-name{
+    width: 70%;
+}
+
+#setting-icon {
+    padding: 0.2vh;
+}
+
+.cs-wrapper {
+    width: 100%;
+    height: 100%;
+    padding-bottom: 0.5vh;
+    padding-top: 0.5vh;
+}
+
+.cs-container {
+    background-color: rgb(77, 75, 75);
+    width: 100%;
+    height: 100%;
+    /* margin-bottom:10px; */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 10px;
+}
+
+::-webkit-scrollbar {
+    width: 10px;
+}
+
+::-webkit-scrollbar-track {
+    background: rgb(0, 0, 0);
+}
+
+::-webkit-scrollbar-thumb {
+    background: #888;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #555;
+}
+</style>
