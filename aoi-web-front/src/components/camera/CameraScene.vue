@@ -206,7 +206,7 @@ export default {
         });
 
         watch(imageFileName, (newValue) => {
-            if(newValue)
+            if(newValue && canvas.backgroundImage)
             {
                 let link = document.createElement('a');
                 link.href = canvas.backgroundImage.getSrc().replace(/^data:image\/[^;]/, 'data:application/octet-stream');
@@ -218,7 +218,9 @@ export default {
         watch(imageSource, (newValue) => {
             if(show.value && canvas)
             {
-                canvas.setBackgroundImage(newValue, canvas.renderAll.bind(canvas), {});
+                fabric.Image.fromURL(newValue, function(img) {
+                    canvas.setBackgroundImage(img, canvas.renderAll.bind(canvas), {});
+                });
             }
         });
 
@@ -241,8 +243,7 @@ export default {
                 }
             });
 
-            canvas.backgroundImage = 0;
-            canvas.renderAll();
+            canvas.setBackgroundImage(null, canvas.renderAll.bind(canvas));
         }
 
         function selectionChanged(obj)

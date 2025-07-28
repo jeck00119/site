@@ -27,7 +27,12 @@ async function post(url, payload, headers){
         body: JSON.stringify(payload)
     });
 
-    return response;
+    const responseData = await response.json();
+
+    return {
+        response,
+        responseData
+    };
 }
 
 async function postStream(url, payload, headers){
@@ -55,7 +60,12 @@ async function update(url, payload, headers){
         body: JSON.stringify(payload)
     });
 
-    return response;
+    const responseData = await response.json();
+
+    return {
+        response,
+        responseData
+    };
 }
 
 async function remove(url, headers){
@@ -68,7 +78,12 @@ async function remove(url, headers){
         headers: headers
     });
 
-    return response;
+    const responseData = await response.json();
+
+    return {
+        response,
+        responseData
+    };
 }
 
 async function patch(url, payload, headers){

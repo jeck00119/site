@@ -36,11 +36,11 @@ export default {
             details: payload.details ? JSON.stringify(payload.details) : JSON.stringify(null)
         };
 
-        const response = await post(`http://${ipAddress}:${port}/log/add`, event);
+        const { response, responseData } = await post(`http://${ipAddress}:${port}/log/add`, event);
 
         if(!response.ok) 
         {
-            const error = new Error(`Could not add the event!`);
+            const error = new Error(responseData.detail || `Could not add the event!`);
             throw error;
         }
         else
@@ -53,11 +53,11 @@ export default {
         const events = context.getters.getEvents;
         const eventId = events.findIndex(event => event.timestamp === payload.timestamp);
 
-        const response = await remove(`http://${ipAddress}:${port}/log/${eventId}`);
+        const { response, responseData } = await remove(`http://${ipAddress}:${port}/log/${eventId}`);
 
         if(!response.ok) 
         {
-            const error = new Error(`Could not remove the event!`);
+            const error = new Error(responseData.detail || `Could not remove the event!`);
             throw error;
         }
         else

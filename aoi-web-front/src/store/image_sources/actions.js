@@ -64,14 +64,14 @@ export default {
 
         const token = context.rootGetters["auth/getToken"];
 
-        const response = await post(`http://${ipAddress}:${port}/image_source`, newSource, {
+        const { response, responseData } = await post(`http://${ipAddress}:${port}/image_source`, newSource, {
             "content-type": "application/json",
             "Authorization": token
         });
 
         if(!response.ok) 
         {
-            const error = new Error(`Could not create ${newSource.image_source_type}!`);
+            const error = new Error(responseData.detail || `Could not create ${newSource.image_source_type}!`);
             throw error;
         }
         else
@@ -91,14 +91,14 @@ export default {
     async removeImageSource(context,payload){
         const token = context.rootGetters["auth/getToken"];
 
-        const response = await remove(`http://${ipAddress}:${port}/image_source/${payload.uid}`, {
+        const { response, responseData } = await remove(`http://${ipAddress}:${port}/image_source/${payload.uid}`, {
             "content-type": "application/json",
             "Authorization": token
         });
 
         if(!response.ok) 
         {
-            const error = new Error(`Could not remove image source with ID ${payload.uid}!`);
+            const error = new Error(responseData.detail || `Could not remove image source with ID ${payload.uid}!`);
             throw error;
         }
         else
@@ -110,14 +110,14 @@ export default {
     async updateImageSource(context,payload){
         const token = context.rootGetters["auth/getToken"];
 
-        const response = await update(`http://${ipAddress}:${port}/image_source/${payload.uid}`, payload, {
+        const { response, responseData } = await update(`http://${ipAddress}:${port}/image_source/${payload.uid}`, payload, {
             "content-type": "application/json",
             "Authorization": token
         });
         
         if(!response.ok) 
         {
-            const error = new Error(`Could not update ${payload.name}!`);
+            const error = new Error(responseData.detail || `Could not update ${payload.name}!`);
             throw error;
         }
         else
@@ -139,14 +139,14 @@ export default {
 
         const token = context.rootGetters["auth/getToken"];
 
-        const response = await post(`http://${ipAddress}:${port}/image_generator`, newGenerator, {
+        const { response, responseData } = await post(`http://${ipAddress}:${port}/image_generator`, newGenerator, {
             "content-type": "application/json",
             "Authorization": token
         });
     
         if(!response.ok) 
         {
-            const error = new Error(`Could not create ${newSource.image_source_type}!`);
+            const error = new Error(responseData.detail || `Could not create image generator!`);
             throw error;
         }
         else
@@ -210,11 +210,11 @@ export default {
     },
 
     async closeImageSourceSocket(_, payload) {
-        const response = await post(`http://${ipAddress}:${port}/image_source/${payload.uid}/ws/close`);
+        const { response, responseData } = await post(`http://${ipAddress}:${port}/image_source/${payload.uid}/ws/close`);
 
         if(!response.ok)
         {
-            const error = new Error(`Failed to close socket for image source with ID ${payload.uid}!`);
+            const error = new Error(responseData.detail || `Failed to close socket for image source with ID ${payload.uid}!`);
             throw error;
         }
     }

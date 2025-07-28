@@ -80,21 +80,21 @@ export default {
     },
 
     async setSaveFailImgsFlag(_, payload) {
-        const response = await post(`http://${ipAddress}:${port}/processing/save_image_flag`, payload);
+        const { response, responseData } = await post(`http://${ipAddress}:${port}/processing/save_image_flag`, payload);
 
         if(!response.ok)
         {
-            const error = new Error(`Failed to toggle save fail images flag to ${payload}!`);
+            const error = new Error(responseData.detail || `Failed to toggle save fail images flag to ${payload}!`);
             throw error;
         }
     },
 
     async closeProcessStateSocket(_, payload) {
-        const response = await post(`http://${ipAddress}:${port}/processing/${payload.uid}/ws/close`);
+        const { response, responseData } = await post(`http://${ipAddress}:${port}/processing/${payload.uid}/ws/close`);
 
         if(!response.ok)
         {
-            const error = new Error(`Failed to close socket for CNC with ID ${payload.uid}!`);
+            const error = new Error(responseData.detail || `Failed to close socket for CNC with ID ${payload.uid}!`);
             throw error;
         }
     }
