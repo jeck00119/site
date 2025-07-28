@@ -5,7 +5,8 @@ async function get(url, headers){
 
     const response = await fetch(url, {
         method: 'GET',
-        headers: headers
+        headers: headers,
+        signal: AbortSignal.timeout(10000) // 10 second timeout
     });
 
     const responseData = await response.json();
@@ -24,7 +25,8 @@ async function post(url, payload, headers){
     const response = await fetch(url, {
         method: 'POST',
         headers: headers,
-        body: JSON.stringify(payload)
+        body: JSON.stringify(payload),
+        signal: AbortSignal.timeout(15000) // 15 second timeout for POST requests
     });
 
     const responseData = await response.json();
@@ -40,13 +42,30 @@ async function postStream(url, payload, headers){
         'Content-Type': 'multipart/form-data'
     };
 
-    const response = await fetch(url, {
-        method: 'POST',
-        headers: headers,
-        body: payload
-    });
+    try {
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: headers,
+            body: payload,
+            signal: AbortSignal.timeout(30000) // 30 second timeout for file uploads
+        });
 
-    return response;
+        let responseData = null;
+        try {
+            responseData = await response.json();
+        } catch (e) {
+            // If response is not JSON, that's okay for some endpoints
+            responseData = null;
+        }
+
+        return {
+            response,
+            responseData
+        };
+    } catch (error) {
+        console.error('PostStream request failed:', error);
+        throw error;
+    }
 }
 
 async function update(url, payload, headers){
@@ -57,7 +76,8 @@ async function update(url, payload, headers){
     const response = await fetch(url, {
         method: 'PUT',
         headers: headers,
-        body: JSON.stringify(payload)
+        body: JSON.stringify(payload),
+        signal: AbortSignal.timeout(15000) // 15 second timeout for PUT requests
     });
 
     const responseData = await response.json();
@@ -75,7 +95,8 @@ async function remove(url, headers){
 
     const response = await fetch(url, {
         method: 'DELETE',
-        headers: headers
+        headers: headers,
+        signal: AbortSignal.timeout(10000) // 10 second timeout for DELETE requests
     });
 
     const responseData = await response.json();
@@ -94,7 +115,8 @@ async function patch(url, payload, headers){
     const response = await fetch(url, {
         method: 'PATCH',
         headers: headers,
-        body: JSON.stringify(payload)
+        body: JSON.stringify(payload),
+        signal: AbortSignal.timeout(15000) // 15 second timeout for PATCH requests
     });
 
     return response;

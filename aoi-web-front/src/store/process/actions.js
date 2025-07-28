@@ -1,10 +1,8 @@
-import { get, patch, post, put } from "../../utils/requests"
-import { ipAddress, port } from "../../url.js";
+import api from "../../utils/api.js";
 
 export default {
     async startProcessing(_, payload) {
-        const url = `http://${ipAddress}:${port}/processing/start_process?offline=${payload.offline}`;
-        const { response, responseData } = await get(url);
+        const { response, responseData } = await api.get(`/processing/start_process?offline=${payload.offline}`);
         if (!response.ok) {
             const error = new Error(responseData.detail || "Failed to process with the current configuration!");
             throw error;
@@ -12,11 +10,11 @@ export default {
     },
 
     async stopProcessing() {
-        await get(`http://${ipAddress}:${port}/processing/stop_process`);
+        await api.get('/processing/stop_process');
     },
 
     async getCapabilityReport(context) {
-        const url = `http://${ipAddress}:${port}/processing/capability_report`
+        const url = await api.getFullUrl('/processing/capability_report');
 
         const response = await fetch(url, {
             method: 'GET',
@@ -37,21 +35,18 @@ export default {
 
 
     async getCapabilityState(context) {
-        const url = `http://${ipAddress}:${port}/processing/capability/state`
-        const { response, responseData } = await get(url);
+        const { response, responseData } = await api.get('/processing/capability/state');
         context.commit("setCapabilityState", responseData);
     },
 
     async getOffsetState(context) {
-        const url = `http://${ipAddress}:${port}/processing/offset/state`
-        const { response, responseData } = await get(url);
+        const { response, responseData } = await api.get('/processing/offset/state');
         context.commit("setOffsetState", responseData);
 
     },
 
     async getItacState(context) {
-        const url = `http://${ipAddress}:${port}/processing/itac/state`
-        const { response, responseData } = await get(url);
+        const { response, responseData } = await api.get('/processing/itac/state');
         context.commit("setItacState", responseData);
 
     },
@@ -59,20 +54,17 @@ export default {
     async postCapabilityState(context) {
         const negCapabilityState = !context.state.capabilityState
 
-        const url = `http://${ipAddress}:${port}/processing/capability/state?state=${negCapabilityState}`
-        const { response, responseData } = await put(url)
+        const { response, responseData } = await api.put(`/processing/capability/state?state=${negCapabilityState}`)
     },
 
     async postOffsetState(context) {
         const negOffsetState = !context.state.offsetState
-        const url = `http://${ipAddress}:${port}/processing/offset/state?state=${negOffsetState}`
-        const { response, responseData } = await put(url)
+        const { response, responseData } = await api.put(`/processing/offset/state?state=${negOffsetState}`)
     },
 
     async postItacState(context) {
         const negItacState = !context.state.itacState
-        const url = `http://${ipAddress}:${port}/processing/itac/state?state=${negItacState}`
-        const { response, responseData } = await put(url)
+        const { response, responseData } = await api.put(`/processing/itac/state?state=${negItacState}`)
     },
 
     resetInspectionResultsStatus(context) {
@@ -80,7 +72,7 @@ export default {
     },
 
     async setSaveFailImgsFlag(_, payload) {
-        const { response, responseData } = await post(`http://${ipAddress}:${port}/processing/save_image_flag`, payload);
+        const { response, responseData } = await api.post('/processing/save_image_flag', payload);
 
         if(!response.ok)
         {
@@ -90,7 +82,7 @@ export default {
     },
 
     async closeProcessStateSocket(_, payload) {
-        const { response, responseData } = await post(`http://${ipAddress}:${port}/processing/${payload.uid}/ws/close`);
+        const { response, responseData } = await api.post(`/processing/${payload.uid}/ws/close`);
 
         if(!response.ok)
         {

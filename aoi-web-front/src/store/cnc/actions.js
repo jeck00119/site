@@ -131,7 +131,7 @@ export default {
     },
 
     async loadLocations(context,_){
-        const { response, responseData } = await get('http://localhost:8000/location');
+        const { response, responseData } = await get(`http://${ipAddress}:${port}/location`);
         if(!response.ok)
         {
             const error = new Error(responseData.detail || `Failed to load Locations!`);

@@ -9,24 +9,28 @@ import './style.css';
 import UUID from 'vue3-uuid';
 
 import { library } from '@fortawesome/fontawesome-svg-core';
-import { faPhone, faHouse, faMagnifyingGlassChart, faScrewdriverWrench, faGear, faGears, faUser,
-    faQuestion, faClipboardCheck, faCamera, faRepeat, faImage, faTrashCan,
-    faSdCard, faPlay, faCubesStacked, faFloppyDisk, faPlus, faTrash, faArrowsRotate, faArrowRotateLeft, 
-    faEject, faStop, faArrowRotateRight, faLockOpen, faMinus, faSignature, faFlagCheckered, faNetworkWired, 
-    faPlayCircle, faCheck, faX, faVideoCamera, faImages, faExclamationCircle, faArrowRight, faToggleOn, faToggleOff, 
-    faFolderOpen, faLocationDot, faMagnifyingGlass, faArrowsUpDownLeftRight, faSun, faCircleHalfStroke, faDroplet,
-    faGem, faChartLine, faPlusMinus, faWandMagicSparkles, faCameraRotate, faAnglesRight, faE, faExpand, faArrowsLeftRight, faCrop, faClock, faFileCirclePlus, faCircleInfo  } from '@fortawesome/free-solid-svg-icons';
+// All actually used icons - verified from codebase usage
+import { faHouse, faMagnifyingGlassChart, faScrewdriverWrench, faGear, faGears, faUser,
+    faClipboardCheck, faCamera, faPlay, faStop, faPlus, faTrash, faCheck, faX,
+    faExclamationCircle, faCircleInfo, faImages, faFloppyDisk, faVideoCamera, faMinus,
+    faTrashCan, faToggleOn, faToggleOff, faFileCirclePlus, faFolderOpen, faMagnifyingGlass,
+    faLocationDot, faClock, faArrowsUpDownLeftRight, faSun, faCircleHalfStroke, faDroplet,
+    faGem, faChartLine, faPlusMinus, faWandMagicSparkles, faCameraRotate, faArrowsLeftRight,
+    faExpand, faCrop, faSignature, faFlagCheckered, faNetworkWired, faPlayCircle, faImage,
+    faSdCard, faArrowsRotate, faArrowRotateLeft, faArrowRotateRight, faLockOpen, faCubesStacked } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome';
 
 import { OhVueIcon, addIcons } from 'oh-vue-icons';
+// All actually used OhVueIcons - verified from codebase usage
 import { BiPlayCircleFill, IoServerSharp, SiSpeedtest, OiDiffRenamed, SiKdenlive,
     BiCameraVideoFill, MdRepeatoneOutlined, RiSave3Fill, FaFileImport, FaFileExport,
     BiStopFill, FaFileUpload, FaFileDownload, IoAddCircleSharp, MdModeeditoutlineSharp,
-    MdDeleteRound, FcDisclaimer, FcUnlock, FcOk, FcCameraAddon, FcCommandLine, FcSupport, FcCancel,
-    IoSendSharp, IoRocketSharp, FaRegularSmile, HiEmojiSad, CoMatrix, FaCog, BiExclamationCircleFill, BiTriangleHalf,
-    HiSolidQuestionMarkCircle, MdRestartalt, FaServer, MdViewarrayRound, FaExclamationTriangle, FaCopy, FaInfoCircle,
-    LaClipboardListSolid, MdSettingsinputcomponent, SiTarget, MdDashboardcustomize, FaListUl, CoCameraControl,
-    BiBugFill, FaTrash, ViFileTypeLightJson, OiFileDirectoryOpenFill } from 'oh-vue-icons/icons';
+    MdDeleteRound, FcDisclaimer, FcUnlock, FcOk, FcCameraAddon, FcCommandLine, FcSupport, 
+    FcCancel, IoSendSharp, FaServer, MdRestartalt, CoMatrix, MdViewarrayRound,
+    FaExclamationTriangle, FaCopy, LaClipboardListSolid, MdSettingsinputcomponent,
+    SiTarget, MdDashboardcustomize, FaListUl, CoCameraControl, BiBugFill, FaTrash,
+    ViFileTypeLightJson, OiFileDirectoryOpenFill, BiExclamationCircleFill,
+    HiSolidQuestionMarkCircle, FaCog } from 'oh-vue-icons/icons';
 
 import ContextMenu from '@imengyu/vue3-context-menu'
 import '@imengyu/vue3-context-menu/lib/vue3-context-menu.css'
@@ -55,46 +59,58 @@ import BaseFileLoader from './components/base/BaseFileLoader.vue';
 
 const app = createApp(App);
 
-library.add(faPhone);
+// Global error handler for better error tracking and user experience
+app.config.errorHandler = (err, instance, info) => {
+    // Log error details for debugging
+    console.error('🚨 Global Vue Error:', {
+        error: err,
+        component: instance?.$options?.name || 'Unknown Component',
+        errorInfo: info,
+        timestamp: new Date().toISOString()
+    });
+    
+    // In production, you would send this to an error tracking service like Sentry
+    // Example: Sentry.captureException(err, { extra: { info, component: instance?.$options?.name } });
+    
+    // Show user-friendly notification
+    if (instance && instance.$store) {
+        instance.$store.dispatch('errors/addError', {
+            message: 'An unexpected error occurred. Please try refreshing the page.',
+            type: 'error',
+            timestamp: Date.now()
+        });
+    }
+};
+
+// Add all actually used icons
 library.add(faHouse);
 library.add(faMagnifyingGlassChart);
 library.add(faScrewdriverWrench);
 library.add(faGear);
 library.add(faGears);
 library.add(faUser);
-library.add(faQuestion);
 library.add(faClipboardCheck);
 library.add(faCamera);
-library.add(faRepeat);
-library.add(faImage);
-library.add(faNetworkWired);
-library.add(faTrashCan);
-library.add(faSdCard);
 library.add(faPlay);
-library.add(faCubesStacked);
-library.add(faFloppyDisk);
+library.add(faStop);
 library.add(faPlus);
 library.add(faTrash);
-library.add(faArrowsRotate);
-library.add(faArrowRotateLeft);
-library.add(faArrowRotateRight)
-library.add(faLockOpen)
-library.add(faStop)
-library.add(faMinus)
-library.add(faSignature);
-library.add(faFlagCheckered);
-library.add(faPlayCircle);
 library.add(faCheck);
 library.add(faX);
-library.add(faVideoCamera);
-library.add(faImages);
 library.add(faExclamationCircle);
-library.add(faArrowRight);
+library.add(faCircleInfo);
+library.add(faImages);
+library.add(faFloppyDisk);
+library.add(faVideoCamera);
+library.add(faMinus);
+library.add(faTrashCan);
 library.add(faToggleOn);
 library.add(faToggleOff);
+library.add(faFileCirclePlus);
 library.add(faFolderOpen);
 library.add(faMagnifyingGlass);
 library.add(faLocationDot);
+library.add(faClock);
 library.add(faArrowsUpDownLeftRight);
 library.add(faSun);
 library.add(faCircleHalfStroke);
@@ -104,26 +120,36 @@ library.add(faChartLine);
 library.add(faPlusMinus);
 library.add(faWandMagicSparkles);
 library.add(faCameraRotate);
-library.add(faAnglesRight);
-library.add(faExpand);
 library.add(faArrowsLeftRight);
+library.add(faExpand);
 library.add(faCrop);
-library.add(faClock);
-library.add(faFileCirclePlus);
-library.add(faCircleInfo);
+library.add(faSignature);
+library.add(faFlagCheckered);
+library.add(faNetworkWired);
+library.add(faPlayCircle);
+library.add(faImage);
+library.add(faSdCard);
+library.add(faArrowsRotate);
+library.add(faArrowRotateLeft);
+library.add(faArrowRotateRight);
+library.add(faLockOpen);
+library.add(faCubesStacked);
 
 
 
 
 
 
-addIcons(BiPlayCircleFill, IoServerSharp, SiSpeedtest, OiDiffRenamed, SiKdenlive, BiCameraVideoFill,
-    MdRepeatoneOutlined, RiSave3Fill, FaFileImport, FaFileExport, BiStopFill, FaFileUpload, FaFileDownload,
-    IoAddCircleSharp, MdModeeditoutlineSharp, MdDeleteRound, FcDisclaimer, FcUnlock, FcOk, FcCameraAddon,
-    FcCommandLine, FcSupport, FcCancel, IoSendSharp, IoRocketSharp, FaRegularSmile, HiEmojiSad, CoMatrix, FaCog,
-    BiExclamationCircleFill, HiSolidQuestionMarkCircle, MdRestartalt, FaServer, MdViewarrayRound, FaExclamationTriangle,
-    FaCopy, FaInfoCircle, LaClipboardListSolid, MdSettingsinputcomponent, SiTarget, MdDashboardcustomize,
-    FaListUl, CoCameraControl, BiBugFill, FaTrash, ViFileTypeLightJson, OiFileDirectoryOpenFill);
+// Add all actually used OhVueIcons
+addIcons(BiPlayCircleFill, IoServerSharp, SiSpeedtest, OiDiffRenamed, SiKdenlive,
+    BiCameraVideoFill, MdRepeatoneOutlined, RiSave3Fill, FaFileImport, FaFileExport,
+    BiStopFill, FaFileUpload, FaFileDownload, IoAddCircleSharp, MdModeeditoutlineSharp,
+    MdDeleteRound, FcDisclaimer, FcUnlock, FcOk, FcCameraAddon, FcCommandLine, FcSupport,
+    FcCancel, IoSendSharp, FaServer, MdRestartalt, CoMatrix, MdViewarrayRound,
+    FaExclamationTriangle, FaCopy, LaClipboardListSolid, MdSettingsinputcomponent,
+    SiTarget, MdDashboardcustomize, FaListUl, CoCameraControl, BiBugFill, FaTrash,
+    ViFileTypeLightJson, OiFileDirectoryOpenFill, BiExclamationCircleFill,
+    HiSolidQuestionMarkCircle, FaCog);
 
 app.component('base-slider', BaseSlider);
 app.component('base-integer-input', BaseIntegerInputBox);

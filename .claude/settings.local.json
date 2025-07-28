@@ -1,0 +1,29 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pip install:*)",
+      "Bash(pip show:*)",
+      "Bash(python:*)",
+      "Bash(E:\\.venv\\Scripts\\python.exe:*)",
+      "Bash(\"E:\\site\\.venv\\Scripts\\python.exe\" \"E:\\site\\backend-flask\\main.py\")",
+      "Bash(pip uninstall:*)",
+      "Bash(mv:*)",
+      "Bash(rm:*)",
+      "Bash(curl:*)",
+      "Bash(npm run dev:*)",
+      "Bash(node:*)",
+      "Bash(npm install:*)",
+      "Bash(npm run build:*)",
+      "Bash(chmod:*)",
+      "Bash(mkdir:*)",
+      "Bash(ls:*)",
+      "Bash(restart_backend_fixed.bat)",
+      "Bash(cmd:*)",
+      "Bash(if exist test_cors_fix.py del test_cors_fix.py)",
+      "Bash(git config:*)",
+      "Bash(git add:*)",
+      "Bash(git rm:*)"
+    ],
+    "deny": []
+  }
+}

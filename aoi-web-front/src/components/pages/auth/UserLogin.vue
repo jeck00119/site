@@ -77,24 +77,57 @@ export default{
         async function login() {
             let error = false;
 
+            // Enhanced email validation
             if(email.value === '')
             {
                 setNotification(3000, `Please enter your email.`, 'bi-exclamation-circle-fill');
                 error = true;
             }
+            else 
+            {
+                // Email format validation
+                const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                if (!emailRegex.test(email.value)) {
+                    setNotification(3000, `Please enter a valid email address.`, 'bi-exclamation-circle-fill');
+                    error = true;
+                }
+                
+                // Email length validation
+                if (email.value.length > 254) {
+                    setNotification(3000, `Email address is too long.`, 'bi-exclamation-circle-fill');
+                    error = true;
+                }
+            }
 
+            // Enhanced password validation
             if(password.value === '')
             {
                 setNotification(3000, `Please enter your password.`, 'bi-exclamation-circle-fill');
                 error = true;
             }
+            else 
+            {
+                // Password length validation
+                if (password.value.length < 3) {
+                    setNotification(3000, `Password must be at least 3 characters long.`, 'bi-exclamation-circle-fill');
+                    error = true;
+                }
+                
+                if (password.value.length > 128) {
+                    setNotification(3000, `Password is too long.`, 'bi-exclamation-circle-fill');
+                    error = true;
+                }
+            }
 
             if(!error)
             {
+                // Sanitize input to prevent XSS
+                const sanitizedEmail = email.value.trim().toLowerCase();
+                const sanitizedPassword = password.value.trim();
+                
                 const user = new FormData();
-
-                user.append('username', email.value);
-                user.append('password', password.value);
+                user.append('username', sanitizedEmail);
+                user.append('password', sanitizedPassword);
                 
                 try {
                     await store.dispatch("auth/login", user);

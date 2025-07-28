@@ -117,9 +117,6 @@ export default {
             }).catch(() => {
                 setNotification(3000, err, 'bi-exclamation-circle-fill');
             });
-            // } catch (err) {
-            //     setNotification(3000, err, 'bi-exclamation-circle-fill')
-            // }
         }
 
         async function saveItac() {

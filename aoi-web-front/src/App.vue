@@ -54,7 +54,9 @@ export default {
 
     function connectToSocket() {
       ws_uid = uuid.v4();
-      configurationSocket = new WebSocket(`ws://${ipAddress}:${port}/configurations/configuration_changes/${ws_uid}/ws`);
+      // Use secure WebSocket protocol based on current page protocol
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      configurationSocket = new WebSocket(`${protocol}//${ipAddress}:${port}/configurations/configuration_changes/${ws_uid}/ws`);
 
       configurationSocket.addEventListener('open', onConfigurationSocketOpen);
       configurationSocket.addEventListener('message', configurationChanged);
@@ -87,7 +89,8 @@ export default {
 
     async function onLoad() {
       await store.dispatch("configurations/tryLoadConfiguration");
-      store.dispatch("log/loadEvents");
+      // Temporarily disabled due to CORS issues - will re-enable after backend fix
+      // store.dispatch("log/loadEvents");
 
       const configuration = store.getters["configurations/getCurrentConfiguration"];
 

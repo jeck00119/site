@@ -1,79 +1,90 @@
-import { get, post } from "../../utils/requests";
-import { ipAddress, port } from "../../url.js";
+import api from "../../utils/api.js";
 
 export default {
     async loadEvents(context) {
-        const  { response, responseData } = await get(`http://${ipAddress}:${port}/media/events`);
+        try {
+            const { response, responseData } = await api.get('/media/events');
 
-        if(!response.ok)
-        {
-            const error = new Error(`Failed to load events!`);
+            if (!response.ok) {
+                const error = new Error(`Failed to load events!`);
+                throw error;
+            } else {
+                context.commit('setEvents', responseData);
+            }
+        } catch (error) {
+            console.error('Failed to load media events:', error);
             throw error;
-        }
-        else
-        {
-            context.commit('setEvents', responseData);
         }
     },
 
     async loadChannels(context) {
-        const  { response, responseData } = await get(`http://${ipAddress}:${port}/media/channels`);
+        try {
+            const { response, responseData } = await api.get('/media/channels');
 
-        if(!response.ok)
-        {
-            const error = new Error(`Failed to load events!`);
+            if (!response.ok) {
+                const error = new Error(`Failed to load channels!`);
+                throw error;
+            } else {
+                context.commit('setChannels', responseData);
+            }
+        } catch (error) {
+            console.error('Failed to load media channels:', error);
             throw error;
-        }
-        else
-        {
-            context.commit('setChannels', responseData);
         }
     },
 
     async loadFiles(context) {
-        const { response, responseData } = await get(`http://${ipAddress}:${port}/media/files`);
+        try {
+            const { response, responseData } = await api.get('/media/files');
 
-        if(!response.ok)
-        {
-            const error = new Error(`Failed to load events!`);
+            if (!response.ok) {
+                const error = new Error(`Failed to load files!`);
+                throw error;
+            } else {
+                context.commit('setFiles', responseData);
+            }
+        } catch (error) {
+            console.error('Failed to load media files:', error);
             throw error;
-        }
-        else
-        {
-            context.commit('setFiles', responseData);
         }
     },
 
     async addChannel(context) {
-        const token = context.rootGetters["auth/getToken"];
-        
-        const response = await post(`http://${ipAddress}:${port}/media/channel`, {
-            "content-type": "application/json",
-            "Authorization": token
-        });
+        try {
+            const token = context.rootGetters["auth/getToken"];
+            
+            const { response } = await api.post('/media/channel', {}, {
+                "content-type": "application/json",
+                "Authorization": token
+            });
 
-        if(!response.ok)
-        {
-            const error = new Error(`Failed to add channel!`);
+            if (!response.ok) {
+                const error = new Error(`Failed to add channel!`);
+                throw error;
+            } else {
+                context.commit('addChannel');
+            }
+        } catch (error) {
+            console.error('Failed to add media channel:', error);
             throw error;
-        }
-        else
-        {
-            context.commit('addChannel');
         }
     },
 
     async addEvent(context, payload) {
-        const token = context.rootGetters["auth/getToken"];
-         
-        const response = await post(`http://${ipAddress}:${port}/media/add_event`, payload, {
-            "content-type": "application/json",
-            "Authorization": token
-        });
+        try {
+            const token = context.rootGetters["auth/getToken"];
+             
+            const { response } = await api.post('/media/add_event', payload, {
+                "content-type": "application/json",
+                "Authorization": token
+            });
 
-        if(!response.ok)
-        {
-            const error = new Error(`Failed to add event!`);
+            if (!response.ok) {
+                const error = new Error(`Failed to add event!`);
+                throw error;
+            }
+        } catch (error) {
+            console.error('Failed to add media event:', error);
             throw error;
         }
     }

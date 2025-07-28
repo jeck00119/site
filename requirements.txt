@@ -35,6 +35,6 @@ transitions
 ttach
 ultralytics
 uvicorn
-python-vlc
+pygame
 wsproto
 xarm

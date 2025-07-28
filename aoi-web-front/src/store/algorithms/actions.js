@@ -1,108 +1,114 @@
 import { uuid } from "vue3-uuid";
-import { get, post, update, remove, postStream } from '../../utils/requests.js';
-import { ipAddress, port } from "../../url.js";
+import api from "../../utils/api.js";
 import { GraphicsRect } from "../../utils/fabric_objects.js";
+import { get, post, update, postStream } from '../../utils/requests.js';
+import { ipAddress, port } from '../../url.js';
 
 export default {
     async loadAlgorithms(context) {
-        const { response, responseData } = await get(`http://${ipAddress}:${port}/algorithm/types`);
+        try {
+            const { response, responseData } = await api.get('/algorithm/types');
 
-        if(!response.ok) 
-        {
-            const error = new Error(responseData.detail || "Failed to fetch the algorithms!");
-            throw error;
-        }
-        else
-        {
-            const algorithms = []
+            if (!response.ok) {
+                const error = new Error(responseData.detail || "Failed to fetch the algorithms!");
+                throw error;
+            } else {
+                const algorithms = []
 
-            for (const key in responseData)
-            {
-                const algorithm = {
-                    uid: uuid.v4(),
-                    type: responseData[key]
-                };
+                for (const key in responseData) {
+                    const algorithm = {
+                        uid: uuid.v4(),
+                        type: responseData[key]
+                    };
 
-                algorithms.push(algorithm);
+                    algorithms.push(algorithm);
+                }
+
+                context.commit('setAlgorithms', algorithms);
             }
-
-            context.commit('setAlgorithms', algorithms);
+        } catch (error) {
+            console.error('Failed to load algorithms:', error);
+            throw error;
         }
     },
 
     async loadBasicAlgorithms(context) {
-        const { response, responseData } = await get(`http://${ipAddress}:${port}/algorithm/basic/types`);
+        try {
+            const { response, responseData } = await api.get('/algorithm/basic/types');
 
-        if(!response.ok) 
-        {
-            const error = new Error(responseData.detail || "Failed to fetch basic algorithms!");
+            if (!response.ok) {
+                const error = new Error(responseData.detail || "Failed to fetch basic algorithms!");
+                throw error;
+            } else {
+                context.commit('setBasicAlgorithms', responseData);
+            }
+        } catch (error) {
+            console.error('Failed to load basic algorithms:', error);
             throw error;
-        }
-        else
-        {
-            context.commit('setBasicAlgorithms', responseData);
         }
     },
 
     async loadReferenceAlgorithms(context) {
-        const { response, responseData } = await get(`http://${ipAddress}:${port}/algorithm/reference/types`);
+        try {
+            const { response, responseData } = await api.get('/algorithm/reference/types');
 
-        if(!response.ok) 
-        {
-            const error = new Error(responseData.detail || "Failed to fetch reference algorithms!");
-            throw error;
-        }
-        else
-        {
-            const algorithms = []
+            if (!response.ok) {
+                const error = new Error(responseData.detail || "Failed to fetch reference algorithms!");
+                throw error;
+            } else {
+                const algorithms = []
 
-            for (const key in responseData)
-            {
-                const algorithm = {
-                    uid: uuid.v4(),
-                    type: responseData[key]
-                };
+                for (const key in responseData) {
+                    const algorithm = {
+                        uid: uuid.v4(),
+                        type: responseData[key]
+                    };
 
-                algorithms.push(algorithm);
+                    algorithms.push(algorithm);
+                }
+
+                context.commit('setReferenceAlgorithms', algorithms);
             }
-
-            context.commit('setReferenceAlgorithms', algorithms);
+        } catch (error) {
+            console.error('Failed to load reference algorithms:', error);
+            throw error;
         }
     },
 
     async loadConfiguredAlgorithms(context) {
-        const token = context.rootGetters["auth/getToken"];
+        try {
+            const token = context.rootGetters["auth/getToken"];
 
-        const { response, responseData } = await get(`http://${ipAddress}:${port}/algorithm`, {
-            'content-type': 'application/json',
-            'Authorization': token
-        });
+            const { response, responseData } = await api.get('/algorithm', {
+                'content-type': 'application/json',
+                'Authorization': token
+            });
 
-        if(!response.ok) 
-        {
-            const error = new Error(responseData.detail || "Failed to fetch configured algorithms!");
-            throw error;
-        }
-        else
-        {
-            const algorithms = []
+            if (!response.ok) {
+                const error = new Error(responseData.detail || "Failed to fetch configured algorithms!");
+                throw error;
+            } else {
+                const algorithms = []
 
-            for (const key in responseData)
-            {
-                const algorithm = {
-                    uid: responseData[key].uid,
-                    type: responseData[key].type
-                };
+                for (const key in responseData) {
+                    const algorithm = {
+                        uid: responseData[key].uid,
+                        type: responseData[key].type
+                    };
 
-                algorithms.push(algorithm);
+                    algorithms.push(algorithm);
+                }
+
+                context.commit('setConfiguredAlgorithms', algorithms);
             }
-
-            context.commit('setConfiguredAlgorithms', algorithms);
+        } catch (error) {
+            console.error('Failed to load configured algorithms:', error);
+            throw error;
         }
     },
 
     async loadCurrentAlgorithm(context, payload) {
-        const { response, responseData } = await get(`http://${ipAddress}:${port}/algorithm/${payload.uid}`);
+        const { response, responseData } = await api.get(`/algorithm/${payload.uid}`);
 
         if(!response.ok)
         {
@@ -143,7 +149,7 @@ export default {
     },
 
     async loadCurrentReferenceAlgorithm(context, payload) {
-        const { response, responseData } = await get(`http://${ipAddress}:${port}/algorithm/${payload.uid}`);
+        const { response, responseData } = await api.get(`/algorithm/${payload.uid}`);
 
         if(!response.ok)
         {
@@ -182,7 +188,7 @@ export default {
     },
 
     async loadAlgorithm(context, payload) {
-        const { response, responseData } = await get(`http://${ipAddress}:${port}/algorithm/types/${payload.type}`);
+        const { response, responseData } = await api.get(`/algorithm/types/${payload.type}`);
 
         if(!response.ok)
         {
@@ -196,7 +202,7 @@ export default {
     },
 
     async loadReferenceAlgorithm(context, payload) {
-        const { response, responseData } = await get(`http://${ipAddress}:${port}/algorithm/reference/types/${payload.type}`);
+        const { response, responseData } = await api.get(`/algorithm/reference/types/${payload.type}`);
 
         if(!response.ok)
         {
@@ -340,7 +346,7 @@ export default {
     async removeAlgorithm(context, payload) {
         const token = context.rootGetters["auth/getToken"];
 
-        const response = await remove(`http://${ipAddress}:${port}/algorithm/${payload.uid}`, {
+        const { response } = await api.delete(`/algorithm/${payload.uid}`, {
             'content-type': 'application/json',
             'Authorization': token
         });
@@ -359,7 +365,7 @@ export default {
     async addAlgorithm(context, payload) {
         const token = context.rootGetters["auth/getToken"];
 
-        const response = await post(`http://${ipAddress}:${port}/algorithm`, payload, {
+        const { response } = await api.post('/algorithm', payload, {
             'content-type': 'application/json',
             'Authorization': token
         });
@@ -376,36 +382,46 @@ export default {
     },
 
     async updateConfiguredAlgorithm(context, payload) {
-        const token = context.rootGetters["auth/getToken"];
+        try {
+            const token = context.rootGetters["auth/getToken"];
 
-        const response = await update(`http://${ipAddress}:${port}/algorithm/${payload.uid}`, payload, {
-            'content-type': 'application/json',
-            'Authorization': token
-        });
+            const { response } = await api.update(`/algorithm/${payload.uid}`, payload, {
+                'content-type': 'application/json',
+                'Authorization': token
+            });
 
-        if(!response.ok)
-        {
-            const error = new Error("Failed to update the algorithm!");
+            if(!response.ok)
+            {
+                const error = new Error("Failed to update the algorithm!");
+                throw error;
+            }
+        } catch (error) {
+            console.error('Failed to update configured algorithm:', error);
             throw error;
         }
     },
 
     async addConfiguredAlgorithm(context, payload) {
-        const token = context.rootGetters["auth/getToken"];
+        try {
+            const token = context.rootGetters["auth/getToken"];
 
-        const response = await post(`http://${ipAddress}:${port}/algorithm`, payload, {
-            'content-type': 'application/json',
-            'Authorization': token
-        });
+            const { response } = await api.post('/algorithm', payload, {
+                'content-type': 'application/json',
+                'Authorization': token
+            });
 
-        if(!response.ok)
-        {
-            const error = new Error("Failed to update the algorithm!");
+            if(!response.ok)
+            {
+                const error = new Error("Failed to update the algorithm!");
+                throw error;
+            }
+            else
+            {
+                context.commit('addConfiguredAlgorithm', payload);
+            }
+        } catch (error) {
+            console.error('Failed to add configured algorithm:', error);
             throw error;
-        }
-        else
-        {
-            context.commit('addConfiguredAlgorithm', payload);
         }
     },
 
@@ -418,141 +434,191 @@ export default {
     },
 
     async updateCurrentAlgorithmProperty(context, payload) {
-        const response = await post(`http://${ipAddress}:${port}/algorithm/__API__/edit_live_algorithm`, {
-            key: payload.name,
-            value: payload.value
-        });
+        try {
+            const { response } = await api.post('/algorithm/__API__/edit_live_algorithm', {
+                key: payload.name,
+                value: payload.value
+            });
 
-        if(!response.ok)
-        {
-            const error = new Error("Failed to edit live algorithm graphics!");
+            if(!response.ok)
+            {
+                const error = new Error("Failed to edit live algorithm graphics!");
+                throw error;
+            }
+            else
+            {
+                context.commit('updateCurrentAlgorithmProperty', payload);
+            }
+        } catch (error) {
+            console.error('Failed to update current algorithm property:', error);
             throw error;
-        }
-        else
-        {
-            context.commit('updateCurrentAlgorithmProperty', payload);
         }
     },
 
     async updateCurrentReferenceAlgorithmProperty(context, payload) {
-        const response = await post(`http://${ipAddress}:${port}/algorithm/__API__/edit_reference_algorithm`, {
-            key: payload.name,
-            value: payload.value
-        });
+        try {
+            const { response } = await api.post('/algorithm/__API__/edit_reference_algorithm', {
+                key: payload.name,
+                value: payload.value
+            });
 
-        if(!response.ok)
-        {
-            const error = new Error("Failed to edit live algorithm graphics!");
+            if(!response.ok)
+            {
+                const error = new Error("Failed to edit live algorithm graphics!");
+                throw error;
+            }
+            else
+            {
+                context.commit('updateCurrentReferenceAlgorithmProperty', payload);
+            }
+        } catch (error) {
+            console.error('Failed to update current reference algorithm property:', error);
             throw error;
-        }
-        else
-        {
-            context.commit('updateCurrentReferenceAlgorithmProperty', payload);
         }
     },
 
     async uploadResource(_, payload) {
-        const response = await postStream(`http://${ipAddress}:${port}/algorithm/__API__/upload_resource`,
-            payload, {}
-        );
+        try {
+            const { response } = await api.postStream('/algorithm/__API__/upload_resource',
+                payload, {}
+            );
 
-        if(!response.ok)
-        {
-            const error = new Error("Failed to load resource!");
+            if(!response.ok)
+            {
+                const error = new Error("Failed to load resource!");
+                throw error;
+            }
+        } catch (error) {
+            console.error('Failed to upload resource:', error);
             throw error;
         }
     },
 
     async setLiveAlgorithm(_, payload) {
-        const { response, _2 } = await get(`http://${ipAddress}:${port}/algorithm/__API__/set_live_algorithm/${payload.type}`);
+        try {
+            const { response } = await api.get(`/algorithm/__API__/set_live_algorithm/${payload.type}`);
 
-        if(!response.ok)
-        {
-            const error = new Error("Failed to update live algorithm!");
+            if(!response.ok)
+            {
+                const error = new Error("Failed to update live algorithm!");
+                throw error;
+            }
+        } catch (error) {
+            console.error('Failed to set live algorithm:', error);
             throw error;
         }
     },
 
     async setReferenceAlgorithm(_, payload) {
-        const { response, _2 } = await get(`http://${ipAddress}:${port}/algorithm/__API__/set_reference_algorithm/${payload.type}`);
+        try {
+            const { response } = await api.get(`/algorithm/__API__/set_reference_algorithm/${payload.type}`);
 
-        if(!response.ok)
-        {
-            const error = new Error("Failed to update reference algorithm!");
+            if(!response.ok)
+            {
+                const error = new Error("Failed to update reference algorithm!");
+                throw error;
+            }
+        } catch (error) {
+            console.error('Failed to set reference algorithm:', error);
             throw error;
         }
     },
 
     async setLiveAlgorithmReferenceRepository(_, payload) {
-        const { response, _3 } = await get(`http://${ipAddress}:${port}/algorithm/__API__/set_live_algorithm_reference/${payload.id}`);
+        try {
+            const { response } = await api.get(`/algorithm/__API__/set_live_algorithm_reference/${payload.id}`);
 
-        if(!response.ok)
-        {
-            const error = new Error("Failed to update live algorithm reference!");
+            if(!response.ok)
+            {
+                const error = new Error("Failed to update live algorithm reference!");
+                throw error;
+            }
+        } catch (error) {
+            console.error('Failed to set live algorithm reference repository:', error);
             throw error;
         }
     },
 
     async setLiveAlgorithmReferenceFromDict(_, payload) {
-        const response = await post(`http://${ipAddress}:${port}/algorithm/__API__/set_live_algorithm_reference_dict`, payload);
+        try {
+            const { response } = await api.post('/algorithm/__API__/set_live_algorithm_reference_dict', payload);
 
-        if(!response.ok)
-        {
-            const error = new Error("Failed to update live algorithm reference!");
+            if(!response.ok)
+            {
+                const error = new Error("Failed to update live algorithm reference!");
+                throw error;
+            }
+        } catch (error) {
+            console.error('Failed to set live algorithm reference from dict:', error);
             throw error;
         }
     },
 
     async setLiveAlgorithmReference() {
-        const {response, _} = await get(`http://${ipAddress}:${port}/algorithm/__API__/set_live_algorithm_reference`);
+        try {
+            const { response } = await api.get('/algorithm/__API__/set_live_algorithm_reference');
 
-        if(!response.ok)
-        {
-            const error = new Error("Failed to update live algorithm reference!");
+            if(!response.ok)
+            {
+                const error = new Error("Failed to update live algorithm reference!");
+                throw error;
+            }
+        } catch (error) {
+            console.error('Failed to set live algorithm reference:', error);
             throw error;
         }
     },
 
     async resetLiveAlgorithmReference() {
-        const {response, _} = await get(`http://${ipAddress}:${port}/algorithm/__API__/reset_live_algorithm_reference`);
+        try {
+            const { response } = await api.get('/algorithm/__API__/reset_live_algorithm_reference');
 
-        if(!response.ok)
-        {
-            const error = new Error("Failed to reset live algorithm reference!");
+            if(!response.ok)
+            {
+                const error = new Error("Failed to reset live algorithm reference!");
+                throw error;
+            }
+        } catch (error) {
+            console.error('Failed to reset live algorithm reference:', error);
             throw error;
         }
     },
 
     async setLiveAlgorithmAttributes(context, payload) {
-        const algorithmAttributes = context.getters.getCurrentAlgorithmAttributes;
-        const currentAlgorithm = context.getters.getCurrentAlgorithm;
+        try {
+            const algorithmAttributes = context.getters.getCurrentAlgorithmAttributes;
+            const currentAlgorithm = context.getters.getCurrentAlgorithm;
 
-        for(const key in algorithmAttributes)
-        {
+            for(const key in algorithmAttributes)
+            {
+                const data = {
+                    "key": algorithmAttributes[key].name,
+                    "value": currentAlgorithm.parameters[algorithmAttributes[key].name]
+                };
+
+                const { response } = await api.post('/algorithm/__API__/edit_live_algorithm', data);
+
+                if(!response.ok)
+                {
+                    const error = new Error("Failed to edit live algorithm!");
+                    throw error;
+                }
+            }
+
             const data = {
-                "key": algorithmAttributes[key].name,
-                "value": currentAlgorithm.parameters[algorithmAttributes[key].name]
-            };
+                "key": "graphics",
+                "value": payload
+            }
 
-            const response = await post(`http://${ipAddress}:${port}/algorithm/__API__/edit_live_algorithm`, data);
+            const { response } = await api.post('/algorithm/__API__/edit_live_algorithm', data);
 
             if(!response.ok)
             {
-                const error = new Error("Failed to edit live algorithm!");
+                const error = new Error("Failed to edit live algorithm graphics!");
                 throw error;
             }
-        }
-
-        const data = {
-            "key": "graphics",
-            "value": payload
-        }
-
-        const response = await post(`http://${ipAddress}:${port}/algorithm/__API__/edit_live_algorithm`, data);
-
-        if(!response.ok)
-        {
-            const error = new Error("Failed to edit live algorithm graphics!");
+        } catch (error) {
+            console.error('Failed to set live algorithm attributes:', error);
             throw error;
         }
     },
@@ -562,35 +628,40 @@ export default {
     },
 
     async setLiveReferenceAlgorithmAttributes(context, payload) {
-        const algorithmAttributes = context.getters.getCurrentReferenceAlgorithmAttributes;
-        const currentAlgorithm = context.getters.getCurrentReferenceAlgorithm;
+        try {
+            const algorithmAttributes = context.getters.getCurrentReferenceAlgorithmAttributes;
+            const currentAlgorithm = context.getters.getCurrentReferenceAlgorithm;
 
-        for(const key in algorithmAttributes)
-        {
+            for(const key in algorithmAttributes)
+            {
+                const data = {
+                    "key": algorithmAttributes[key].name,
+                    "value": currentAlgorithm.parameters[algorithmAttributes[key].name]
+                };
+
+                const { response } = await api.post('/algorithm/__API__/edit_live_algorithm', data);
+
+                if(!response.ok)
+                {
+                    const error = new Error("Failed to edit live algorithm!");
+                    throw error;
+                }
+            }
+
             const data = {
-                "key": algorithmAttributes[key].name,
-                "value": currentAlgorithm.parameters[algorithmAttributes[key].name]
-            };
+                "key": "graphics",
+                "value": payload
+            }
 
-            const response = await post(`http://${ipAddress}:${port}/algorithm/__API__/edit_live_algorithm`, data);
+            const { response } = await api.post('/algorithm/__API__/edit_live_algorithm', data);
 
             if(!response.ok)
             {
-                const error = new Error("Failed to edit live algorithm!");
+                const error = new Error("Failed to edit live algorithm graphics!");
                 throw error;
             }
-        }
-
-        const data = {
-            "key": "graphics",
-            "value": payload
-        }
-
-        const response = await post(`http://${ipAddress}:${port}/algorithm/__API__/edit_live_algorithm`, data);
-
-        if(!response.ok)
-        {
-            const error = new Error("Failed to edit live algorithm graphics!");
+        } catch (error) {
+            console.error('Failed to set live reference algorithm attributes:', error);
             throw error;
         }
     },
@@ -657,7 +728,7 @@ export default {
     },
 
     async setBasicLiveAlgorithm(_, payload) {
-        const response = await post(`http://${ipAddress}:${port}/algorithm/__API__/basic/set_live_algorithm`, payload);
+        const { response } = await api.post(`/algorithm/__API__/basic/set_live_algorithm`, payload);
 
         if(!response.ok)
         {
@@ -669,7 +740,7 @@ export default {
     async loadSelectedBasicAlgorithmsAttributes(context, payload) {
         for(const type of payload.types)
         {
-            const { response, responseData } = await get(`http://${ipAddress}:${port}/algorithm/basic/types/${type}`);
+            const { response, responseData } = await api.get(`/algorithm/basic/types/${type}`);
 
             if(!response.ok)
             {
@@ -732,7 +803,7 @@ export default {
     },
 
     async updateCurrentBasicAlgorithmProperty(context, payload) {
-        const response = await post(`http://${ipAddress}:${port}/algorithm/__API__/basic/edit_live_algorithm_field`, payload);
+        const { response } = await api.post(`/algorithm/__API__/basic/edit_live_algorithm_field`, payload);
 
         if(!response.ok)
         {
@@ -750,7 +821,7 @@ export default {
     },
 
     async updateCurrentBasicAlgorithmFromConfig(_, payload) {
-        const {response, _2} = await get(`http://${ipAddress}:${port}/algorithm/__API__/basic/edit_live_algorithm/${payload}`);
+        const {response, _2} = await get(`/algorithm/__API__/basic/edit_live_algorithm/${payload}`);
 
         if(!response.ok)
         {
@@ -760,7 +831,7 @@ export default {
     },
 
     async updateCurrentBasicAlgorithmFromDict(_, payload) {
-        const response = await post(`http://${ipAddress}:${port}/algorithm/__API__/basic/edit_live_algorithm`, payload);
+        const { response } = await api.post(`/algorithm/__API__/basic/edit_live_algorithm`, payload);
 
         if(!response.ok)
         {
@@ -819,7 +890,7 @@ export default {
     },
 
     async singleProcessAlgorithm(context, payload) {
-        const { response, responseData } = await get(payload.url);
+        const { response, responseData } = await api.get(payload.url);
 
         if(!response.ok)
         {
@@ -859,11 +930,11 @@ export default {
         let url = null;
         if(payload.type === "custom_component")
         {
-            url = `http://${ipAddress}:${port}/algorithm/__API__/basic/process_live_algorithm/${payload.uid}`;
+            url = `/algorithm/__API__/basic/process_live_algorithm/${payload.uid}`;
         }
         else
         {
-            url = `http://${ipAddress}:${port}/algorithm/__API__/process_live_algorithm/${payload.uid}`;
+            url = `/algorithm/__API__/process_live_algorithm/${payload.uid}`;
         }
 
         await context.dispatch('singleProcessAlgorithm', {
@@ -873,7 +944,7 @@ export default {
     },
 
     async singleProcessAlgorithmStatic(context, payload) {
-        let url = `http://${ipAddress}:${port}/algorithm/__API__/process_live_algorithm`;
+        let url = `/algorithm/__API__/process_live_algorithm`;
         await context.dispatch('singleProcessAlgorithm', {
             url: url,
             type: payload.type
@@ -881,7 +952,7 @@ export default {
     },
 
     async singleProcessReference(context, payload) {
-        const { response, responseData } = await get(payload.url);
+        const { response, responseData } = await api.get(payload.url);
 
         if(!response.ok)
         {
@@ -901,7 +972,7 @@ export default {
     },
 
     async singleProcessReferenceCamera(context, payload) {
-        let url = `http://${ipAddress}:${port}/algorithm/__API__/process_reference_algorithm/${payload.uid}`;
+        let url = `/algorithm/__API__/process_reference_algorithm/${payload.uid}`;
         
         await context.dispatch('singleProcessAlgorithm', {
             url: url,
@@ -910,7 +981,7 @@ export default {
     },
 
     async singleProcessReferenceStatic(context, payload) {
-        let url = `http://${ipAddress}:${port}/algorithm/__API__/process_reference_algorithm`;
+        let url = `/algorithm/__API__/process_reference_algorithm`;
         await context.dispatch('singleProcessAlgorithm', {
             url: url,
             type: payload.type
@@ -918,7 +989,7 @@ export default {
     },
 
     async setStaticImage(_, payload) {
-        const response = await post(`http://${ipAddress}:${port}/algorithm/__API__/set_static_image`, payload);
+        const { response } = await api.post(`/algorithm/__API__/set_static_image`, payload);
 
         if(!response.ok)
         {

@@ -122,8 +122,9 @@
       <excludeFolder url="file://$MODULE_DIR$/frontend-vue/frontend/node_modules/xml-name-validator/lib" />
       <excludeFolder url="file://$MODULE_DIR$/frontend-vue/frontend/dist" />
       <excludeFolder url="file://$MODULE_DIR$/frontend-vue/.history" />
+      <excludeFolder url="file://$MODULE_DIR$/.venv" />
     </content>
-    <orderEntry type="jdk" jdkName="Python 3.8 (slyrak)" jdkType="Python SDK" />
+    <orderEntry type="jdk" jdkName="Python 3.13 (site)" jdkType="Python SDK" />
     <orderEntry type="sourceFolder" forTests="false" />
   </component>
 </module>
