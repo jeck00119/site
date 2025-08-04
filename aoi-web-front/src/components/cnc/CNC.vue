@@ -740,7 +740,10 @@ export default {
 
     function onCncSocketMsgRecv(event) {
       let msg = JSON.parse(event.data);
+      handleSingleMessage(msg);
+    }
 
+    function handleSingleMessage(msg) {
       switch (msg.event) {
         case "on_stateupdate":
           store.dispatch("cnc/setMPos",{
@@ -776,6 +779,15 @@ export default {
 
         case "on_read":
           addToConsole(msg.message);
+          break;
+
+        case "batch":
+          // Handle batched messages
+          if (msg.messages && Array.isArray(msg.messages)) {
+            msg.messages.forEach(batchedMsg => {
+              handleSingleMessage(batchedMsg);
+            });
+          }
           break;
 
         case "on_settings_downloaded":
