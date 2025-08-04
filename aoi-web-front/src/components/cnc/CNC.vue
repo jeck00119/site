@@ -774,6 +774,10 @@ export default {
           });
           break;
 
+        case "on_read":
+          addToConsole(msg.message);
+          break;
+
         case "on_settings_downloaded":
           for (const prop in msg.message) {
             ugsTerminalHistory.value += `>> $${prop} = ${msg.message[prop].val}\n`;
