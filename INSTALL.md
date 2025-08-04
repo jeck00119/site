@@ -2,6 +2,14 @@
 
 This guide provides detailed installation instructions for the CNC Control System.
 
+## 🌐 Cross-Platform Support
+
+This project supports **Windows**, **Linux**, and **macOS**. For platform-specific instructions, see:
+- 📖 [Cross-Platform Guide](CROSS_PLATFORM_GUIDE.md) - Detailed platform-specific instructions
+- 🪟 [Windows Setup](#windows-specific-setup)
+- 🐧 [Linux Setup](#linux-specific-setup)
+- 🍎 [macOS Setup](#macos-specific-setup)
+
 ## 🚀 Automated Setup (Recommended)
 
 The easiest way to set up the project is using the automated setup script:
@@ -11,17 +19,94 @@ The easiest way to set up the project is using the automated setup script:
 git clone https://github.com/jeck00119/site.git
 cd site
 
-# Run the setup script
+# Run the cross-platform setup script
 python setup.py
 ```
 
 The script will:
+- ✅ Detect your platform automatically
 - ✅ Check prerequisites (Python 3.8+, Node.js 16+)
 - ✅ Create Python virtual environment
 - ✅ Install all backend dependencies
 - ✅ Install all frontend dependencies
 - ✅ Create environment configuration
-- ✅ Generate start scripts
+- ✅ Generate platform-specific start scripts
+
+## 🪟 Windows-Specific Setup
+
+### System Dependencies
+
+Run the Windows system dependencies installer:
+```cmd
+install-system-deps.bat
+```
+
+Or install manually:
+1. **Python 3.8+**: Download from [python.org](https://www.python.org/downloads/)
+   - ⚠️ **Important**: Check "Add Python to PATH"
+2. **Node.js 16+**: Download from [nodejs.org](https://nodejs.org/)
+3. **Visual C++ Build Tools**: For package compilation
+
+### Alternative Requirements
+
+If you encounter package installation issues:
+```cmd
+pip install -r requirements-windows.txt
+```
+
+## 🐧 Linux-Specific Setup
+
+### System Dependencies
+
+Run the Linux system dependencies installer:
+```bash
+chmod +x install-system-deps.sh
+./install-system-deps.sh
+```
+
+Or install manually based on your distribution:
+
+**Ubuntu/Debian:**
+```bash
+sudo apt update
+sudo apt install python3 python3-pip python3-venv nodejs npm git
+sudo apt install libzbar0 libdmtx0a tesseract-ocr python3-opencv
+```
+
+**CentOS/RHEL/Fedora:**
+```bash
+sudo dnf install python3 python3-pip nodejs npm git
+sudo dnf install zbar-devel libdmtx-devel tesseract opencv-python3
+```
+
+### Alternative Requirements
+
+For Linux-optimized packages:
+```bash
+pip3 install -r requirements-linux.txt
+```
+
+### Serial Port Permissions
+
+```bash
+# Add user to dialout group for serial port access
+sudo usermod -a -G dialout $USER
+# Logout and login again
+```
+
+## 🍎 macOS-Specific Setup
+
+### System Dependencies
+
+Using Homebrew (recommended):
+```bash
+# Install Homebrew if not already installed
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+
+# Install dependencies
+brew install python node git
+brew install zbar libdmtx tesseract opencv
+```
 
 ## 🔧 Manual Setup
 

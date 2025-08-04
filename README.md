@@ -16,8 +16,32 @@ A modern, full-stack CNC control system with real-time monitoring, multi-firmwar
 ### Prerequisites
 
 - **Python 3.8+** (recommended: Python 3.11)
-- **Node.js 18+** (recommended: Node.js 20)
-- **Git**
+- **Node.js 16+** (recommended: Node.js 20)
+- **Git** (optional but recommended)
+
+#### Platform-Specific Installation
+
+**Windows:**
+- Python: Download from [python.org](https://www.python.org/downloads/)
+- Node.js: Download from [nodejs.org](https://nodejs.org/)
+- Git: Download from [git-scm.com](https://git-scm.com/)
+
+**Linux (Ubuntu/Debian):**
+```bash
+sudo apt update
+sudo apt install python3 python3-pip python3-venv nodejs npm git
+```
+
+**Linux (CentOS/RHEL):**
+```bash
+sudo yum install python3 python3-pip nodejs npm git
+```
+
+**macOS:**
+```bash
+# Using Homebrew
+brew install python node git
+```
 
 ### 1. Clone the Repository
 
@@ -26,19 +50,41 @@ git clone https://github.com/jeck00119/site.git
 cd site
 ```
 
-### 2. Backend Setup
+### 2. Automated Setup (Recommended)
+
+```bash
+# Run the cross-platform setup script
+python setup.py
+```
+
+The setup script will:
+- ✅ Detect your platform (Windows/Linux/macOS)
+- ✅ Check all prerequisites
+- ✅ Create Python virtual environment
+- ✅ Install all dependencies
+- ✅ Generate platform-specific start scripts
+- ✅ Create configuration files
+
+### 3. Manual Setup (Alternative)
+
+<details>
+<summary>Click to expand manual setup instructions</summary>
+
+#### Backend Setup
 
 ```bash
 # Navigate to backend directory
 cd backend-flask
 
-# Create virtual environment (recommended)
+# Create virtual environment
 python -m venv venv
 
 # Activate virtual environment
-# Windows:
-venv\\Scripts\\activate
-# macOS/Linux:
+# Windows (Command Prompt):
+venv\Scripts\activate
+# Windows (PowerShell):
+venv\Scripts\Activate.ps1
+# Linux/macOS:
 source venv/bin/activate
 
 # Install dependencies
@@ -46,14 +92,9 @@ pip install -r ../requirements.txt
 
 # Copy environment configuration
 cp ../.env.example .env
-
-# Start the backend server
-python main.py
 ```
 
-The backend will start on `http://localhost:8000`
-
-### 3. Frontend Setup
+#### Frontend Setup
 
 ```bash
 # Open new terminal and navigate to frontend directory
@@ -61,16 +102,53 @@ cd aoi-web-front
 
 # Install dependencies
 npm install
-
-# Start the development server
-npm run dev
 ```
 
-The frontend will start on `http://localhost:5173`
+</details>
 
-### 4. Access the Application
+### 4. Start the Application
+
+#### Option A: Individual Scripts
+
+**Windows:**
+```bash
+# Start backend (in one terminal)
+start_backend.bat
+# Or use PowerShell
+start_backend.ps1
+
+# Start frontend (in another terminal)
+start_frontend.bat
+```
+
+**Linux/macOS:**
+```bash
+# Start backend (in one terminal)
+./start_backend.sh
+
+# Start frontend (in another terminal)
+./start_frontend.sh
+```
+
+#### Option B: Combined Start (Recommended)
+
+**Windows:**
+```bash
+start_cnc_system.bat
+```
+
+**Linux/macOS:**
+```bash
+./start_cnc_system.sh
+```
+
+### 5. Access the Application
 
 Open your browser and go to `http://localhost:5173`
+
+- **Frontend**: http://localhost:5173
+- **Backend API**: http://localhost:8000
+- **API Documentation**: http://localhost:8000/docs
 
 ## 📁 Project Structure
 
@@ -179,33 +257,112 @@ The project includes:
 
 ### Common Issues
 
+#### Platform-Specific Issues
+
+**Windows:**
+
+*Python not found:*
+```bash
+# Add Python to PATH or use full path
+C:\Python311\python.exe setup.py
+```
+
+*Virtual environment activation fails:*
+```bash
+# Try PowerShell instead of Command Prompt
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+.\venv\Scripts\Activate.ps1
+```
+
+*Permission denied errors:*
+```bash
+# Run as Administrator or use PowerShell
+```
+
+**Linux:**
+
+*Python3 not found:*
+```bash
+# Install Python 3
+sudo apt install python3 python3-pip python3-venv
+# Or use python instead of python3
+python setup.py
+```
+
+*Permission denied for serial ports:*
+```bash
+# Add user to dialout group
+sudo usermod -a -G dialout $USER
+# Logout and login again
+```
+
+*Node.js version too old:*
+```bash
+# Install newer Node.js
+curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+sudo apt-get install -y nodejs
+```
+
+#### General Issues
+
 **Backend won't start:**
 - Check Python version: `python --version`
-- Verify all dependencies: `pip list`
+- Verify virtual environment is activated
 - Check port availability: `netstat -an | grep 8000`
+- Review error messages in terminal
 
 **Frontend won't start:**
 - Check Node.js version: `node --version`
 - Clear npm cache: `npm cache clean --force`
 - Delete node_modules and reinstall: `rm -rf node_modules && npm install`
+- Check port availability: `netstat -an | grep 5173`
 
 **CNC connection issues:**
 - Verify USB/Serial connection
-- Check device permissions (Linux/macOS)
+- Check device permissions (Linux/macOS): `ls -l /dev/ttyUSB* /dev/ttyACM*`
 - Ensure correct baud rate and firmware type
 - Try different USB ports
+- Check for driver requirements
 
 **WebSocket connection errors:**
 - Check firewall settings
-- Verify CORS configuration
+- Verify CORS configuration in `.env`
 - Ensure backend is running on port 8000
+- Try different browser or disable extensions
+
+### Platform-Specific Serial Port Detection
+
+**Windows:**
+- Check Device Manager → Ports (COM & LPT)
+- Look for COM ports (e.g., COM3, COM4)
+
+**Linux:**
+```bash
+# List USB serial devices
+ls /dev/ttyUSB* /dev/ttyACM*
+# Check dmesg for device detection
+dmesg | grep tty
+```
+
+**macOS:**
+```bash
+# List serial devices
+ls /dev/tty.*
+# Check system report
+system_profiler SPUSBDataType
+```
 
 ### Getting Help
 
-1. Check the [Issues](https://github.com/jeck00119/site/issues) page
-2. Review the troubleshooting section above
+1. Check the [INSTALL.md](INSTALL.md) for detailed setup instructions
+2. Review error messages carefully
 3. Ensure all prerequisites are installed correctly
 4. Verify your hardware connections
+5. Create an issue on GitHub with:
+   - Operating system and version
+   - Python and Node.js versions
+   - Complete error messages
+   - Steps to reproduce the issue
 
 ## 📋 System Requirements
 

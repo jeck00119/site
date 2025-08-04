@@ -1,0 +1,86 @@
+# Linux-specific Python requirements for CNC Project
+# Use this file if you encounter issues with the main requirements.txt on Linux
+
+# Core dependencies
+aiofiles>=23.0.0
+anyio>=3.6.0
+fastapi>=0.100.0
+uvicorn[standard]>=0.20.0
+pydantic>=2.0.0
+pydantic-settings>=2.0.0
+
+# Authentication and security
+PyJWT>=2.6.0
+bcrypt>=4.0.0
+cryptography>=40.0.0
+python-jose[cryptography]>=3.3.0
+passlib[bcrypt]>=1.7.4
+
+# Database
+sqlalchemy>=2.0.0
+
+# Web and networking
+starlette>=0.27.0
+python-multipart>=0.0.6
+websockets>=11.0.0
+wsproto>=1.2.0
+
+# File handling
+python-dotenv>=1.0.0
+openpyxl>=3.1.0
+
+# Image processing
+Pillow>=9.5.0
+opencv-python>=4.7.0
+scikit-image>=0.20.0
+
+# Scientific computing
+numpy>=1.24.0
+scipy>=1.10.0
+matplotlib>=3.7.0
+
+# Machine learning
+torch>=2.0.0
+torchvision>=0.15.0
+
+# Computer vision and OCR
+easyocr>=1.7.0
+pytesseract>=0.3.10
+
+# Hardware interfaces
+pyserial>=3.5
+pygame>=2.5.0
+
+# Utilities
+humps>=0.2.2
+shortuuid>=1.0.11
+imutils>=0.5.4
+filelock>=3.12.0
+
+# Barcode and QR code processing
+pylibdmtx>=0.1.10
+pyzbar>=0.1.9
+
+# Hardware-specific libraries
+pymycobot>=3.0.0
+pypylon>=1.9.0
+xarm>=1.11.0
+
+# Development and testing
+transitions>=0.9.0
+
+# Additional packages for specific features
+patched-yolo-infer
+segment-anything-py
+supervision
+ttach
+ultralytics
+
+# GUI framework
+PyQt5>=5.15.0
+
+# Note: Some packages may require system dependencies:
+# sudo apt-get install libzbar0 libdmtx0a python3-opencv
+# sudo apt-get install tesseract-ocr tesseract-ocr-eng
+# sudo apt-get install libqt5gui5 libqt5core5a libqt5widgets5
+
