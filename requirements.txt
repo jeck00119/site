@@ -15,6 +15,9 @@ passlib
 patched-yolo-infer
 Pillow
 pydantic
+pydantic-settings
+PyJWT
+bcrypt
 pylibdmtx
 pymycobot
 pypylon
@@ -28,7 +31,6 @@ shortuuid
 scikit-image
 starlette
 supervision
-tinydb
 torch
 torchvision
 transitions

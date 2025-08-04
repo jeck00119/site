@@ -1,10 +1,9 @@
 import { uuid } from "vue3-uuid";
-import { get, post, put, remove } from "../../utils/requests";
-import { ipAddress, port } from "../../url.js";
+import api from "../../utils/api.js";
 
 export default {
     async loadPorts(context, _) {
-        const { response, responseData } = await get(`http://${ipAddress}:${port}/cnc/check_ports`);
+        const { response, responseData } = await api.get('/cnc/check_ports');
 
         if(!response.ok)
         {
@@ -18,7 +17,7 @@ export default {
     },
 
     async loadCNCs(context, _) {
-        const { response, responseData } = await get(`http://${ipAddress}:${port}/cnc`);
+        const { response, responseData } = await api.get('/cnc');
 
         if(!response.ok)
         {
@@ -32,7 +31,7 @@ export default {
     },
 
     async loadCNCTypes(context, _) {
-        const { response, responseData } = await get(`http://${ipAddress}:${port}/cnc/cnc_types`);
+        const { response, responseData } = await api.get('/cnc/cnc_types');
 
         if(!response.ok)
         {
@@ -72,7 +71,7 @@ export default {
         const cncs = context.getters.getCNCs;
         const token = context.rootGetters["auth/getToken"];
 
-        const response = await post(`http://${ipAddress}:${port}/cnc/save`, cncs, {
+        const { response } = await api.post('/cnc/save', cncs, {
             "content-type": "application/json",
             "Authorization": token
         });
@@ -93,7 +92,7 @@ export default {
     },
 
     async fetchLocations(context, payload){
-        const {response, responseData} = await get(`http://${ipAddress}:${port}/location/axis/${payload}`);
+        const {response, responseData} = await api.get(`/location/axis/${payload}`);
 
         if (!response.ok)
         {
@@ -124,14 +123,14 @@ export default {
 
         const token = context.rootGetters["auth/getToken"];
 
-        const {response, responseData} = await post (`http://${ipAddress}:${port}/location`, payload[0], {
+        const {response, responseData} = await api.post('/location', payload[0], {
             'content-type': 'application/json',
             'Authorization': token
         });
     },
 
     async loadLocations(context,_){
-        const { response, responseData } = await get(`http://${ipAddress}:${port}/location`);
+        const { response, responseData } = await api.get('/location');
         if(!response.ok)
         {
             const error = new Error(responseData.detail || `Failed to load Locations!`);
@@ -155,7 +154,7 @@ export default {
         patchedLocation.name = payload.newName;
         try{
             const token = context.rootGetters["auth/getToken"];
-            const { response, responseData } = await put(`http://${ipAddress}:${port}/location`, patchedLocation, {
+            const { response, responseData } = await api.put('/location', patchedLocation, {
                 "content-type": "application/json",
                 "Authorization": token
             });
@@ -166,34 +165,34 @@ export default {
 
     async deleteLocation(context, payload){
         const token = context.rootGetters["auth/getToken"];
-        const { response, responseData } = await remove(`http://${ipAddress}:${port}/location/${payload}`, {
+        const { response, responseData } = await api.delete(`/location/${payload}`, {
             "content-type": "application/json",
             "Authorization": token
         });
     },
 
     async api_moveToLocation(context, payload){
-        const { response, responseData } = await get(`http://${ipAddress}:${port}/cnc/${payload.cncUid}/__API__/${payload.location}/move_to_location?block=${payload.block}&timeout=${payload.timeout}`);
+        const { response, responseData } = await api.get(`/cnc/${payload.cncUid}/__API__/${payload.location}/move_to_location?block=${payload.block}&timeout=${payload.timeout}`);
     },
 
     async api_command(context, payload){
-        const { response, responseData } = await get(`http://${ipAddress}:${port}/cnc/${payload.cncUid}/__API__/${payload.command}`);
+        const { response, responseData } = await api.get(`/cnc/${payload.cncUid}/__API__/${payload.command}`);
     },
 
     async api_increaseAxis(context, payload){
-        const { response, responseData } = await get(`http://${ipAddress}:${port}/cnc/${payload.cncUid}/__API__/${payload.axis}/plus?feed_rate=${payload.feedrate}&step=${payload.step}`);
+        const { response, responseData } = await api.get(`/cnc/${payload.cncUid}/__API__/${payload.axis}/plus?feed_rate=${payload.feedrate}&step=${payload.step}`);
     },
 
     async api_decreaseAxis(context, payload){
-        const { response, responseData } = await get(`http://${ipAddress}:${port}/cnc/${payload.cncUid}/__API__/${payload.axis}/minus?feed_rate=${payload.feedrate}&step=${payload.step}`);
+        const { response, responseData } = await api.get(`/cnc/${payload.cncUid}/__API__/${payload.axis}/minus?feed_rate=${payload.feedrate}&step=${payload.step}`);
     },
 
     async api_terminal(context, payload){
-        const {response, responseData} = await get(`http://${ipAddress}:${port}/cnc/${payload.cncUid}/__API__/terminal?command=${payload.command}`)
+        const {response, responseData} = await api.get(`/cnc/${payload.cncUid}/__API__/terminal?command=${payload.command}`)
     },
 
     async closeStateSocket(_, payload) {
-        const response = await post(`http://${ipAddress}:${port}/cnc/${payload.uid}/ws/close`);
+        const { response } = await api.post(`/cnc/${payload.uid}/ws/close`);
 
         if(!response.ok)
         {
@@ -203,7 +202,7 @@ export default {
     },
 
     async initializeAllCNCs(context, _) {
-        const { response, responseData } = await post(`http://${ipAddress}:${port}/cnc/initialize_all`);
+        const { response, responseData } = await api.post('/cnc/initialize_all');
 
         if(!response.ok)
         {

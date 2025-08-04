@@ -1,6 +1,5 @@
 import { uuid } from "vue3-uuid";
-import { get, post, update, remove } from '../../utils/requests.js';
-import { ipAddress, port } from "../../url.js";
+import api from '../../utils/api.js';
 
 export default {
     async addComponent(context, payload) {
@@ -30,7 +29,7 @@ export default {
 
         const token = context.rootGetters["auth/getToken"];
 
-        const response = await post(`http://${ipAddress}:${port}/${payload.type}`, component, {
+        const { response } = await api.post(`/${payload.type}`, component, {
             "content-type": "application/json",
             "Authorization": token
         });
@@ -60,7 +59,7 @@ export default {
 
     async removeComponent(context, payload) {
         const token = context.rootGetters["auth/getToken"];
-        const response = await remove(`http://${ipAddress}:${port}/${payload.type}/${payload.uid}`, {
+        const { response } = await api.delete(`/${payload.type}/${payload.uid}`, {
             "content-type": "application/json",
             "Authorization": token
         });
@@ -87,7 +86,7 @@ export default {
     },
 
     async loadComponents(context, payload) {
-        const { response, responseData } = await get(`http://${ipAddress}:${port}/${payload.type}`);
+        const { response, responseData } = await api.get(`/${payload.type}`);
 
         if(!response.ok)
         {
@@ -128,7 +127,7 @@ export default {
     },
 
     async loadComponent(context, payload) {
-        const { response, responseData } = await get(`http://${ipAddress}:${port}/${payload.type}/${payload.uid}`);
+        const { response, responseData } = await api.get(`/${payload.type}/${payload.uid}`);
 
         if(!response.ok)
         {
@@ -151,7 +150,7 @@ export default {
 
         const token = context.rootGetters["auth/getToken"];
 
-        const response = await update(`http://${ipAddress}:${port}/${type}/${component.uid}`, component, {
+        const { response } = await api.update(`/${type}/${component.uid}`, component, {
             "content-type": "application/json",
             "Authorization": token
         });
@@ -189,7 +188,7 @@ export default {
 
         const token = context.rootGetters["auth/getToken"];
 
-        const response = await post(`http://${ipAddress}:${port}/${payload.type}`, component, {
+        const { response } = await api.post(`/${payload.type}`, component, {
             "content-type": "application/json",
             "Authorization": token
         });
@@ -218,7 +217,7 @@ export default {
 
         const token = context.rootGetters["auth/getToken"];
 
-        const response = await post(`hhttp://${ipAddress}:${port}/{payload.type}`, component, {
+        const { response } = await api.post(`/${payload.type}`, component, {
             "content-type": "application/json",
             "Authorization": token
         });

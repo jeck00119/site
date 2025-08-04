@@ -544,7 +544,7 @@
 <script>
 import { ref, onMounted, onUnmounted, computed } from "vue";
 import { useStore } from "vuex";
-import { ipAddress, port } from "../../url";
+import api from "../../utils/api.js";
 
 export default {
   props: ["axisName", "axisUid"],
@@ -703,8 +703,9 @@ export default {
       }, 200);
     }
 
-    function connectToWs() {
-      socket = new WebSocket(`ws://${ipAddress}:${port}/cnc/${props.axisUid}/ws`);
+    async function connectToWs() {
+      const wsUrl = await api.getFullUrl(`/cnc/${props.axisUid}/ws`);
+      socket = new WebSocket(wsUrl.replace('http:', 'ws:'));
 
       socket.addEventListener("open", onCncSocketOpen);
       socket.addEventListener("close", onCncSocketClose);

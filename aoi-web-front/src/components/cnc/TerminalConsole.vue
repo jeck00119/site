@@ -1,0 +1,380 @@
+<template>
+  <div class="terminal-grid">
+    <label class="terminal-label">UGS Terminal</label>
+    
+    <div class="terminal-output-container">
+      <textarea 
+        ref="terminalOutput"
+        readonly 
+        :value="terminalHistory"
+        class="terminal-output"
+        @scroll="handleScroll"
+      ></textarea>
+      
+      <div v-if="!isAtBottom" class="scroll-indicator">
+        <button @click="scrollToBottom" class="scroll-button">
+          <font-awesome-icon icon="chevron-down" />
+          New messages
+        </button>
+      </div>
+    </div>
+    
+    <div class="terminal-control">
+      <input
+        ref="commandInput"
+        type="text"
+        v-model="commandLine"
+        @keyup.enter="sendCommand"
+        @keyup.up="navigateHistory(-1)"
+        @keyup.down="navigateHistory(1)"
+        class="terminal-input"
+        placeholder="Enter command..."
+        :disabled="isSending"
+      />
+      
+      <button
+        @click="sendCommand"
+        class="button-wide small-button"
+        :disabled="isSending || !commandLine.trim()"
+      >
+        <v-icon 
+          :name="isSending ? 'fa-spinner' : 'io-send-sharp'" 
+          scale="0.7"
+          :spin="isSending"
+        />
+      </button>
+      
+      <button
+        @click="clearTerminal"
+        class="button-wide small-button clear-button"
+        title="Clear terminal"
+      >
+        <font-awesome-icon icon="trash" scale="0.7" />
+      </button>
+    </div>
+  </div>
+</template>
+
+<script>
+import { ref, nextTick, watch, onMounted, onUnmounted } from "vue";
+import { useStore } from "vuex";
+
+export default {
+  name: "TerminalConsole",
+  props: {
+    axisUid: {
+      type: String,
+      required: true
+    },
+    terminalHistory: {
+      type: String,
+      default: ""
+    }
+  },
+  emits: ['command-sent', 'terminal-cleared'],
+  setup(props, { emit }) {
+    const store = useStore();
+    
+    const commandLine = ref("");
+    const commandHistory = ref([]);
+    const historyIndex = ref(-1);
+    const isSending = ref(false);
+    const isAtBottom = ref(true);
+    
+    const terminalOutput = ref(null);
+    const commandInput = ref(null);
+
+    // Auto-scroll to bottom when new content is added
+    watch(() => props.terminalHistory, async () => {
+      if (isAtBottom.value) {
+        await nextTick();
+        scrollToBottom();
+      }
+    });
+
+    onMounted(() => {
+      loadCommandHistory();
+      focusInput();
+    });
+
+    onUnmounted(() => {
+      saveCommandHistory();
+    });
+
+    function loadCommandHistory() {
+      const saved = localStorage.getItem(`cnc-command-history-${props.axisUid}`);
+      if (saved) {
+        try {
+          commandHistory.value = JSON.parse(saved);
+        } catch (error) {
+          console.error("Failed to load command history:", error);
+        }
+      }
+    }
+
+    function saveCommandHistory() {
+      // Keep only last 50 commands
+      const historyToSave = commandHistory.value.slice(-50);
+      localStorage.setItem(`cnc-command-history-${props.axisUid}`, JSON.stringify(historyToSave));
+    }
+
+    function focusInput() {
+      if (commandInput.value) {
+        commandInput.value.focus();
+      }
+    }
+
+    async function sendCommand() {
+      if (isSending.value || !commandLine.value.trim()) return;
+      
+      const command = commandLine.value.trim();
+      
+      try {
+        isSending.value = true;
+        
+        // Handle special commands
+        if (command.toLowerCase() === "clear") {
+          clearTerminal();
+          commandLine.value = "";
+          return;
+        }
+        
+        // Add to history
+        if (command && !commandHistory.value.includes(command)) {
+          commandHistory.value.push(command);
+          saveCommandHistory();
+        }
+        
+        // Send command to store
+        await store.dispatch("cnc/api_terminal", {
+          cncUid: props.axisUid,
+          command: command,
+        });
+        
+        emit('command-sent', { command, timestamp: new Date() });
+        
+        // Clear input and reset history navigation
+        commandLine.value = "";
+        historyIndex.value = -1;
+        
+      } catch (error) {
+        console.error("Failed to send command:", error);
+        
+      } finally {
+        isSending.value = false;
+        focusInput();
+      }
+    }
+
+    function clearTerminal() {
+      emit('terminal-cleared');
+    }
+
+    function navigateHistory(direction) {
+      if (commandHistory.value.length === 0) return;
+      
+      const newIndex = historyIndex.value + direction;
+      
+      if (newIndex >= 0 && newIndex < commandHistory.value.length) {
+        historyIndex.value = newIndex;
+        commandLine.value = commandHistory.value[commandHistory.value.length - 1 - newIndex];
+      } else if (newIndex < 0) {
+        historyIndex.value = -1;
+        commandLine.value = "";
+      }
+    }
+
+    function handleScroll() {
+      if (!terminalOutput.value) return;
+      
+      const element = terminalOutput.value;
+      const threshold = 50; // pixels from bottom
+      
+      isAtBottom.value = (
+        element.scrollHeight - element.scrollTop - element.clientHeight < threshold
+      );
+    }
+
+    function scrollToBottom() {
+      if (terminalOutput.value) {
+        terminalOutput.value.scrollTop = terminalOutput.value.scrollHeight;
+        isAtBottom.value = true;
+      }
+    }
+
+    return {
+      commandLine,
+      isSending,
+      isAtBottom,
+      terminalOutput,
+      commandInput,
+      sendCommand,
+      clearTerminal,
+      navigateHistory,
+      handleScroll,
+      scrollToBottom,
+      focusInput
+    };
+  }
+};
+</script>
+
+<style scoped>
+.terminal-grid {
+  color: white;
+  background-color: #161616;
+  display: flex;
+  flex-direction: column;
+  border-radius: 8px;
+  padding: 1rem;
+  height: 100%;
+}
+
+.terminal-label {
+  font-size: 1.2rem;
+  font-weight: bold;
+  margin-bottom: 0.5rem;
+  text-align: center;
+  background-color: rgb(41, 41, 41);
+  padding: 0.5rem;
+  border-radius: 8px;
+}
+
+.terminal-output-container {
+  position: relative;
+  flex: 1;
+  margin-bottom: 0.5rem;
+}
+
+.terminal-output {
+  background-color: black;
+  color: #00ff00;
+  width: 100%;
+  height: 100%;
+  border: none;
+  border-radius: 4px;
+  padding: 0.5rem;
+  font-family: 'Courier New', monospace;
+  font-size: 0.8rem;
+  resize: none;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+
+.terminal-output:focus {
+  outline: none;
+}
+
+.scroll-indicator {
+  position: absolute;
+  bottom: 10px;
+  right: 10px;
+  z-index: 10;
+}
+
+.scroll-button {
+  background-color: rgba(204, 161, 82, 0.9);
+  color: black;
+  border: none;
+  border-radius: 20px;
+  padding: 0.5rem 1rem;
+  font-size: 0.7rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  transition: all 0.2s ease;
+}
+
+.scroll-button:hover {
+  background-color: rgb(204, 161, 82);
+  transform: scale(1.05);
+}
+
+.terminal-control {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.terminal-input {
+  flex: 1;
+  background-color: rgb(41, 41, 41);
+  border: none;
+  color: white;
+  padding: 0.5rem;
+  border-radius: 4px;
+  font-family: 'Courier New', monospace;
+  font-size: 0.9rem;
+}
+
+.terminal-input:focus {
+  outline: 2px solid rgb(204, 161, 82);
+  background-color: rgb(51, 51, 51);
+}
+
+.terminal-input:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.button-wide {
+  background: rgb(41, 41, 41);
+  color: #ffffff;
+  border-radius: 8px;
+  box-shadow: rgb(41, 41, 41) 0 3px 5px -3px;
+  box-sizing: border-box;
+  cursor: pointer;
+  border: 0;
+  transition: all 0.2s ease;
+}
+
+.button-wide:hover:not(:disabled) {
+  box-shadow: rgba(255, 255, 255, 0.2) 0 3px 15px inset,
+    rgba(0, 0, 0, 0.1) 0 3px 5px, rgba(0, 0, 0, 0.1) 0 10px 13px;
+  transform: scale(1.05);
+}
+
+.button-wide:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.small-button {
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.clear-button {
+  background-color: rgb(139, 69, 19);
+}
+
+.clear-button:hover:not(:disabled) {
+  background-color: rgb(160, 82, 45);
+}
+
+/* Scrollbar styling for webkit browsers */
+.terminal-output::-webkit-scrollbar {
+  width: 8px;
+}
+
+.terminal-output::-webkit-scrollbar-track {
+  background: #2a2a2a;
+  border-radius: 4px;
+}
+
+.terminal-output::-webkit-scrollbar-thumb {
+  background: #555;
+  border-radius: 4px;
+}
+
+.terminal-output::-webkit-scrollbar-thumb:hover {
+  background: #777;
+}
+</style>
+
