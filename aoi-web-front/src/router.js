@@ -1,12 +1,13 @@
 import { createRouter, createWebHistory } from 'vue-router';
 
-import HomeComponent from './components/pages/home/HomeComponent.vue';
-import ResultsList from './components/pages/home/ResultsList.vue';
+// Convert all imports to lazy loading for better code splitting
+const HomeComponent = () => import('./components/pages/home/HomeComponent.vue');
+const ResultsList = () => import('./components/pages/home/ResultsList.vue');
 
-import UserSignup from './components/pages/auth/UserSignup.vue';
-import UserLogin from './components/pages/auth/UserLogin.vue';
+const UserSignup = () => import('./components/pages/auth/UserSignup.vue');
+const UserLogin = () => import('./components/pages/auth/UserLogin.vue');
 
-import Configurations from './components/configurations/Configurations.vue';
+const Configurations = () => import('./components/configurations/Configurations.vue');
 
 import store from './store/index.js';
 
