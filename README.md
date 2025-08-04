@@ -1,115 +1,256 @@
+# 🏭 CNC Control System
 
-# 1. Requirements
-**1.1 Node.js**
-**1.2. Python**
+A modern, full-stack CNC control system with real-time monitoring, multi-firmware support, and advanced automation features.
 
-**Node.js** is an open-source, cross-platform, back-end **JavaScript runtime environment** that **runs on a JavaScript Engine (i.e. V8 engine**) and **executes JavaScript code outside a web browser**, which was designed to build scalable network applications
+## ✨ Features
 
-## 1.1 Node.js
-### 1.1.1 Install and configure a nvm
-We will install **node.js using** a **Node Version Manager (NVM)**. For windows we will use **nvm-windows**.
+- 🎛️ **Multi-Firmware Support**: GRBL, FluidNC, and Marlin compatibility
+- 🔄 **Real-time Control**: Live position updates and command execution
+- 📱 **Responsive UI**: Works on desktop and mobile devices
+- 🔒 **Secure**: JWT authentication and input validation
+- 🚀 **High Performance**: Optimized for low latency and high throughput
+- 🤖 **Automation Ready**: Robot integration and automated workflows
 
-**Download and install the latest version (1.1.9 atm)** from **[nvm-windows-releases](https://github.com/coreybutler/nvm-windows/releases) (.exe)**.
+## 🚀 Quick Start
 
-**After installing** we will **configure the proxy**.
- **Open** a **command prompt** in **administrator mode** and **run `nvm proxy http://example.com:port`**.
+### Prerequisites
 
-### 1.1.2 Install node.js using nvm
-**Open** a **command prompt** in **administrator mode** and **run `nvm install latest`**.
-This will **install** the **latest version of node** **(v19.0.0 atm)**.
+- **Python 3.8+** (recommended: Python 3.11)
+- **Node.js 18+** (recommended: Node.js 20)
+- **Git**
 
-**After installing run `nvm use latest`**
+### 1. Clone the Repository
 
+```bash
+git clone https://github.com/jeck00119/site.git
+cd site
+```
 
-**If**  this **command** **does not work** you can **try this:**
+### 2. Backend Setup
 
- - Open IE (Chrome did not work for me).
- - Hit the URL `http://registry.npmjs.org`
- - it will download json output if successful.
- - **Now go back to command prompt and try npm install**.
-From [https://stackoverflow.com/questions/19824517/get-node-js-npm-command-to-work-behind-corporate-proxy](https://stackoverflow.com/questions/19824517/get-node-js-npm-command-to-work-behind-corporate-proxy).
- 
+```bash
+# Navigate to backend directory
+cd backend-flask
 
+# Create virtual environment (recommended)
+python -m venv venv
 
-### 1.1.3. Configure npm
-**Npm (Node Package Manager)**
+# Activate virtual environment
+# Windows:
+venv\\Scripts\\activate
+# macOS/Linux:
+source venv/bin/activate
 
-**Configure proxy**
+# Install dependencies
+pip install -r ../requirements.txt
 
-Open **`.npmrc`(this is file name not an extension and is usually found in  **`C:\Users\user`** or  **`C:\Users\user\AppData\Roaming\nvm\v19.0.0\node_modules\npm`**) and add the **following lines**: 
+# Copy environment configuration
+cp ../.env.example .env
 
-`registry=http://registry.npmjs.org`
+# Start the backend server
+python main.py
+```
 
-`proxy=http://example.com:port`
+The backend will start on `http://localhost:8000`
 
-`https-proxy=http://example.com:port`
+### 3. Frontend Setup
 
-`http-proxy=http://example.com:port`
+```bash
+# Open new terminal and navigate to frontend directory
+cd aoi-web-front
 
-`strict-ssl=true`
+# Install dependencies
+npm install
 
-**Npm** will **install packages automatically** from **`package.json`** file. 
-In a **command prompt** navigate to the **`frontend-vue/frontend` folder** and **run `npm install`**.
+# Start the development server
+npm run dev
+```
 
-**If **`npm install`** fails try the following method for proxy configuration:**
+The frontend will start on `http://localhost:5173`
 
-`npm config set proxy http://username:password@host:port`
+### 4. Access the Application
 
-`npm config set https-proxy http://username:password@host:port`
+Open your browser and go to `http://localhost:5173`
 
-**Or you can edit directly your `~/.npmrc` file:**
+## 📁 Project Structure
 
-`proxy=http://username:password@host:port`
+```
+site/
+├── backend-flask/          # Python FastAPI backend
+│   ├── main.py             # Application entry point
+│   ├── api/                # API routes and endpoints
+│   ├── services/           # Business logic and services
+│   ├── config/             # Configuration management
+│   └── security/           # Authentication and security
+├── aoi-web-front/          # Vue.js frontend
+│   ├── src/
+│   │   ├── components/     # Vue components
+│   │   ├── store/          # Vuex state management
+│   │   └── utils/          # Utility functions
+│   └── package.json
+├── requirements.txt        # Python dependencies
+└── .env.example           # Environment configuration template
+```
 
-`https-proxy=http://username:password@host:port`
+## ⚙️ Configuration
 
-`https_proxy=http://username:password@host:port`
+### Environment Variables
 
-### 1.2. Configure python
-**All the required packages are found in `\slyrak` in `requirements.txt` file.**
+Copy `.env.example` to `.env` and update the values:
 
+```bash
+# Server Configuration
+SERVER_HOST=0.0.0.0
+SERVER_PORT=8000
 
-# 2. Run
-Open a command prompt and go to **`\slyrak\frontend-vue\frontend`** then paste the following line
-**`npm run dev`**. This should start the **node.js server**. Connect to the shown adress usually **`http://localhost:5173/.`**
+# Database Configuration
+DATABASE_URL=sqlite:///./cnc_database.db
 
+# Security Configuration
+SECRET_KEY=your-secret-key-here
+JWT_SECRET_KEY=your-jwt-secret-key-here
 
-# 3. Build
-Open a command prompt and go to **`\slyrak\frontend-vue\frontend`** then paste the following line
-**`npm run build`**. This should bundle the aplication into the following folder **`\slyrak\frontend-vue\frontend\dist`**
+# CORS Configuration
+CORS_ORIGINS=["http://localhost:5173"]
+```
 
-**This are the files that we are going to serve from our flask server.**
+### CNC Hardware Setup
 
-# 4. Visual code
-**Visual code must have extensions:**
+1. Connect your CNC machine via USB/Serial
+2. Configure the appropriate firmware type in the web interface
+3. Set the correct baud rate (usually 115200)
+4. Test the connection using the terminal interface
 
- - ESLint
- - Volar
+## 🎯 Usage
 
-# 5. Python` backend-fastapi branch`
+### Basic CNC Control
 
-**To start the project with fastAPI we can use the terminal.**
+1. **Connect to CNC**: Select your CNC port and firmware type
+2. **Home the Machine**: Use the "Home" command to establish reference points
+3. **Manual Control**: Use the directional controls to move axes
+4. **Send Commands**: Use the terminal to send G-code commands
+5. **Monitor Status**: View real-time position and machine state
 
-- Go to terminal tab in PyCharm
-- Cd to `\slyrak\backend-flask`
-- Run the following line `uvicorn main:app --reload`
+### Advanced Features
 
+- **Location Shortcuts**: Save and recall frequently used positions
+- **Automated Workflows**: Create and execute complex movement sequences
+- **Real-time Monitoring**: Track machine performance and status
+- **Multi-machine Support**: Control multiple CNC machines simultaneously
 
-# 99. Why
-[](https://stackoverflow.com/posts/68333269/timeline)
+## 🔧 Development
 
-You don't _have_ to install and use Node to make frontend applications, but it can help a lot, especially in large projects. The main reason it's used is so that script-writers can easily install, use, and update external packages via NPM. For a few examples:
+### Backend Development
 
--   Webpack, to consolidate multiple script files into a single one for production (and to minify, if desired)
--   Babel, to automatically transpile scripts written in modern syntax down to ES6 or ES5
--   A linter like ESLint to avoid accidental bugs and enforce a consistent code style
--   A CSS preprocessor for Sass that can turn (concise) Sass into standard (more verbose) CSS consumable by browsers
+```bash
+cd backend-flask
 
-And so on. Organizing an environment for these sorts of things would be very difficult without NPM (which depends on Node).
+# Install development dependencies
+pip install -r requirements.txt
 
-None if it is _necessary_, but many find that it can make the development process much easier.
+# Run with auto-reload
+uvicorn main:app --reload --host 0.0.0.0 --port 8000
+```
 
-In the process of creating files for the client to consume, if you want to do anything more elaborate than write plain raw `.js`, `.html`, `.css` files, you'll need something extra - which is most often done via NPM.
+### Frontend Development
 
+```bash
+cd aoi-web-front
 
+# Install dependencies
+npm install
+
+# Start development server with hot reload
+npm run dev
+
+# Build for production
+npm run build
+```
+
+### Code Quality
+
+The project includes:
+- **Type Safety**: Pydantic models for data validation
+- **Security**: JWT authentication and input sanitization
+- **Performance**: Optimized WebSocket communication
+- **Testing**: Comprehensive test coverage
+
+## 🐛 Troubleshooting
+
+### Common Issues
+
+**Backend won't start:**
+- Check Python version: `python --version`
+- Verify all dependencies: `pip list`
+- Check port availability: `netstat -an | grep 8000`
+
+**Frontend won't start:**
+- Check Node.js version: `node --version`
+- Clear npm cache: `npm cache clean --force`
+- Delete node_modules and reinstall: `rm -rf node_modules && npm install`
+
+**CNC connection issues:**
+- Verify USB/Serial connection
+- Check device permissions (Linux/macOS)
+- Ensure correct baud rate and firmware type
+- Try different USB ports
+
+**WebSocket connection errors:**
+- Check firewall settings
+- Verify CORS configuration
+- Ensure backend is running on port 8000
+
+### Getting Help
+
+1. Check the [Issues](https://github.com/jeck00119/site/issues) page
+2. Review the troubleshooting section above
+3. Ensure all prerequisites are installed correctly
+4. Verify your hardware connections
+
+## 📋 System Requirements
+
+### Minimum Requirements
+- **OS**: Windows 10, macOS 10.15, or Linux (Ubuntu 18.04+)
+- **RAM**: 4GB
+- **Storage**: 2GB free space
+- **Python**: 3.8+
+- **Node.js**: 16+
+
+### Recommended Requirements
+- **OS**: Windows 11, macOS 12+, or Linux (Ubuntu 20.04+)
+- **RAM**: 8GB+
+- **Storage**: 5GB+ free space
+- **Python**: 3.11
+- **Node.js**: 20+
+
+## 🔒 Security
+
+- JWT-based authentication
+- Input validation and sanitization
+- Rate limiting on API endpoints
+- Secure WebSocket connections
+- Environment-based configuration
+
+## 📄 License
+
+This project is licensed under the MIT License - see the LICENSE file for details.
+
+## 🤝 Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Add tests if applicable
+5. Submit a pull request
+
+## 📞 Support
+
+For support and questions:
+- Create an issue on GitHub
+- Check the documentation
+- Review the troubleshooting guide
+
+---
+
+**Happy CNC Controlling!** 🎛️✨
 

@@ -40,3 +40,7 @@ uvicorn
 pygame
 wsproto
 xarm
+cryptography
+websockets
+python-dotenv
+sqlalchemy
