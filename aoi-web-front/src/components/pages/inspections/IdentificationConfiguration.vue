@@ -170,7 +170,7 @@ export default {
                 else
                 {
                     store.dispatch("algorithms/setCurrentAlgorithm", null);
-                    store.dispatch("algorithms/setCurrentAlgorithmAttributes", null);
+                    store.dispatch("algorithms/setCurrentAlgorithmAttributes", []);
                     store.dispatch("algorithms/setAlgorithmResult", null);
                     store.dispatch("components/setCurrentComponent", null);
                     store.dispatch("graphics/resetGraphicsItems");

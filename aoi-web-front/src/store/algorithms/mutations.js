@@ -171,10 +171,10 @@ export default {
     updateCurrentBasicAlgorithmAttributes(state, payload) {
         for(const key in state.basicAlgorithmsAttributes[payload.idx])
         {
-            if(state.basicAlgorithmsAttributes[key].name === payload.name
-                && !state.basicAlgorithmsAttributes[key].values.includes(payload.value))
+            if(state.basicAlgorithmsAttributes[payload.idx][key].name === payload.name
+                && !state.basicAlgorithmsAttributes[payload.idx][key].values.includes(payload.value))
             {
-                state.basicAlgorithmsAttributes[key].values.push(payload.value);
+                state.basicAlgorithmsAttributes[payload.idx][key].values.push(payload.value);
                 break;
             }
         }

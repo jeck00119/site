@@ -1,17 +1,21 @@
-# 🏭 CNC Control System
+# AOI Platform
 
-A modern, full-stack CNC control system with real-time monitoring, multi-firmware support, and advanced automation features.
+A modern, full-stack AOI (Automated Optical Inspection) platform with real-time monitoring, multi-module support, and advanced automation features for comprehensive industrial inspection and control.
 
-## ✨ Features
+## Features
 
-- 🎛️ **Multi-Firmware Support**: GRBL, FluidNC, and Marlin compatibility
-- 🔄 **Real-time Control**: Live position updates and command execution
-- 📱 **Responsive UI**: Works on desktop and mobile devices
-- 🔒 **Secure**: JWT authentication and input validation
-- 🚀 **High Performance**: Optimized for low latency and high throughput
-- 🤖 **Automation Ready**: Robot integration and automated workflows
+- **Multi-Module Platform**: Camera systems, robots, CNC, profilometer, and more
+- **CNC Support**: GRBL, FluidNC, and Marlin compatibility for precision control
+- **Advanced Imaging**: Multi-camera setups with calibration and stereo vision
+- **Robot Integration**: Automated workflows and position control
+- **Real-time Monitoring**: Live updates from all connected industrial modules
+- **Responsive UI**: Works on desktop and mobile devices
+- **Secure**: JWT authentication and input validation
+- **High Performance**: Optimized for low latency and high throughput
+- **Industrial Configurations**: Support for multiple production setups and part numbers
+- **Inspection Analytics**: Comprehensive detection and quality control algorithms
 
-## 🚀 Quick Start
+## Quick Start
 
 ### Prerequisites
 
@@ -58,12 +62,12 @@ python setup.py
 ```
 
 The setup script will:
-- ✅ Detect your platform (Windows/Linux/macOS)
-- ✅ Check all prerequisites
-- ✅ Create Python virtual environment
-- ✅ Install all dependencies
-- ✅ Generate platform-specific start scripts
-- ✅ Create configuration files
+- Detect your platform (Windows/Linux/macOS)
+- Check all prerequisites
+- Create Python virtual environment
+- Install all dependencies
+- Generate platform-specific start scripts
+- Create configuration files
 
 ### 3. Manual Setup (Alternative)
 
@@ -134,12 +138,12 @@ start_frontend.bat
 
 **Windows:**
 ```bash
-start_cnc_system.bat
+start_aoi_system.bat
 ```
 
 **Linux/macOS:**
 ```bash
-./start_cnc_system.sh
+./start_aoi_system.sh
 ```
 
 ### 5. Access the Application
@@ -150,7 +154,7 @@ Open your browser and go to `http://localhost:5173`
 - **Backend API**: http://localhost:8000
 - **API Documentation**: http://localhost:8000/docs
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 site/
@@ -170,7 +174,7 @@ site/
 └── .env.example           # Environment configuration template
 ```
 
-## ⚙️ Configuration
+## Configuration
 
 ### Environment Variables
 
@@ -182,7 +186,7 @@ SERVER_HOST=0.0.0.0
 SERVER_PORT=8000
 
 # Database Configuration
-DATABASE_URL=sqlite:///./cnc_database.db
+DATABASE_URL=sqlite:///./aoi_database.db
 
 # Security Configuration
 SECRET_KEY=your-secret-key-here
@@ -192,31 +196,38 @@ JWT_SECRET_KEY=your-jwt-secret-key-here
 CORS_ORIGINS=["http://localhost:5173"]
 ```
 
-### CNC Hardware Setup
+### Hardware Setup
 
-1. Connect your CNC machine via USB/Serial
-2. Configure the appropriate firmware type in the web interface
-3. Set the correct baud rate (usually 115200)
-4. Test the connection using the terminal interface
+1. **Camera Systems**: Connect USB/IP cameras and configure camera settings
+2. **CNC Module**: Connect CNC machine via USB/Serial (GRBL, FluidNC, or Marlin)
+3. **Robot Module**: Setup robot communication and position calibration
+4. **Profilometer**: Configure profilometer settings for surface measurements
+5. **Other Modules**: Connect additional industrial equipment as needed
+6. **Network Configuration**: Ensure all modules are accessible on the network
+7. **Configuration Setup**: Select or create your production part number configuration
 
-## 🎯 Usage
+## Usage
 
-### Basic CNC Control
+### Platform Control
 
-1. **Connect to CNC**: Select your CNC port and firmware type
-2. **Home the Machine**: Use the "Home" command to establish reference points
-3. **Manual Control**: Use the directional controls to move axes
-4. **Send Commands**: Use the terminal to send G-code commands
-5. **Monitor Status**: View real-time position and machine state
+1. **Select Configuration**: Choose your part number (IBS-012.787-xx, IBS-014.xxx-xx, etc.)
+2. **Camera Setup**: Configure cameras for inspection tasks and calibrate positions
+3. **Robot Control**: Set up robot positions and automated sequences
+4. **CNC Module**: Connect CNC for precision positioning (optional)
+5. **Profilometer**: Configure surface measurement parameters
+6. **Inspection Algorithms**: Select and configure detection algorithms
+7. **Run Inspections**: Execute automated inspection workflows
 
 ### Advanced Features
 
-- **Location Shortcuts**: Save and recall frequently used positions
-- **Automated Workflows**: Create and execute complex movement sequences
-- **Real-time Monitoring**: Track machine performance and status
-- **Multi-machine Support**: Control multiple CNC machines simultaneously
+- **Multi-Module Coordination**: Synchronize cameras, robots, and other equipment
+- **Custom Algorithms**: Implement custom detection and inspection routines
+- **Real-time Analytics**: Monitor inspection results and quality metrics
+- **Configuration Templates**: Save and recall complete production configurations
+- **Automated Workflows**: Create complex multi-step inspection sequences
+- **Report Generation**: Export inspection results and quality reports
 
-## 🔧 Development
+## Development
 
 ### Backend Development
 
@@ -253,7 +264,7 @@ The project includes:
 - **Performance**: Optimized WebSocket communication
 - **Testing**: Comprehensive test coverage
 
-## 🐛 Troubleshooting
+## Troubleshooting
 
 ### Common Issues
 
@@ -317,12 +328,14 @@ sudo apt-get install -y nodejs
 - Delete node_modules and reinstall: `rm -rf node_modules && npm install`
 - Check port availability: `netstat -an | grep 5173`
 
-**CNC connection issues:**
-- Verify USB/Serial connection
-- Check device permissions (Linux/macOS): `ls -l /dev/ttyUSB* /dev/ttyACM*`
-- Ensure correct baud rate and firmware type
-- Try different USB ports
-- Check for driver requirements
+**Hardware connection issues:**
+- **CNC Module**: Verify USB/Serial connection, check baud rate and firmware type
+- **Camera Systems**: Ensure cameras are detected and have proper drivers installed  
+- **Robot Module**: Verify network/serial communication and position calibration
+- **Profilometer**: Check connection and measurement calibration
+- Check device permissions (Linux): `ls -l /dev/ttyUSB* /dev/ttyACM*`
+- Try different USB ports or network configurations
+- Verify production configuration matches connected hardware
 
 **WebSocket connection errors:**
 - Check firewall settings
@@ -364,7 +377,7 @@ system_profiler SPUSBDataType
    - Complete error messages
    - Steps to reproduce the issue
 
-## 📋 System Requirements
+## System Requirements
 
 ### Minimum Requirements
 - **OS**: Windows 10, macOS 10.15, or Linux (Ubuntu 18.04+)
@@ -380,7 +393,7 @@ system_profiler SPUSBDataType
 - **Python**: 3.11
 - **Node.js**: 20+
 
-## 🔒 Security
+## Security
 
 - JWT-based authentication
 - Input validation and sanitization
@@ -388,11 +401,11 @@ system_profiler SPUSBDataType
 - Secure WebSocket connections
 - Environment-based configuration
 
-## 📄 License
+## License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
 
-## 🤝 Contributing
+## Contributing
 
 1. Fork the repository
 2. Create a feature branch
@@ -400,7 +413,7 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 4. Add tests if applicable
 5. Submit a pull request
 
-## 📞 Support
+## Support
 
 For support and questions:
 - Create an issue on GitHub
@@ -409,5 +422,5 @@ For support and questions:
 
 ---
 
-**Happy CNC Controlling!** 🎛️✨
+**Happy Automating!**
 

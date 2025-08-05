@@ -308,7 +308,7 @@ export default {
             }
             else {
                 store.dispatch("algorithms/setCurrentReferenceAlgorithm", null);
-                store.dispatch("algorithms/setCurrentReferenceAlgorithmAttributes", null);
+                store.dispatch("algorithms/setCurrentReferenceAlgorithmAttributes", []);
                 store.dispatch("graphics/resetReferenceGraphicItems");
                 store.dispatch("algorithms/setAlgorithmResult", null);
                 store.dispatch("algorithms/resetLiveAlgorithmReference");
@@ -698,9 +698,9 @@ export default {
         onBeforeUnmount(() => {
             resultsWatch();
             store.dispatch("algorithms/setCurrentAlgorithm", null);
-            store.dispatch("algorithms/setCurrentAlgorithmAttributes", null);
+            store.dispatch("algorithms/setCurrentAlgorithmAttributes", []);
             store.dispatch("algorithms/setCurrentReferenceAlgorithm", null);
-            store.dispatch("algorithms/setCurrentReferenceAlgorithmAttributes", null);
+            store.dispatch("algorithms/setCurrentReferenceAlgorithmAttributes", []);
             store.dispatch("graphics/resetReferenceGraphicItems");
             store.dispatch("graphics/resetGraphicsItems");
             store.dispatch("algorithms/setAlgorithmResult", null);

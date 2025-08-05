@@ -112,13 +112,15 @@ export default {
                     canvas.add(graphic);
                     canvas.setActiveObject(graphic);
 
-                    canvas.bringToFront(graphic);
+                    canvas.bringObjectToFront(graphic);
                     canvas.renderAll();
                 }
             }
         }
 
         function removeRectangles() {
+            if (!canvas) return;
+            
             const objects = canvas.getObjects();
 
             objects.forEach(function(item, _) {
@@ -130,6 +132,8 @@ export default {
         }
 
         function removeCircles() {
+            if (!canvas) return;
+            
             const objects = canvas.getObjects();
 
             objects.forEach(function(item, _) {
@@ -199,9 +203,9 @@ export default {
             if(newValue)
             {
                 removeImages();
-                canvas.setOverlayImage(newValue, canvas.renderAll.bind(canvas), {
-                    globalCompositeOperation: 'destination-atop'
-                });
+                // Fabric.js v6: Use direct property assignment instead of setOverlayImage
+                canvas.overlayImage = newValue;
+                canvas.renderAll();
             }
         });
 
@@ -218,22 +222,31 @@ export default {
         watch(imageSource, (newValue) => {
             if(show.value && canvas)
             {
-                fabric.Image.fromURL(newValue, function(img) {
-                    canvas.setBackgroundImage(img, canvas.renderAll.bind(canvas), {});
+                // Fabric.js v6: Use async/await with FabricImage.fromURL
+                fabric.FabricImage.fromURL(newValue).then(img => {
+                    canvas.backgroundImage = img;
+                    canvas.renderAll();
+                }).catch(err => {
+                    console.error('Error loading background image:', err);
                 });
             }
         });
 
         function addStaticImage(url) {
-            fabric.Image.fromURL(url, function(img){
+            // Fabric.js v6: Use async/await with FabricImage.fromURL
+            fabric.FabricImage.fromURL(url).then(img => {
                 img.set({top: 0, left: staticImagesOffset, selectable: false});
                 staticImagesOffset += img.width + staticImagesMargin;
-                // canvas.add(img);
-                canvas.sendToBack(img);
+                canvas.add(img);
+                canvas.sendObjectToBack(img);
+            }).catch(err => {
+                console.error('Error loading static image:', err);
             });
         }
 
         function removeImages() {
+            if (!canvas) return;
+            
             const objects = canvas.getObjects();
 
             objects.forEach(function(object, _) {
@@ -243,7 +256,9 @@ export default {
                 }
             });
 
-            canvas.setBackgroundImage(null, canvas.renderAll.bind(canvas));
+            // Fabric.js v6: Use direct property assignment instead of setBackgroundImage
+            canvas.backgroundImage = null;
+            canvas.renderAll();
         }
 
         function selectionChanged(obj)
@@ -341,9 +356,9 @@ export default {
 
             if(overlay.value)
             {
-                canvas.setOverlayImage(overlay.value, canvas.renderAll.bind(canvas), {
-                    globalCompositeOperation: 'destination-atop'
-                });
+                // Fabric.js v6: Use direct property assignment instead of setOverlayImage
+                canvas.overlayImage = overlay.value;
+                canvas.renderAll();
             }
         });
 
@@ -354,7 +369,11 @@ export default {
         });
 
         onUnmounted(() => {
-            disconnectFromCamera();
+            try {
+                disconnectFromCamera();
+            } catch (error) {
+                console.warn('Error during CameraScene component unmounting:', error);
+            }
         });
 
         return {

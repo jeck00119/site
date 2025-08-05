@@ -332,7 +332,7 @@ export default{
                 originY: 'center'
             });
 
-            const text = new fabric.Text(currentDraggedType.name, {
+            const text = new fabric.FabricText(currentDraggedType.name, {
                 fontFamily: 'Calibri',
                 fontSize: 30,
                 originX: 'center',

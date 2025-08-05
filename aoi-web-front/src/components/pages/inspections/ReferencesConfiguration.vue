@@ -644,7 +644,7 @@ export default{
             else
             {
                 store.dispatch("algorithms/setCurrentReferenceAlgorithm", null);
-                store.dispatch("algorithms/setCurrentReferenceAlgorithmAttributes", null);
+                store.dispatch("algorithms/setCurrentReferenceAlgorithmAttributes", []);
                 store.dispatch("graphics/resetReferenceGraphicItems");
                 store.dispatch("algorithms/setAlgorithmResult", null);
             }

@@ -17,7 +17,7 @@
 </template>
 
 <script>
-import { computed, onMounted } from 'vue';
+import { computed, onMounted, onUnmounted } from 'vue';
 import { useStore } from 'vuex';
 
 import cnc from "../../cnc/CNC.vue";
@@ -41,10 +41,21 @@ export default {
       }
     });
 
+    onUnmounted(() => {
+      try {
+        // Clean up any CNC connections if needed
+        console.log("CNCMachine component unmounting");
+      } catch (error) {
+        console.warn('Error during CNCMachine component unmounting:', error);
+      }
+    });
+
     function initializeConnections() {
       console.log("Attempting to initialize all CNCs...");
       store.dispatch("cnc/initializeAllCNCs").catch(error => {
         console.error("Failed to initialize CNCs:", error);
+        // Show user-friendly error message
+        alert(`Failed to initialize CNCs: ${error.message || error}`);
       });
     }
 

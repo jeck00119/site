@@ -137,7 +137,11 @@ export default {
     });
 
     onUnmounted(() => {
-      cleanup();
+      try {
+        cleanup();
+      } catch (error) {
+        console.warn('Error during CNCRefactored component unmounting:', error);
+      }
     });
 
     // Initialization

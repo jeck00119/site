@@ -172,32 +172,83 @@ export default {
     },
 
     async api_moveToLocation(context, payload){
-        const { response, responseData } = await api.get(`/cnc/${payload.cncUid}/__API__/${payload.location}/move_to_location?block=${payload.block}&timeout=${payload.timeout}`);
+        try {
+            const { response, responseData } = await api.get(`/cnc/${payload.cncUid}/__API__/${payload.location}/move_to_location?block=${payload.block}&timeout=${payload.timeout}`);
+            if (!response.ok) {
+                const error = new Error(responseData.detail || `Failed to move CNC ${payload.cncUid} to location ${payload.location}`);
+                console.error('CNC Move to Location Error:', error.message);
+                throw error;
+            }
+        } catch (error) {
+            console.error('CNC Move to Location Exception:', error.message);
+            throw error;
+        }
     },
 
     async api_command(context, payload){
-        const { response, responseData } = await api.get(`/cnc/${payload.cncUid}/__API__/${payload.command}`);
+        try {
+            const { response, responseData } = await api.get(`/cnc/${payload.cncUid}/__API__/${payload.command}`);
+            if (!response.ok) {
+                const error = new Error(responseData.detail || `Failed to execute command '${payload.command}' on CNC ${payload.cncUid}`);
+                console.error('CNC Command Error:', error.message);
+                throw error;
+            }
+        } catch (error) {
+            console.error('CNC Command Exception:', error.message);
+            throw error;
+        }
     },
 
     async api_increaseAxis(context, payload){
-        const { response, responseData } = await api.get(`/cnc/${payload.cncUid}/__API__/${payload.axis}/plus?feed_rate=${payload.feedrate}&step=${payload.step}`);
+        try {
+            const { response, responseData } = await api.get(`/cnc/${payload.cncUid}/__API__/${payload.axis}/plus?feed_rate=${payload.feedrate}&step=${payload.step}`);
+            if (!response.ok) {
+                const error = new Error(responseData.detail || `Failed to move CNC ${payload.cncUid} axis ${payload.axis} plus by ${payload.step} steps`);
+                console.error('CNC Axis Plus Error:', error.message);
+                throw error;
+            }
+        } catch (error) {
+            console.error('CNC Axis Plus Exception:', error.message);
+            throw error;
+        }
     },
 
     async api_decreaseAxis(context, payload){
-        const { response, responseData } = await api.get(`/cnc/${payload.cncUid}/__API__/${payload.axis}/minus?feed_rate=${payload.feedrate}&step=${payload.step}`);
+        try {
+            const { response, responseData } = await api.get(`/cnc/${payload.cncUid}/__API__/${payload.axis}/minus?feed_rate=${payload.feedrate}&step=${payload.step}`);
+            if (!response.ok) {
+                const error = new Error(responseData.detail || `Failed to move CNC ${payload.cncUid} axis ${payload.axis} minus by ${payload.step} steps`);
+                console.error('CNC Axis Minus Error:', error.message);
+                throw error;
+            }
+        } catch (error) {
+            console.error('CNC Axis Minus Exception:', error.message);
+            throw error;
+        }
     },
 
     async api_terminal(context, payload){
-        const {response, responseData} = await api.get(`/cnc/${payload.cncUid}/__API__/terminal?command=${payload.command}`)
+        try {
+            const {response, responseData} = await api.get(`/cnc/${payload.cncUid}/__API__/terminal?command=${payload.command}`);
+            if (!response.ok) {
+                const error = new Error(responseData.detail || `Failed to send terminal command '${payload.command}' to CNC ${payload.cncUid}`);
+                console.error('CNC Terminal Error:', error.message);
+                throw error;
+            }
+        } catch (error) {
+            console.error('CNC Terminal Exception:', error.message);
+            throw error;
+        }
     },
 
     async closeStateSocket(_, payload) {
-        const { response } = await api.post(`/cnc/${payload.uid}/ws/close`);
-
-        if(!response.ok)
-        {
-            const error = new Error(`Failed to close socket for CNC with ID ${payload.uid}!`);
-            throw error;
+        try {
+            const { response, responseData } = await api.post(`/cnc/${payload.uid}/ws/close`);
+            if(!response.ok) {
+                console.warn(`Socket for CNC ${payload.uid} may already be closed or doesn't exist:`, responseData?.detail || 'Unknown error');
+            }
+        } catch (error) {
+            console.warn(`Error closing socket for CNC ${payload.uid}:`, error.message);
         }
     },
 

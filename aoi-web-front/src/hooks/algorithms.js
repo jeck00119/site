@@ -114,7 +114,7 @@ export default function useAlgorithms(algorithmUid, referenceUid, currentImageSo
         else
         {
             store.dispatch("algorithms/setCurrentAlgorithm", null);
-            store.dispatch("algorithms/setCurrentAlgorithmAttributes", null);
+            store.dispatch("algorithms/setCurrentAlgorithmAttributes", []);
             store.dispatch("graphics/resetGraphicsItems");
             store.dispatch("algorithms/setAlgorithmResult", null);
         }

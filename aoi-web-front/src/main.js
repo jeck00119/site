@@ -62,9 +62,11 @@ const app = createApp(App);
 // Global error handler for better error tracking and user experience
 app.config.errorHandler = (err, instance, info) => {
     // Log error details for debugging
-    console.error('🚨 Global Vue Error:', {
+    console.error('Global Vue Error:', {
         error: err,
-        component: instance?.$options?.name || 'Unknown Component',
+        errorMessage: err.message,
+        errorStack: err.stack,
+        component: instance?.$options?.name || instance?.type?.name || 'Unknown Component',
         errorInfo: info,
         timestamp: new Date().toISOString()
     });

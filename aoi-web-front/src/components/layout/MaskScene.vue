@@ -101,7 +101,9 @@ export default {
             {
                 removePoints();
                 removePolygons();
-                canvas.setBackgroundImage(null, canvas.renderAll.bind(canvas));
+                // Fabric.js v6: Use direct property assignment instead of setBackgroundImage
+                canvas.backgroundImage = null;
+                canvas.renderAll();
             }
         });
 
@@ -194,7 +196,9 @@ export default {
 
         function roiReceived(event) {
             let recvData = JSON.parse(event.data);
-            canvas.setBackgroundImage('data:image/png;base64,' + recvData.roi, canvas.renderAll.bind(canvas), {});
+            // Fabric.js v6: Use direct property assignment instead of setBackgroundImage
+            canvas.backgroundImage = 'data:image/png;base64,' + recvData.roi;
+            canvas.renderAll();
         }
 
         function addPolyPoint(mouseEvent) {

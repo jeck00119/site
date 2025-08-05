@@ -63,16 +63,20 @@ export default {
     }
 
     function disconnectFromSocket() {
-      if(configurationSocket)
-      {
-        configurationSocket.removeEventListener('open', onConfigurationSocketOpen);
-        configurationSocket.removeEventListener('message', configurationChanged);
+      try {
+        if(configurationSocket)
+        {
+          configurationSocket.removeEventListener('open', onConfigurationSocketOpen);
+          configurationSocket.removeEventListener('message', configurationChanged);
 
-        configurationSocket.close();
-        configurationSocket = null;
-        store.dispatch("configurations/closeConfigurationChangedSocket", {
-          uid: ws_uid
-        });
+          configurationSocket.close();
+          configurationSocket = null;
+          store.dispatch("configurations/closeConfigurationChangedSocket", {
+            uid: ws_uid
+          });
+        }
+      } catch (error) {
+        console.warn('Error during socket disconnection:', error);
       }
     }
 
@@ -113,7 +117,11 @@ export default {
     onMounted(() => onLoad());
 
     onUnmounted(() => {
-      disconnectFromSocket();
+      try {
+        disconnectFromSocket();
+      } catch (error) {
+        console.warn('Error during component unmounting:', error);
+      }
     });
   }
 }

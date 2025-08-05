@@ -294,29 +294,33 @@ export default {
         });
 
         onUnmounted(async () => {
-            store.dispatch("process/stopProcessing");
+            try {
+                store.dispatch("process/stopProcessing");
 
-            clearNotification();
+                clearNotification();
 
-            store.commit("process/setProcessStatus", 'IDLE');
+                store.commit("process/setProcessStatus", 'IDLE');
 
-            await closeSocket();
-            await closeCognexSocket();
-            await closeCameraSocket();
+                await closeSocket();
+                await closeCognexSocket();
+                await closeCameraSocket();
 
-            if (wsProcess) {
-                wsProcess.close();
-                wsProcess = null;
-            }
+                if (wsProcess) {
+                    wsProcess.close();
+                    wsProcess = null;
+                }
 
-            if (cognexStateSocket) {
-                cognexStateSocket.close();
-                cognexStateSocket = null;
-            }
+                if (cognexStateSocket) {
+                    cognexStateSocket.close();
+                    cognexStateSocket = null;
+                }
 
-            if(cameraStateSocket) {
-                cameraStateSocket.close();
-                cameraStateSocket = null;
+                if(cameraStateSocket) {
+                    cameraStateSocket.close();
+                    cameraStateSocket = null;
+                }
+            } catch (error) {
+                console.warn('Error during ResultsList component unmounting:', error);
             }
         });
 

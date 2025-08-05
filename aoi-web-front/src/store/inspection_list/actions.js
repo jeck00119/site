@@ -14,10 +14,14 @@ export default {
         {
             if(responseData)
             {
-                context.commit('setColumnNames', responseData.columns);
-                context.commit('setColumnTypes', responseData.columnTypes);
+                context.commit('setColumnNames', responseData.columns || []);
+                context.commit('setColumnTypes', responseData.columnTypes || []);
 
-                context.dispatch('convertAndSetInspections', responseData.inspections);
+                if(responseData.inspections) {
+                    context.dispatch('convertAndSetInspections', responseData.inspections);
+                } else {
+                    context.commit('setInspections', []);
+                }
             }
         }
     },
@@ -37,12 +41,14 @@ export default {
     convertAndSetInspections(context, payload) {
         let inspections = [];
 
-        for(const [key, value] of Object.entries(payload))
-        {
-            inspections.push({
-                "Name": key,
-                ...value
-            });
+        if(payload && typeof payload === 'object') {
+            for(const [key, value] of Object.entries(payload))
+            {
+                inspections.push({
+                    "Name": key,
+                    ...value
+                });
+            }
         }
 
         context.commit('setInspections', inspections);

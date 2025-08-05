@@ -12,8 +12,8 @@ export default {
             configuredAlgorithms: [],
             currentAlgorithm: null,
             currentReferenceAlgorithm: null,
-            currentAlgorithmAttributes: null,
-            currentReferenceAlgorithmAttributes: null,
+            currentAlgorithmAttributes: [],
+            currentReferenceAlgorithmAttributes: [],
             algorithmResult: null,
             basicAlgorithmsAttributes: [],
             currentBasicAlgorithms: []

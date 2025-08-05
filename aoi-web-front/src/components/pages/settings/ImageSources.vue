@@ -237,10 +237,14 @@ export default{
         }
 
         onUnmounted(() => {
-            showCamera.value = false;
+            try {
+                showCamera.value = false;
 
-            store.dispatch("imageSources/setCurrentImageSource", null);
-            store.dispatch("imageSources/setCurrentImageGenerator", null);
+                store.dispatch("imageSources/setCurrentImageSource", null);
+                store.dispatch("imageSources/setCurrentImageGenerator", null);
+            } catch (error) {
+                console.warn('Error during ImageSources component unmounting:', error);
+            }
         });
         
         return{
