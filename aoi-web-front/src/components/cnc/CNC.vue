@@ -497,20 +497,26 @@
       <label>Name:</label> <input type="text" v-model.trim="newLocationName" />
       <p>New position coordinates</p>
       <table>
-        <th>X</th>
-        <th>Y</th>
-        <th>Z</th>
-        <tr>
-          <td>
-            <div class="boxed">{{ pos.x.toFixed(3) }}</div>
-          </td>
-          <td>
-            <div class="boxed">{{ pos.y.toFixed(3) }}</div>
-          </td>
-          <td>
-            <div class="boxed">{{ pos.z.toFixed(3) }}</div>
-          </td>
-        </tr>
+        <thead>
+          <tr>
+            <th>X</th>
+            <th>Y</th>
+            <th>Z</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>
+              <div class="boxed">{{ pos.x.toFixed(3) }}</div>
+            </td>
+            <td>
+              <div class="boxed">{{ pos.y.toFixed(3) }}</div>
+            </td>
+            <td>
+              <div class="boxed">{{ pos.z.toFixed(3) }}</div>
+            </td>
+          </tr>
+        </tbody>
       </table>
       <base-button @click="saveLocation">Save</base-button>
       <base-button>Cancel</base-button>

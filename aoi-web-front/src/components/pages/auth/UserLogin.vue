@@ -62,6 +62,7 @@ import { useRouter } from 'vue-router';
 import { useStore } from 'vuex';
 
 import useNotification from '../../../hooks/notifications.js';
+import { validateEmail, validatePassword, sanitizeInput } from '../../../utils/validation.js';
 
 export default{
     setup() {
@@ -77,52 +78,23 @@ export default{
         async function login() {
             let error = false;
 
-            // Enhanced email validation
-            if(email.value === '')
-            {
-                setNotification(3000, `Please enter your email.`, 'bi-exclamation-circle-fill');
+            // Use centralized validation
+            const emailValidation = validateEmail(email.value);
+            if (!emailValidation.isValid) {
+                setNotification(3000, emailValidation.errors[0], 'bi-exclamation-circle-fill');
                 error = true;
-            }
-            else 
-            {
-                // Email format validation
-                const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-                if (!emailRegex.test(email.value)) {
-                    setNotification(3000, `Please enter a valid email address.`, 'bi-exclamation-circle-fill');
-                    error = true;
-                }
-                
-                // Email length validation
-                if (email.value.length > 254) {
-                    setNotification(3000, `Email address is too long.`, 'bi-exclamation-circle-fill');
-                    error = true;
-                }
             }
 
-            // Enhanced password validation
-            if(password.value === '')
-            {
-                setNotification(3000, `Please enter your password.`, 'bi-exclamation-circle-fill');
+            const passwordValidation = validatePassword(password.value);
+            if (!passwordValidation.isValid) {
+                setNotification(3000, passwordValidation.errors[0], 'bi-exclamation-circle-fill');
                 error = true;
-            }
-            else 
-            {
-                // Password length validation
-                if (password.value.length < 3) {
-                    setNotification(3000, `Password must be at least 3 characters long.`, 'bi-exclamation-circle-fill');
-                    error = true;
-                }
-                
-                if (password.value.length > 128) {
-                    setNotification(3000, `Password is too long.`, 'bi-exclamation-circle-fill');
-                    error = true;
-                }
             }
 
             if(!error)
             {
-                // Sanitize input to prevent XSS
-                const sanitizedEmail = email.value.trim().toLowerCase();
+                // Use centralized sanitization
+                const sanitizedEmail = sanitizeInput(email.value);
                 const sanitizedPassword = password.value.trim();
                 
                 const user = new FormData();
@@ -134,7 +106,9 @@ export default{
 
                     router.replace('/configurations');
                 }catch(e) {
-                    setNotification(3000, `Something went wrong. Please try again.`, 'bi-exclamation-circle-fill');
+                    // Display the specific error message from the backend
+                    const errorMessage = e.message || 'Something went wrong. Please try again.';
+                    setNotification(3000, errorMessage, 'bi-exclamation-circle-fill');
                 }
             }
         }

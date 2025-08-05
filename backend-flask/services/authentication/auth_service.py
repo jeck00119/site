@@ -24,8 +24,11 @@ class AuthService(metaclass=Singleton):
         user = self.users_repository.get_by_username(username)
         if user:
             if self.bcrypt_context.verify(password, user["password"]):
-                return True, user
-        return False, None
+                return True, user, "authenticated"
+            else:
+                return False, None, "invalid_password"
+        else:
+            return False, None, "user_not_found"
 
     def hash_password(self, password: str):
         return self.bcrypt_context.hash(password)

@@ -1,16 +1,10 @@
 {
     "users": {
         "1": {
-            "level": "operator",
-            "password": "$2b$12$o2ZRNk3XUz.T63TlSHzVd.SAOdyCp4ag658Fu/7umFyUtCwFbsGC6",
-            "uid": "test-user-123",
-            "username": "testuser"
-        },
-        "2": {
-            "level": "",
-            "password": "$2b$12$a0U5ro7NWJd5Qp7Jd14mb.nKQTLNSf5U9rqRiuSyXtA/4AldTozuO",
-            "uid": "5abf61bc-08e2-4c32-99bd-65f052d66698",
-            "username": "sadasd@forvia.com"
+            "level": "admin",
+            "password": "$2b$12$xZZNOr6tUpCLZD4U1ehneufPgZOUpkeqbJU9r/UzVlAahNuafPNfa",
+            "uid": "admin-dev-001",
+            "username": "admin@forvia.com"
         }
     }
 }

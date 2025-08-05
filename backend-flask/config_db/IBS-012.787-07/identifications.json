@@ -1,0 +1,12 @@
+{
+    "identifications": {
+        "1": {
+            "algorithm_type": "advanced",
+            "algorithm_uid": "test-algo-updated",
+            "image_source_uid": "test-img-source-updated",
+            "name": "Updated Test Identification",
+            "reference_uid": "test-ref-updated",
+            "uid": "test-id-001"
+        }
+    }
+}

@@ -82,7 +82,7 @@ async def post_cnc(
 ):
     try:
         # Create in repository
-        RouteHelper.create_entity(cnc_repository, cnc_model.model_dump(), "CNC")
+        RouteHelper.create_entity(cnc_repository, cnc_model, "CNC")
         # Initialize in service
         cnc_service.create_cnc(cnc_model.uid)
         return RouteHelper.create_success_response(

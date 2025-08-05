@@ -167,8 +167,8 @@ class ConfigurationManager(metaclass=Singleton):
             elif component == "database":
                 return {
                     "type": self.settings.database.db_type,
-                    "path": self.settings.database.sqlite_path,
-                    "timeout": self.settings.database.sqlite_timeout,
+                    "path": self.settings.database.json_path,
+                    "cache_size": self.settings.database.cache_size,
                 }
             
             elif component == "server":

@@ -148,6 +148,14 @@ class ConfigurationService(metaclass=Singleton):
         self.camera_calibration_repository.set_db(name)
         self.stereo_calibration_repository.set_db(name)
         self.robot_positions_repository.set_db(name)
+        
+        # CRITICAL FIX: Include users repository in configuration switching
+        # Users should be configuration-specific based on directory structure
+        from api.dependencies.services import get_service_by_type
+        from services.authentication.auth_service import AuthService
+        auth_service = get_service_by_type(AuthService)()
+        auth_service.users_repository.set_db(name)
+        print(f"[DEBUG] Users repository switched to configuration: {name}")
 
     def reset_dbs(self):
         self.algorithms_repository.reset_db()

@@ -49,49 +49,91 @@ class RouteHelper:
             )
     
     @staticmethod
-    def create_entity(repository, entity_data: dict, entity_type: str = "Entity"):
-        """Create entity with standardized error handling."""
+    def create_entity(repository, entity_data, entity_type: str = "Entity"):
+        """Create entity with standardized error handling. Accepts model or dict."""
         try:
-            repository.create(entity_data)
+            # Handle both model objects and dictionaries
+            if hasattr(entity_data, 'uid'):
+                # It's a model object
+                uid = entity_data.uid
+                repository.create(entity_data)
+            else:
+                # It's a dictionary - create temporary model-like object
+                uid = entity_data.get('uid', 'unknown')
+                
+                class TempModel:
+                    def __init__(self, data):
+                        for key, value in data.items():
+                            setattr(self, key, value)
+                    
+                    def model_dump(self):
+                        return {key: value for key, value in self.__dict__.items()}
+                
+                temp_model = TempModel(entity_data)
+                repository.create(temp_model)
+            
             return RouteHelper.create_success_response(
-                f"{entity_type} {entity_data.get('uid', '')} created successfully",
+                f"{entity_type} {uid} created successfully",
                 status_code=status.HTTP_201_CREATED
             )
         except UidNotUnique:
+            uid = getattr(entity_data, 'uid', entity_data.get('uid', 'unknown') if isinstance(entity_data, dict) else 'unknown')
             raise create_error_response(
                 operation="create",
                 entity_type=entity_type,
-                entity_id=entity_data.get('uid'),
+                entity_id=uid,
                 exception=UidNotUnique(f"{entity_type} already exists")
             )
         except Exception as e:
+            uid = getattr(entity_data, 'uid', entity_data.get('uid', 'unknown') if isinstance(entity_data, dict) else 'unknown')
             raise create_error_response(
                 operation="create",
                 entity_type=entity_type,
-                entity_id=entity_data.get('uid'),
+                entity_id=uid,
                 exception=e
             )
     
     @staticmethod
-    def update_entity(repository, entity_data: dict, entity_type: str = "Entity"):
-        """Update entity with standardized error handling."""
+    def update_entity(repository, entity_data, entity_type: str = "Entity"):
+        """Update entity with standardized error handling. Accepts model or dict."""
         try:
-            repository.update(entity_data)
+            # Handle both model objects and dictionaries
+            if hasattr(entity_data, 'uid'):
+                # It's a model object
+                uid = entity_data.uid
+                repository.update(entity_data)
+            else:
+                # It's a dictionary - create temporary model-like object
+                uid = entity_data.get('uid', 'unknown')
+                
+                class TempModel:
+                    def __init__(self, data):
+                        for key, value in data.items():
+                            setattr(self, key, value)
+                    
+                    def model_dump(self):
+                        return {key: value for key, value in self.__dict__.items()}
+                
+                temp_model = TempModel(entity_data)  
+                repository.update(temp_model)
+            
             return RouteHelper.create_success_response(
-                f"{entity_type} {entity_data.get('uid', '')} updated successfully"
+                f"{entity_type} {uid} updated successfully"
             )
         except UidNotFound:
+            uid = getattr(entity_data, 'uid', entity_data.get('uid', 'unknown') if isinstance(entity_data, dict) else 'unknown')
             raise create_error_response(
                 operation="update",
                 entity_type=entity_type,
-                entity_id=entity_data.get('uid'),
+                entity_id=uid,
                 exception=UidNotFound(f"{entity_type} not found")
             )
         except Exception as e:
+            uid = getattr(entity_data, 'uid', entity_data.get('uid', 'unknown') if isinstance(entity_data, dict) else 'unknown')
             raise create_error_response(
                 operation="update",
                 entity_type=entity_type,
-                entity_id=entity_data.get('uid'),
+                entity_id=uid,
                 exception=e
             )
     

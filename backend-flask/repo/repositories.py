@@ -1,13 +1,13 @@
 from typing import Callable
 
-from repo.sqlite_repo import SQLiteRepo
+from repo.abstract_repo import BaseRepo
 from repo.repository_exceptions import UserNotFound, UidNotFound, NoConfigurationChosen
 from services.camera_calibration.camera_calibration_models import CameraIntrinsicsModel
 from services.image_source.image_source_model import ImageSourceModel
 from services.interpreter.inspection_model import InspectionsModel
 
 
-class ImageSourceRepository(SQLiteRepo):
+class ImageSourceRepository(BaseRepo):
     def __init__(self):
         super().__init__(db_name='image_source')
 
@@ -15,19 +15,19 @@ class ImageSourceRepository(SQLiteRepo):
         return ImageSourceModel(**data)
 
 
-class ItacRepository(SQLiteRepo):
+class ItacRepository(BaseRepo):
     def __init__(self):
         super().__init__(db_name='itac')
         self.set_db(configuration_name=None)
 
 
-class ConfigurationRepository(SQLiteRepo):
+class ConfigurationRepository(BaseRepo):
     def __init__(self):
         super().__init__(db_name='configurations')
         self.set_db(configuration_name=None)
 
     def read_part_number(self, part_number):
-        if self.db_path:
+        if self.db:
             # Use find_by_query with a lambda function
             found = self.find_by_query(lambda x: x.get("part_number") == part_number)
             if found:
@@ -38,27 +38,27 @@ class ConfigurationRepository(SQLiteRepo):
             raise NoConfigurationChosen
 
 
-class ImageGeneratorRepository(SQLiteRepo):
+class ImageGeneratorRepository(BaseRepo):
     def __init__(self):
         super().__init__(db_name='image_generators')
 
 
-class ComponentsRepository(SQLiteRepo):
+class ComponentsRepository(BaseRepo):
     def __init__(self):
         super().__init__(db_name='components')
 
 
-class ReferencesRepository(SQLiteRepo):
+class ReferencesRepository(BaseRepo):
     def __init__(self):
         super().__init__(db_name='references')
 
 
-class IdentificationsRepository(SQLiteRepo):
+class IdentificationsRepository(BaseRepo):
     def __init__(self):
         super(IdentificationsRepository, self).__init__(db_name='identifications')
 
 
-class CameraSettingsRepository(SQLiteRepo):
+class CameraSettingsRepository(BaseRepo):
     def __init__(self):
         super().__init__(db_name='camera_settings')
 
@@ -67,17 +67,17 @@ class CameraSettingsRepository(SQLiteRepo):
         return found
 
 
-class CustomComponentsRepository(SQLiteRepo):
+class CustomComponentsRepository(BaseRepo):
     def __init__(self):
         super(CustomComponentsRepository, self).__init__(db_name='custom_components')
 
 
-class PortManagerRepo(SQLiteRepo):
+class PortManagerRepo(BaseRepo):
     def __init__(self):
         super().__init__(db_name='cnc')
 
 
-class LocationRepository(SQLiteRepo):
+class LocationRepository(BaseRepo):
     def __init__(self):
         super().__init__(db_name='locations')
 
@@ -86,27 +86,27 @@ class LocationRepository(SQLiteRepo):
         return found
 
 
-class CncRepository(SQLiteRepo):
+class CncRepository(BaseRepo):
     def __init__(self):
         super().__init__(db_name='cnc')
 
 
-class RobotRepository(SQLiteRepo):
+class RobotRepository(BaseRepo):
     def __init__(self):
         super().__init__(db_name='robot')
 
 
-class RobotPositionsRepository(SQLiteRepo):
+class RobotPositionsRepository(BaseRepo):
     def __init__(self):
         super().__init__(db_name='robot_positions')
 
 
-class ProfilometerRepository(SQLiteRepo):
+class ProfilometerRepository(BaseRepo):
     def __init__(self):
         super().__init__(db_name='profilometer')
 
 
-class CameraRepository(SQLiteRepo):
+class CameraRepository(BaseRepo):
     def __init__(self):
         super().__init__(db_name='cameras')
 
@@ -115,7 +115,7 @@ class CameraRepository(SQLiteRepo):
         return found
 
 
-class CameraCalibrationRepository(SQLiteRepo):
+class CameraCalibrationRepository(BaseRepo):
     def __init__(self):
         super().__init__(db_name='camera_calibration')
 
@@ -123,12 +123,12 @@ class CameraCalibrationRepository(SQLiteRepo):
         return CameraIntrinsicsModel(**data)
 
 
-class StereoCalibrationRepository(SQLiteRepo):
+class StereoCalibrationRepository(BaseRepo):
     def __init__(self):
         super().__init__(db_name='stereo_calibration')
 
 
-class AlgorithmsRepository(SQLiteRepo):
+class AlgorithmsRepository(BaseRepo):
     def __init__(self):
         super().__init__(db_name='algorithms')
 
@@ -140,12 +140,12 @@ class AlgorithmsRepository(SQLiteRepo):
             return None
 
 
-class InspectionsRepository(SQLiteRepo):
+class InspectionsRepository(BaseRepo):
     def __init__(self):
         super().__init__(db_name='inspections')
 
     def insert(self, model):
-        # For SQLite, we'll use a fixed uid for single-record tables
+        # For single-record tables, use a fixed uid
         model.uid = "1"
         try:
             self.create(model)
@@ -175,7 +175,7 @@ class InspectionsRepository(SQLiteRepo):
         return stats
 
 
-class MediaEventsRepository(SQLiteRepo):
+class MediaEventsRepository(BaseRepo):
     def __init__(self):
         super().__init__(db_name=self._name())
 
@@ -184,28 +184,25 @@ class MediaEventsRepository(SQLiteRepo):
         uid = "1"
         try:
             existing = self.read_id(uid)
-            # Update existing record
-            with self._get_connection() as conn:
-                cursor = conn.cursor()
-                import json
-                data_json = json.dumps(audio_config)
-                cursor.execute(f'''
-                    UPDATE {self.table_name} 
-                    SET data = ?, updated_at = CURRENT_TIMESTAMP 
-                    WHERE uid = ?
-                ''', (data_json, uid))
-                conn.commit()
+            # Update existing record using BaseRepo methods
+            from pydantic import BaseModel
+            
+            class ConfigModel(BaseModel):
+                uid: str
+                config: dict
+            
+            model = ConfigModel(uid=uid, config=audio_config)
+            super().update(model)
         except UidNotFound:
-            # Insert new record
-            with self._get_connection() as conn:
-                cursor = conn.cursor()
-                import json
-                data_json = json.dumps(audio_config)
-                cursor.execute(f'''
-                    INSERT INTO {self.table_name} (uid, data) 
-                    VALUES (?, ?)
-                ''', (uid, data_json))
-                conn.commit()
+            # Insert new record using BaseRepo methods
+            from pydantic import BaseModel
+            
+            class ConfigModel(BaseModel):
+                uid: str
+                config: dict
+            
+            model = ConfigModel(uid=uid, config=audio_config)
+            super().create(model)
 
     def get(self):
         return self.read_all()
@@ -247,7 +244,7 @@ class AudioEventsRepository(MediaEventsRepository):
         return "audio"
 
 
-class UsersRepository(SQLiteRepo):
+class UsersRepository(BaseRepo):
     def __init__(self):
         super().__init__(db_name='users')
         self.set_db(configuration_name=None)
@@ -264,12 +261,12 @@ class UsersRepository(SQLiteRepo):
         if found:
             return found[0]
         else:
-            if username == self.root_user["username"]:
-                return self.root_user
+            # SECURITY: Remove hardcoded authentication bypass
+            # Original code allowed "slyrak" to bypass database lookup
             raise UserNotFound
 
     def update_role(self, value, uid):
-        if self.db_path:
+        if self.db:
             try:
                 user_dict = self.read_id(uid)
                 user_dict['level'] = value

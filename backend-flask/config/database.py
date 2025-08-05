@@ -2,6 +2,7 @@
 Database Configuration
 
 Centralized database configuration for the Industrial Vision Application.
+Uses JSON/TinyDB for unified data storage.
 """
 
 import os
@@ -10,46 +11,33 @@ from pydantic import BaseModel, Field, validator
 
 
 class DatabaseConfig(BaseModel):
-    """Database configuration settings."""
+    """Database configuration settings for JSON/TinyDB storage."""
     
-    # Database Type
-    db_type: str = Field(default="sqlite", description="Database type (sqlite, postgresql, mysql)")
+    # Database Type - Fixed to JSON for unified storage
+    db_type: str = Field(default="json", description="Database type (json only - unified TinyDB storage)")
     
-    # SQLite Configuration
-    sqlite_path: str = Field(default="config_db", description="SQLite database directory path")
-    sqlite_timeout: int = Field(default=30, ge=1, le=300, description="SQLite connection timeout")
-    sqlite_check_same_thread: bool = Field(default=False, description="SQLite check same thread setting")
-    
-    # PostgreSQL Configuration (for future use)
-    postgres_host: Optional[str] = Field(default=None, description="PostgreSQL host")
-    postgres_port: int = Field(default=5432, ge=1, le=65535, description="PostgreSQL port")
-    postgres_database: Optional[str] = Field(default=None, description="PostgreSQL database name")
-    postgres_username: Optional[str] = Field(default=None, description="PostgreSQL username")
-    postgres_password: Optional[str] = Field(default=None, description="PostgreSQL password")
-    
-    # MySQL Configuration (for future use)
-    mysql_host: Optional[str] = Field(default=None, description="MySQL host")
-    mysql_port: int = Field(default=3306, ge=1, le=65535, description="MySQL port")
-    mysql_database: Optional[str] = Field(default=None, description="MySQL database name")
-    mysql_username: Optional[str] = Field(default=None, description="MySQL username")
-    mysql_password: Optional[str] = Field(default=None, description="MySQL password")
-    
-    # Connection Pool Settings
-    pool_size: int = Field(default=10, ge=1, le=100, description="Database connection pool size")
-    max_overflow: int = Field(default=20, ge=0, le=100, description="Maximum connection pool overflow")
-    pool_timeout: int = Field(default=30, ge=1, le=300, description="Connection pool timeout")
-    pool_recycle: int = Field(default=3600, ge=300, le=86400, description="Connection pool recycle time")
+    # JSON/TinyDB Configuration
+    json_path: str = Field(default="config_db", description="JSON database directory path")
+    json_indent: int = Field(default=4, ge=2, le=8, description="JSON file indentation")
+    json_sort_keys: bool = Field(default=True, description="Sort keys in JSON files")
     
     # Performance Settings
-    enable_query_logging: bool = Field(default=False, description="Enable SQL query logging")
-    slow_query_threshold: float = Field(default=1.0, ge=0.1, le=60.0, description="Slow query threshold in seconds")
-    enable_connection_pooling: bool = Field(default=True, description="Enable connection pooling")
+    enable_query_logging: bool = Field(default=False, description="Enable database query logging")
+    cache_size: int = Field(default=100, ge=10, le=1000, description="Database cache size")
     
     # Backup Settings
     enable_auto_backup: bool = Field(default=True, description="Enable automatic database backup")
     backup_interval_hours: int = Field(default=24, ge=1, le=168, description="Backup interval in hours")
-    backup_retention_days: int = Field(default=30, ge=1, le=365, description="Backup retention period in days")
+    backup_retention_days: int = Field(default=7, ge=1, le=30, description="Backup retention period in days")
     backup_directory: str = Field(default="backups", description="Backup directory path")
+    
+    # Configuration Management
+    config_directory: str = Field(default="config_db", description="Configuration database directory")
+    default_configuration: Optional[str] = Field(default=None, description="Default configuration name")
+    
+    # File System Settings
+    create_directories: bool = Field(default=True, description="Automatically create missing directories")
+    file_mode: int = Field(default=0o644, description="File permissions for database files")
     
     class Config:
         env_prefix = "DB_"
@@ -57,80 +45,58 @@ class DatabaseConfig(BaseModel):
     
     @validator("db_type")
     def validate_db_type(cls, v):
-        """Validate database type."""
-        allowed_types = ["sqlite", "postgresql", "mysql"]
-        if v.lower() not in allowed_types:
-            raise ValueError(f"Database type must be one of: {allowed_types}")
-        return v.lower()
-    
-    @validator("sqlite_path")
-    def validate_sqlite_path(cls, v):
-        """Ensure SQLite path exists."""
-        if v and not os.path.isabs(v):
-            # Convert relative path to absolute
-            v = os.path.abspath(v)
-        os.makedirs(v, exist_ok=True)
+        """Validate that only JSON database type is supported."""
+        if v != "json":
+            raise ValueError("Only 'json' database type is supported for unified storage")
         return v
     
-    def get_connection_url(self) -> str:
-        """Get database connection URL based on configuration."""
-        if self.db_type == "sqlite":
-            return f"sqlite:///{self.sqlite_path}"
+    @validator("json_path", "backup_directory", "config_directory")
+    def validate_paths(cls, v):
+        """Validate directory paths."""
+        if not v or not isinstance(v, str):
+            raise ValueError("Path must be a non-empty string")
+        return v.strip()
+    
+    def get_database_path(self, configuration_name: Optional[str] = None) -> str:
+        """Get the database path for a specific configuration."""
+        base_path = os.path.abspath(self.json_path)
         
-        elif self.db_type == "postgresql":
-            if not all([self.postgres_host, self.postgres_database, self.postgres_username]):
-                raise ValueError("PostgreSQL configuration incomplete")
-            
-            password_part = f":{self.postgres_password}" if self.postgres_password else ""
-            return (f"postgresql://{self.postgres_username}{password_part}@"
-                   f"{self.postgres_host}:{self.postgres_port}/{self.postgres_database}")
-        
-        elif self.db_type == "mysql":
-            if not all([self.mysql_host, self.mysql_database, self.mysql_username]):
-                raise ValueError("MySQL configuration incomplete")
-            
-            password_part = f":{self.mysql_password}" if self.mysql_password else ""
-            return (f"mysql://{self.mysql_username}{password_part}@"
-                   f"{self.mysql_host}:{self.mysql_port}/{self.mysql_database}")
-        
+        if configuration_name:
+            return os.path.join(base_path, configuration_name)
         else:
-            raise ValueError(f"Unsupported database type: {self.db_type}")
+            return base_path
     
-    def get_sqlite_config(self) -> dict:
-        """Get SQLite-specific configuration."""
+    def get_backup_path(self) -> str:
+        """Get the backup directory path."""
+        return os.path.abspath(self.backup_directory)
+    
+    def ensure_directories(self):
+        """Ensure all required directories exist."""
+        if self.create_directories:
+            paths_to_create = [
+                self.json_path,
+                self.backup_directory,
+                self.config_directory
+            ]
+            
+            for path in paths_to_create:
+                abs_path = os.path.abspath(path)
+                os.makedirs(abs_path, mode=self.file_mode, exist_ok=True)
+    
+    def is_json_database(self) -> bool:
+        """Check if using JSON database (always True in unified system)."""
+        return True
+    
+    def get_connection_info(self) -> dict:
+        """Get database connection information."""
         return {
-            "path": self.sqlite_path,
-            "timeout": self.sqlite_timeout,
-            "check_same_thread": self.sqlite_check_same_thread
+            "type": self.db_type,
+            "path": self.json_path,
+            "config_directory": self.config_directory,
+            "backup_directory": self.backup_directory,
+            "settings": {
+                "indent": self.json_indent,
+                "sort_keys": self.json_sort_keys,
+                "cache_size": self.cache_size
+            }
         }
-    
-    def get_pool_config(self) -> dict:
-        """Get connection pool configuration."""
-        return {
-            "pool_size": self.pool_size,
-            "max_overflow": self.max_overflow,
-            "pool_timeout": self.pool_timeout,
-            "pool_recycle": self.pool_recycle
-        }
-    
-    def get_backup_config(self) -> dict:
-        """Get backup configuration."""
-        return {
-            "enabled": self.enable_auto_backup,
-            "interval_hours": self.backup_interval_hours,
-            "retention_days": self.backup_retention_days,
-            "directory": self.backup_directory
-        }
-    
-    def is_sqlite(self) -> bool:
-        """Check if using SQLite database."""
-        return self.db_type == "sqlite"
-    
-    def is_postgresql(self) -> bool:
-        """Check if using PostgreSQL database."""
-        return self.db_type == "postgresql"
-    
-    def is_mysql(self) -> bool:
-        """Check if using MySQL database."""
-        return self.db_type == "mysql"
-

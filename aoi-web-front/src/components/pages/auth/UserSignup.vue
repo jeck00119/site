@@ -61,6 +61,7 @@ import { useRouter } from 'vue-router';
 import { useStore } from 'vuex';
 
 import useNotification from '../../../hooks/notifications.js';
+import { validateEmail, validatePassword } from '../../../utils/validation.js';
 
 export default{
     setup() {
@@ -82,21 +83,16 @@ export default{
 
             let error = false;
 
-            if(email.value === '')
-            {
-                setNotification(3000, `Email field cannot be empty.`, 'bi-exclamation-circle-fill');
+            // Use centralized validation
+            const emailValidation = validateEmail(email.value);
+            if (!emailValidation.isValid) {
+                setNotification(3000, emailValidation.errors[0], 'bi-exclamation-circle-fill');
                 error = true;
             }
 
-            if(!email.value.includes('@forvia.com'))
-            {
-                setNotification(3000, `Please enter a valid email address.`, 'bi-exclamation-circle-fill');
-                error = true;
-            }
-
-            if(password.value === '')
-            {
-                setNotification(3000, `Please choose a password.`, 'bi-exclamation-circle-fill');
+            const passwordValidation = validatePassword(password.value);
+            if (!passwordValidation.isValid) {
+                setNotification(3000, passwordValidation.errors[0], 'bi-exclamation-circle-fill');
                 error = true;
             }
 

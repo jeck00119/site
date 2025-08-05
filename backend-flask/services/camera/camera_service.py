@@ -90,7 +90,7 @@ class CameraService(metaclass=Singleton):
 
         if self.cameras[uid].type == EnumCameraTypes.webcam_logi or self.cameras[uid].type == EnumCameraTypes.webcam_msft:
             if not self.cameras[uid]._cap.isOpened():
-                image = cv2.imread('assets/cap_not_opened.jpg')
+                image = cv2.imread('assets/cap_not_opened.png')
                 return image
 
             frame = self.cameras[uid].get_frame()

@@ -10,10 +10,16 @@ class Socket:
         self.running = running
 
     async def disconnect(self):
+        from starlette.websockets import WebSocketState
         print(self.websocket.client_state)
         try:
-            await self.websocket.close()
-        except wsproto.utilities.LocalProtocolError:
+            # Only close if the WebSocket is still connected
+            if self.websocket.client_state == WebSocketState.CONNECTED:
+                await self.websocket.close()
+        except (wsproto.utilities.LocalProtocolError, RuntimeError) as e:
+            # WebSocket already closed or in process of closing
+            pass
+        finally:
             self.running = False
 
     def get_websocket(self):
@@ -50,10 +56,15 @@ class ConnectionManager(metaclass=Singleton):
         return not self.active_connections[uid].status()
 
     async def disconnect(self, uid):
+        from starlette.websockets import WebSocketState
         socket = self.active_connections[uid].get_websocket()
         try:
-            await socket.close()
-            print(f"CLOSING SOCKET: {uid}")
+            # Only close if the WebSocket is still connected
+            if socket.client_state == WebSocketState.CONNECTED:
+                await socket.close()
+                print(f"CLOSING SOCKET: {uid}")
+            else:
+                print(f"SOCKET ALREADY CLOSED: {uid}")
         except Exception:
             pass
 

@@ -147,8 +147,13 @@ class SecurityValidator:
         return threats
     
     def _validate_email(self, email: str) -> bool:
-        """Validate email format."""
-        return bool(self.patterns["email"].match(email))
+        """Validate email format and ensure it's a @forvia email."""
+        # First check basic email format
+        if not self.patterns["email"].match(email):
+            return False
+        
+        # Then check if it's a @forvia email
+        return '@forvia' in email.lower()
     
     def _validate_username(self, username: str) -> bool:
         """Validate username format."""

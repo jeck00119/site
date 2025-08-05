@@ -55,7 +55,7 @@ async def post_itac(
         itac_repository: ItacRepository = Depends(get_service_by_type(ItacRepository))
 ) -> Dict[str, Any]:
     try:
-        RouteHelper.create_entity(itac_repository, itac.model_dump(), "ITAC")
+        RouteHelper.create_entity(itac_repository, itac, "ITAC")
         return RouteHelper.create_success_response("ITAC created successfully", status_code=status.HTTP_201_CREATED)
     except Exception as e:
         raise create_error_response(

@@ -1,4 +1,5 @@
 import api from "../../utils/api.js";
+import { handleApiError, getAuthErrorMessage } from "../../utils/errorHandler.js";
 
 import { uuid } from "vue3-uuid";
 
@@ -10,7 +11,7 @@ export default {
             const { response, responseData } = await api.get('/auth/users');
 
             if (!response.ok) {
-                const error = new Error(`Failed to load users!`);
+                const error = new Error(responseData?.detail || "Failed to load users!");
                 throw error;
             } else {
                 context.commit('setUsers', responseData);
@@ -107,12 +108,25 @@ export default {
 
     async login(context, payload) {
         try {
-            const { response, responseData } = await api.postStream('/auth/login', new URLSearchParams(payload), {
+            // Convert FormData to proper URLSearchParams for OAuth2PasswordRequestForm
+            let formData;
+            if (payload instanceof FormData) {
+                formData = new URLSearchParams();
+                for (let [key, value] of payload.entries()) {
+                    formData.append(key, value);
+                }
+            } else {
+                formData = new URLSearchParams(payload);
+            }
+            
+            const { response, responseData } = await api.postStream('/auth/login', formData, {
                 'Content-Type': 'application/x-www-form-urlencoded'
             });
 
             if (!response || !response.ok) {
-                const error = new Error(`Failed to login! ${response ? `Status: ${response.status}` : 'Network error'}`);
+                // Use centralized error handling following existing patterns
+                const errorMessage = getAuthErrorMessage(responseData, response);
+                const error = new Error(errorMessage);
                 throw error;
             } else {
                 const userData = response.headers.get('user-data');

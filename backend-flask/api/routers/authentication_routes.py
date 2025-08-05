@@ -12,6 +12,7 @@ from api.dependencies.services import get_service_by_type
 from api.error_handlers import create_error_response, validate_authentication
 from api.route_utils import RouteHelper, require_authentication
 from repo.repositories import UsersRepository
+from security.validators import SecurityValidator
 from services.authentication.auth_service import AuthService
 from services.authentication.user_model import User
 from services.authorization.authorization import get_current_user
@@ -33,7 +34,17 @@ async def login(
         auth_service: AuthService = Depends(get_service_by_type(AuthService))
 ) -> JSONResponse:
     try:
-        user_status, user = auth_service.is_authenticated(user_data.username, user_data.password)
+        # Validate @forvia email domain
+        if not user_data.username or '@forvia' not in user_data.username.lower():
+            raise create_error_response(
+                operation="authenticate",
+                entity_type="User",
+                entity_id=user_data.username,
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                custom_message="Only @forvia email addresses are allowed"
+            )
+        
+        user_status, user, auth_result = auth_service.is_authenticated(user_data.username, user_data.password)
         if user_status:
             token_data = {"username": user["username"], "level": user["level"]}
             expires = datetime.utcnow() + timedelta(seconds=28800)
@@ -50,12 +61,23 @@ async def login(
             response.headers["Token-Expiration"] = "28800"
             return response
         else:
+            # Provide specific error messages based on authentication failure reason
+            if auth_result == "user_not_found":
+                error_message = "No account found with this email address"
+                status_code = status.HTTP_404_NOT_FOUND
+            elif auth_result == "invalid_password":
+                error_message = "Invalid password"
+                status_code = status.HTTP_401_UNAUTHORIZED
+            else:
+                error_message = "Invalid credentials provided"
+                status_code = status.HTTP_401_UNAUTHORIZED
+            
             raise create_error_response(
                 operation="authenticate",
                 entity_type="User",
                 entity_id=user_data.username,
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                custom_message="Invalid credentials provided"
+                status_code=status_code,
+                custom_message=error_message
             )
     except HTTPException:
         raise
@@ -75,6 +97,16 @@ async def create_user(
         users_repository: UsersRepository = Depends(get_service_by_type(UsersRepository))
 ) -> JSONResponse:
     try:
+        # Validate @forvia email domain
+        if not user.username or '@forvia' not in user.username.lower():
+            raise create_error_response(
+                operation="create_user",
+                entity_type="User",
+                entity_id=user.username,
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                custom_message="Only @forvia email addresses are allowed"
+            )
+        
         print(f"Creating user: {user.username} with uid: {user.uid}")
         
         # Set default level if empty

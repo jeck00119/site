@@ -51,10 +51,18 @@ async function postStream<T = any>(url: string, payload?: any, headers?: Headers
             'content-type': 'application/json'
         };
 
+        // Handle different payload types properly
+        let body: string | URLSearchParams | FormData;
+        if (payload instanceof URLSearchParams || payload instanceof FormData) {
+            body = payload;
+        } else {
+            body = JSON.stringify(payload);
+        }
+
         const response = await fetch(url, {
             method: 'POST',
             headers: headers,
-            body: JSON.stringify(payload),
+            body: body,
             signal: AbortSignal.timeout(30000) // 30 second timeout for stream requests
         });
 
