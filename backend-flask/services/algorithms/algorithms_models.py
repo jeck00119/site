@@ -103,78 +103,78 @@ class AlgorithmModel(CamelModel):
 
     @field_validator('parameters')
     @classmethod
-    def match_parameters(cls, v, values):
-        if values['type'] == EnumAlgorithmType.basic_binarization.value:
+    def match_parameters(cls, v, info):
+        if info.data['type'] == EnumAlgorithmType.basic_binarization.value:
             return BasicBinarizationAlgorithmModel(**v)
-        elif values['type'] == EnumAlgorithmType.dmc.value:
+        elif info.data['type'] == EnumAlgorithmType.dmc.value:
             return DmcAlgorithmModel(**v)
-        elif values['type'] == EnumAlgorithmType.simple_histogram.value:
+        elif info.data['type'] == EnumAlgorithmType.simple_histogram.value:
             return DmcAlgorithmModel(**v)
-        elif values['type'] == EnumAlgorithmType.motion_detection_hist.value:
+        elif info.data['type'] == EnumAlgorithmType.motion_detection_hist.value:
             return MotionDetectionHistAlgorithmModel(**v)
-        elif values['type'] == EnumAlgorithmType.color_averaging.value:
+        elif info.data['type'] == EnumAlgorithmType.color_averaging.value:
             return ColorAveragingAlgorithmModel(**v)
-        elif values['type'] == EnumAlgorithmType.brightness_averaging.value:
+        elif info.data['type'] == EnumAlgorithmType.brightness_averaging.value:
             return BrightnessAveragingAlgorithmModel(**v)
-        elif values['type'] == EnumAlgorithmType.conformal_hsv.value:
+        elif info.data['type'] == EnumAlgorithmType.conformal_hsv.value:
             return ConformalHSVAlgorithmModel(**v)
-        elif values['type'] == EnumAlgorithmType.contour_logic.value:
+        elif info.data['type'] == EnumAlgorithmType.contour_logic.value:
             return ContourLogicAlgorithmModel(**v)
-        elif values['type'] == EnumAlgorithmType.barcode_scan.value:
+        elif info.data['type'] == EnumAlgorithmType.barcode_scan.value:
             return BarcodeScanAlgorithmModel(**v)
-        elif values['type'] == EnumAlgorithmType.steep_detection.value:
+        elif info.data['type'] == EnumAlgorithmType.steep_detection.value:
             return SteepDetectionAlgorithmModel(**v)
-        elif values['type'] == EnumAlgorithmType.ocr.value:
+        elif info.data['type'] == EnumAlgorithmType.ocr.value:
             return OCRAlgorithmModel(**v)
-        elif values['type'] == EnumAlgorithmType.contour_double.value:
+        elif info.data['type'] == EnumAlgorithmType.contour_double.value:
             return ContourDoubleAlgorithmModel(**v)
-        elif values['type'] == EnumAlgorithmType.contour_double_hsv.value:
+        elif info.data['type'] == EnumAlgorithmType.contour_double_hsv.value:
             return ContourDoubleHSVAlgorithmModel(**v)
-        elif values['type'] == EnumAlgorithmType.aruco_detector.value:
+        elif info.data['type'] == EnumAlgorithmType.aruco_detector.value:
             return ArucoDetectorAlgorithmModel(**v)
-        elif values['type'] == EnumAlgorithmType.color_matcher.value:
+        elif info.data['type'] == EnumAlgorithmType.color_matcher.value:
             return ColorMatcherAlgorithmModel(**v)
-        elif values['type'] == EnumAlgorithmType.clips_shut.value:
+        elif info.data['type'] == EnumAlgorithmType.clips_shut.value:
             return ClipsShutAlgorithmModel(**v)
-        elif values['type'] == EnumAlgorithmType.foreground_subtraction.value:
+        elif info.data['type'] == EnumAlgorithmType.foreground_subtraction.value:
             return ForegroundSubtractionAlgorithmModel(**v)
-        elif values['type'] == EnumAlgorithmType.graph_segmentation.value:
+        elif info.data['type'] == EnumAlgorithmType.graph_segmentation.value:
             return GraphSegmentationAlgorithmModel(**v)
-        elif values['type'] == EnumAlgorithmType.label.value:
+        elif info.data['type'] == EnumAlgorithmType.label.value:
             return LabelDetectionAlgorithmModel(**v)
-        elif values['type'] == EnumAlgorithmType.cable_inspection.value:
+        elif info.data['type'] == EnumAlgorithmType.cable_inspection.value:
             return CableInspectionAlgorithmModel(**v)
-        elif values['type'] == EnumAlgorithmType.cable_cover.value:
+        elif info.data['type'] == EnumAlgorithmType.cable_cover.value:
             return CableCoverDetectionAlgorithmModel(**v)
-        elif values['type'] == EnumAlgorithmType.scratch_template.value:
+        elif info.data['type'] == EnumAlgorithmType.scratch_template.value:
             return ScratchDetectionTemplateAlgorithmModel(**v)
-        elif values['type'] == EnumAlgorithmType.contour_gravity_center.value:
+        elif info.data['type'] == EnumAlgorithmType.contour_gravity_center.value:
             return ContourGravityCenterAlgorithmModel(**v)
-        elif values['type'] == EnumAlgorithmType.blob:
+        elif info.data['type'] == EnumAlgorithmType.blob:
             return BlobDetectionAlgorithmModel(**v)
-        elif values['type'] == EnumAlgorithmType.sam.value:
+        elif info.data['type'] == EnumAlgorithmType.sam.value:
             return SAMAlgorithmModel(**v)
-        elif values['type'] == EnumAlgorithmType.cable_detection_yolov8.value:
+        elif info.data['type'] == EnumAlgorithmType.cable_detection_yolov8.value:
             return CableDetectionYoloV8AlgorithmModel(**v)
-        elif values['type'] == EnumAlgorithmType.mobile_sam.value:
+        elif info.data['type'] == EnumAlgorithmType.mobile_sam.value:
             return MobileSAMAlgorithmModel(**v)
-        elif values['type'] == EnumAlgorithmType.yolo:
+        elif info.data['type'] == EnumAlgorithmType.yolo:
             return YoloAlgorithmModel(**v)
-        elif values['type'] == EnumAlgorithmType.rtdetr:
+        elif info.data['type'] == EnumAlgorithmType.rtdetr:
             return RTDETRAlgorithmModel(**v)
-        elif values['type'] == EnumAlgorithmType.yolo_classification:
+        elif info.data['type'] == EnumAlgorithmType.yolo_classification:
             return YoloClassificationAlgorithmModel(**v)
-        elif values['type'] == EnumAlgorithmType.easy_ocr:
+        elif info.data['type'] == EnumAlgorithmType.easy_ocr:
             return EasyOCRAlgorithmModel(**v)
-        elif values['type'] == EnumReferenceAlgorithmType.circle_detection_ransac.value:
+        elif info.data['type'] == EnumReferenceAlgorithmType.circle_detection_ransac.value:
             return CircleDetectionRansacAlgorithmModel(**v)
-        elif values['type'] == EnumReferenceAlgorithmType.template_detection.value:
+        elif info.data['type'] == EnumReferenceAlgorithmType.template_detection.value:
             return TemplateDetectionAlgorithmModel(**v)
-        elif values['type'] == EnumReferenceAlgorithmType.line_reference.value:
+        elif info.data['type'] == EnumReferenceAlgorithmType.line_reference.value:
             return LineReferenceAlgorithmModel(**v)
-        elif values['type'] == EnumReferenceAlgorithmType.vertical_line.value:
+        elif info.data['type'] == EnumReferenceAlgorithmType.vertical_line.value:
             return VerticalLinePositionAlgorithmModel(**v)
-        elif values['type'] == EnumReferenceAlgorithmType.horizontal_line.value:
+        elif info.data['type'] == EnumReferenceAlgorithmType.horizontal_line.value:
             return HorizontalLinePositionAlgorithmModel(**v)
-        elif values['type'] == EnumReferenceAlgorithmType.clips_reference.value:
+        elif info.data['type'] == EnumReferenceAlgorithmType.clips_reference.value:
             return ClipsReferenceAlgorithmModel(**v)

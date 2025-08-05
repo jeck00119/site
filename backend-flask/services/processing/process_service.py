@@ -326,6 +326,9 @@ class ProcessService(metaclass=Singleton):
                     {'event': 'process_status', 'data': 'Initializing Algorithm'})
 
                 components = self.components_repository.read_all()
+                if not components:
+                    print("No components configured - cannot initialize cable algorithm")
+                    return
                 cable_component = components[0]
 
                 self.cable_algorithm = self.algorithms_service.create_algorithm(
@@ -334,8 +337,12 @@ class ProcessService(metaclass=Singleton):
 
             self.configuration_service.reset_configuration_flag_process()
 
-        self.add_process_status_to_ws_deque({'event': 'process_status', 'data': 'Inspecting Cable'})
-        self.cable_inspection(self.cable_algorithm, self.image_source_uid)
+        if self.cable_algorithm is not None and self.image_source_uid is not None:
+            self.add_process_status_to_ws_deque({'event': 'process_status', 'data': 'Inspecting Cable'})
+            self.cable_inspection(self.cable_algorithm, self.image_source_uid)
+        else:
+            self.add_process_status_to_ws_deque({'event': 'process_status', 'data': 'Cannot start inspection - no components or image source configured'})
+            print("Cannot start cable inspection - cable_algorithm or image_source_uid is None")
 
     def _start_sm(self):
         while True:

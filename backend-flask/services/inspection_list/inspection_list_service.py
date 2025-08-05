@@ -29,6 +29,9 @@ class InspectionListService(metaclass=Singleton):
 
     def load_inspection_list(self):
         inspections_table = self.inspection_list_repo.get()
+        if inspections_table is None:
+            print("No inspections configured - skipping inspection list loading")
+            return
         for key in inspections_table.inspections:
             self.inspection_list[key] = Inspection(value_type=inspections_table.inspections[key]['Value Type'],
                                                    meas_unit=inspections_table.inspections[key]['Meas Unit'],
@@ -119,6 +122,9 @@ class InspectionListService(metaclass=Singleton):
 
     def save_offsets(self):
         inspections_table = self.inspection_list_repo.get()
+        if inspections_table is None:
+            print("No inspections configured - skipping offset saving")
+            return
 
         for key in self.inspection_list:
             if self.inspection_list[key].offset != 'N/A':
