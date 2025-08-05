@@ -1,3 +1,72 @@
-version https://git-lfs.github.com/spec/v1
-oid sha256:6aaf6b58371a1a01414aca786a5f85bb44de6111bbddd7b67b98bb1703c766f5
-size 1442
+[
+    {
+        "name": "lower_threshold",
+        "type": "integer",
+        "default": 0
+    },
+    {
+        "name": "upper_threshold",
+        "type": "integer",
+        "default": 0
+    },
+    {
+        "name": "gamma",
+        "type": "float",
+        "default": 0.01
+    },
+    {
+        "name": "kernel_erode_size",
+        "type": "integer",
+        "default": 0
+    },
+    {
+        "name": "erode_iterations",
+        "type": "integer",
+        "default": 0
+    },
+    {
+        "name": "kernel_dilate_size",
+        "type": "integer",
+        "default": 0
+    },
+    {
+        "name": "dilate_iterations",
+        "type": "integer",
+        "default": 0
+    },
+    {
+        "name": "kernel_blur",
+        "type": "integer",
+        "default": 0
+    },
+    {
+        "name": "part_area_min",
+        "type": "float",
+        "default": 0.0
+    },
+    {
+        "name": "part_area_max",
+        "type": "float",
+        "default": 0.0
+    },
+    {
+        "name": "line_size",
+        "type": "integer",
+        "default": 1
+    },
+    {
+        "name": "graphics",
+        "type": "graphics",
+        "default": [
+            {
+                "bound": [10, 10, 100, 100],
+                "rect": [10, 10, 100, 100],
+                "offset": [0, 0],
+                "rotation": 0.0,
+                "color": "rgba(140, 235, 52, 0.5)",
+                "masks": [],
+                "masksColors": []
+            }
+        ]
+    }
+]

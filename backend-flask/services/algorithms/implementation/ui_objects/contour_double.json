@@ -1,3 +1,87 @@
-version https://git-lfs.github.com/spec/v1
-oid sha256:d8b0a169517974d5e98819025d94425dff93875ea4b611eabc2b62815295dedc
-size 1757
+[
+    {
+        "name": "white_threshold",
+        "type": "integer",
+        "default": 0
+    },
+    {
+        "name": "black_threshold",
+        "type": "integer",
+        "default": 0
+    },
+    {
+        "name": "gamma",
+        "type": "float",
+        "default": 0.01
+    },
+    {
+        "name": "erode_kernel",
+        "type": "integer",
+        "default": 0
+    },
+    {
+        "name": "erode_iterations",
+        "type": "integer",
+        "default": 0
+    },
+    {
+        "name": "dilate_kernel",
+        "type": "integer",
+        "default": 0
+    },
+    {
+        "name": "dilate_iterations",
+        "type": "integer",
+        "default": 0
+    },
+    {
+        "name": "blur_kernel",
+        "type": "integer",
+        "default": 0
+    },
+    {
+        "name": "part_area_min",
+        "type": "integer",
+        "default": 0
+    },
+    {
+        "name": "part_area_max",
+        "type": "integer",
+        "default": 0
+    },
+    {
+        "name": "adaptive_threshold",
+        "type": "integer",
+        "default": 0
+    },
+    {
+        "name": "enable_inv_binarization",
+        "type": "bool",
+        "default": false
+    },
+    {
+        "name": "enable_adaptive_threshold",
+        "type": "bool",
+        "default": false
+    },
+    {
+        "name": "enable_histogram_debug",
+        "type": "bool",
+        "default": false
+    },
+    {
+        "name": "graphics",
+        "type": "graphics",
+        "default": [
+            {
+                "bound": [10, 10, 100, 100],
+                "rect": [10, 10, 100, 100],
+                "offset": [0, 0],
+                "rotation": 0.0,
+                "color": "rgba(140, 235, 52, 0.5)",
+                "masks": [],
+                "masksColors": []
+            }
+        ]
+    }
+]

@@ -1,3 +1,67 @@
-version https://git-lfs.github.com/spec/v1
-oid sha256:f16e0b81d73e06fd7e5ea7573315052a66add8ac2692bad77af348f283ace5df
-size 1414
+[
+    {
+        "name": "blur_kernel_size",
+        "type": "integer",
+        "default": 19
+    },
+    {
+        "name": "bin_lower_threshold",
+        "type": "integer",
+        "default": 185
+    },
+    {
+        "name": "bin_upper_threshold",
+        "type": "integer",
+        "default": 255
+    },
+    {
+        "name": "canny_first_threshold",
+        "type": "integer",
+        "default": 30
+    },
+    {
+        "name": "canny_second_threshold",
+        "type": "integer",
+        "default": 200
+    },
+    {
+        "name": "flatten_contour_step",
+        "type": "integer",
+        "default": 50
+    },
+    {
+        "name": "threshold_angle",
+        "type": "integer",
+        "default": 10
+    },
+    {
+        "name": "contour_variation_epsilon",
+        "type": "integer",
+        "default": 10
+    },
+    {
+        "name": "reference_distance",
+        "type": "integer",
+        "default": 1
+    },
+    {
+        "name": "absolute_distance",
+        "type": "bool",
+        "default": true
+    },
+    {
+        "name": "graphics",
+        "type": "graphics",
+        "default": [
+            {
+                "bound": [10, 10, 100, 100],
+                "rect": [10, 10, 100, 100],
+                "offset": [0, 0],
+                "rotation": 0.0,
+                "color": "rgba(140, 235, 52, 0.5)",
+                "masks": [],
+                "masksColors": []
+            }
+        ]
+    }
+]

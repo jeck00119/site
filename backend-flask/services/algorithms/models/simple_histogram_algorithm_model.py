@@ -1,3 +1,29 @@
-version https://git-lfs.github.com/spec/v1
-oid sha256:d0c7f7c36165b5f99ded98836490dbcf264bbb81ba4cf4d06f3f3f83dd3672d7
-size 683
+from services.algorithms.models.algorithm_parameters_model import AlgorithmParametersModel
+
+
+class SimpleHistogramAlgorithmModel(AlgorithmParametersModel):
+    graphics: list = [
+        {
+            "color": "rgba(140, 235, 52, 0.5)",
+            "rotation": 0,
+            "bound": [
+                10,
+                10,
+                100,
+                100
+            ],
+            "offset": [
+                0,
+                0
+            ],
+            "rect": [
+                10,
+                10,
+                100,
+                100
+            ],
+            "masks": [],
+            "masksColors": []
+        }
+    ]
+    golden_position: list = [0, 0]

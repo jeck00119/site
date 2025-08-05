@@ -1,3 +1,12 @@
-version https://git-lfs.github.com/spec/v1
-oid sha256:29f05bedcffbf875368648c618ce872d7035f71d70be377f50f1db596e2e70dd
-size 255
+from typing import Any
+
+from src.utils import generate_uid, CamelModel
+
+
+class ComponentModel(CamelModel):
+    uid: str = generate_uid(length=8)
+    name: str
+    image_source_uid: Any
+    algorithm_uid: Any
+    algorithm_type: Any
+    reference_uid: Any

@@ -1,3 +1,71 @@
-version https://git-lfs.github.com/spec/v1
-oid sha256:41f613c2764dc5433f8f1cca70a0f71c3e24e59b3f0fe0ca32df30fc74bf6ade
-size 1297
+[
+  {
+    "name": "model_path",
+    "type": "dropdown",
+    "default": "",
+    "values": []
+  },
+  {
+    "name": "device",
+    "type": "dropdown",
+    "default": "CPU",
+    "values": ["CPU", "GPU"]
+  },
+  {
+    "name": "confidence_threshold",
+    "type": "float",
+    "default": 0.7
+  },
+  {
+    "name": "iou_threshold",
+    "type": "float",
+    "default": 0.45
+  },
+  {
+    "name": "max_detections",
+    "type": "integer",
+    "default": 1000
+  },
+  {
+    "name": "use_dnn",
+    "type": "bool",
+    "default": false
+  },
+  {
+    "name": "patch_inference",
+    "type": "bool",
+    "default": false
+  },
+  {
+    "name": "patch_size",
+    "type": "integer",
+    "default": 640
+  },
+  {
+    "name": "patch_overlap",
+    "type": "integer",
+    "default": 50
+  },
+  {
+    "name": "file_data",
+    "type": "fileloader",
+    "default": ["", ""],
+    "path": "assets/yolov8",
+    "update": "model_path"
+  },
+  {
+        "name": "graphics",
+        "type": "graphics",
+        "default": [
+            {
+                "bound": [10, 10, 100, 100],
+                "rect": [10, 10, 100, 100],
+                "offset": [0, 0],
+                "rotation": 0.0,
+                "color": "rgba(140, 235, 52, 0.5)",
+                "masks": [],
+                "masksColors": []
+            }
+        ]
+    }
+]

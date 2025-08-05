@@ -1,3 +1,35 @@
-version https://git-lfs.github.com/spec/v1
-oid sha256:64e481a643c081e8983a7455943622ca81c7742255a7045f1461d00e8bc0eff0
-size 1419
+"""
+Gerbil - Copyright (c) 2015 Michael Franzl
+
+Permission is hereby granted, free of charge, to any person obtaining a
+copy of this software and associated documentation files (the "Software"),
+to deal in the Software without restriction, including without limitation
+the rights to use, copy, modify, merge, publish, distribute, sublicense,
+and/or sell copies of the Software, and to permit persons to whom the
+Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included
+in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
+THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR
+OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+OTHER DEALINGS IN THE SOFTWARE.
+"""
+
+import logging
+
+
+class CallbackLogHandler(logging.StreamHandler):
+    def __init__(self, cb=None):
+        super(CallbackLogHandler, self).__init__()
+        self.callback = cb
+
+    def emit(self, record):
+        if self.callback:
+            self.callback("on_log", record)
+        else:
+            logging.StreamHandler.emit(self, record)

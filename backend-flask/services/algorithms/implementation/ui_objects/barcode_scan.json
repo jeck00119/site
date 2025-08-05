@@ -1,3 +1,32 @@
-version https://git-lfs.github.com/spec/v1
-oid sha256:3c7d94870720dc8e1bc2928835719862aa0ecf57b5006532e52c834e44745862
-size 673
+[
+    {
+        "name": "threshold_enabled",
+        "type": "bool",
+        "default": false
+    },
+    {
+        "name": "block_size",
+        "type": "integer",
+        "default": 3
+    },
+    {
+        "name": "c",
+        "type": "integer",
+        "default": 0
+    },
+    {
+        "name": "graphics",
+        "type": "graphics",
+        "default": [
+            {
+                "bound": [10, 10, 100, 100],
+                "rect": [10, 10, 100, 100],
+                "offset": [0, 0],
+                "rotation": 0.0,
+                "color": "rgba(140, 235, 52, 0.5)",
+                "masks": [],
+                "masksColors": []
+            }
+        ]
+    }
+]

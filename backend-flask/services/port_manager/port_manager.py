@@ -1,3 +1,33 @@
-version https://git-lfs.github.com/spec/v1
-oid sha256:a1af337169590b9cdce5080a4e86048a3c0477a0d22270e31b0e70a04743fc7d
-size 1082
+import serial.tools.list_ports
+
+from src.metaclasses.singleton import Singleton
+
+
+class PortManager(metaclass=Singleton):
+    def __init__(self):
+        self.vendors = ["Arduino Uno", "USB Serial Device", "USB-SERIAL CH340", "USB Serial Port", "MARLIN_STM32G0B1RE CDC in FS"]
+
+    async def get_available_ports(self):
+        ports = []
+        for comport in serial.tools.list_ports.comports():
+            par_ind = comport.description.rfind(" ")
+            device_name = comport.description[:par_ind]
+            if device_name in self.vendors:
+                ports.append(comport.device)
+
+        return ports
+
+    @staticmethod
+    async def get_available_ports_ultra_arm():
+        ports = []
+        for comport in serial.tools.list_ports.comports():
+            if comport.pid == 29987 and comport.vid == 6790:
+                ports.append(comport.device)
+
+        return ports
+
+
+# if __name__ == "__main__":
+#     for comport in serial.tools.list_ports.comports():
+#         par_ind = comport.description.rfind(" ")
+#         device_name = comport.description[:par_ind]

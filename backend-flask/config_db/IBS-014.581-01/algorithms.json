@@ -1,3 +1,42 @@
-version https://git-lfs.github.com/spec/v1
-oid sha256:a679e4fc37d2b5524c69a7c069278e6f6cb9e4f472403e94e32be51d5cb7dd23
-size 1385
+{
+    "algorithms": {
+        "1": {
+            "name": "",
+            "parameters": {
+                "confidence_threshold": 0.7,
+                "device": "GPU",
+                "golden_position": [],
+                "graphics": [
+                    {
+                        "bound": [
+                            148.4575317669794,
+                            104.87968548013079,
+                            1679.471221528059,
+                            609.177430922991
+                        ],
+                        "color": "rgba(140, 235, 52, 0.5)",
+                        "masks": [],
+                        "masksColors": [],
+                        "offset": [
+                            0,
+                            0
+                        ],
+                        "rect": [
+                            148.4575317669794,
+                            104.87968548013077,
+                            1668.5951275968478,
+                            607.3460776814314
+                        ],
+                        "rotation": 0
+                    }
+                ],
+                "iou_threshold": 0.45,
+                "max_detections": 1000,
+                "model_path": "100_last.pt",
+                "use_dnn": false
+            },
+            "type": "Cable YOLO v8",
+            "uid": "bc75a7cb-4ef1-42fc-921d-f2f90b8e208e"
+        }
+    }
+}

@@ -1,3 +1,111 @@
-version https://git-lfs.github.com/spec/v1
-oid sha256:7f174e5d02c05198250895961bed9eef4d774d0ac5a8174cccaab35ba4032c1d
-size 2131
+from abc import ABC, abstractmethod
+
+
+class Type(ABC):
+    def __init__(self):
+        pass
+
+    @abstractmethod
+    def value(self):
+        pass
+
+    @abstractmethod
+    def set_value(self, value):
+        pass
+
+    def __str__(self):
+        pass
+
+
+class ListType(Type):
+    def __init__(self):
+        super(ListType, self).__init__()
+        self.lst = []
+
+    def value(self):
+        return self.lst
+
+    def set_value(self, value):
+        self.lst = value
+
+    def __str__(self):
+        return "ListType"
+
+
+class NumpyType(Type):
+    def __init__(self):
+        super(NumpyType, self).__init__()
+        self.array = None
+
+    def value(self):
+        return self.array
+
+    def set_value(self, value):
+        self.array = value
+
+    def __str__(self):
+        return "NumpyType"
+
+
+class IntegerType(Type):
+    def __init__(self):
+        super(IntegerType, self).__init__()
+        self.i = None
+
+    def value(self):
+        return self.i
+
+    def set_value(self, value):
+        self.i = value
+
+    def __str__(self):
+        return "IntegerType"
+
+
+class DictType(Type):
+    def __init__(self):
+        super(DictType, self).__init__()
+        self.dct = None
+
+    def value(self):
+        return self.dct
+
+    def set_value(self, value):
+        self.dct = value
+
+    def __str__(self):
+        return "DictType"
+
+
+class InOutBlock(ABC):
+    def __init__(self):
+        pass
+
+
+class SimpleBlock(InOutBlock):
+    def __init__(self, ins: [Type], outs: [Type], name=""):
+        super(SimpleBlock, self).__init__()
+        self.ins = ins
+        self.outs = outs
+        self.name = name
+
+
+class CompoundBlock(InOutBlock):
+    def __init__(self):
+        super(CompoundBlock, self).__init__()
+        self.blocks: [InOutBlock] = []
+
+    def add(self, block: InOutBlock):
+        self.blocks.append(block)
+
+    def remove(self, block: InOutBlock):
+        self.blocks.remove(block)
+
+    def remove_by_index(self, index: int):
+        del self.blocks[index]
+
+    def swap(self, old_index, new_index):
+        self.blocks.insert(new_index, self.blocks.pop(old_index))
+
+    def get_blocks(self):
+        return self.blocks

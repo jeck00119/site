@@ -1,3 +1,13 @@
-version https://git-lfs.github.com/spec/v1
-oid sha256:d04510bda26b4a80882b781569c8f078697394c6fc6df872e4db59868e5f7483
-size 344
+{
+    "itac": {
+        "1": {
+            "destination_ip": "10.169.82.130",
+            "destination_port": "3333",
+            "fail_booking_code": "2110",
+            "name": "IBS",
+            "pass_booking_code": "2100",
+            "start_booking_code": "1020",
+            "uid": "332cad03-5faf-4d7e-9d75-96717bc7e95c"
+        }
+    }
+}

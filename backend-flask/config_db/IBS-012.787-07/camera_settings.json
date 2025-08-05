@@ -1,3 +1,25 @@
-version https://git-lfs.github.com/spec/v1
-oid sha256:b3966b88866bf007412baa8e2a41a272f150d875adececfae0ac3527d0895b75
-size 599
+{
+    "camera_settings": {
+        "1": {
+            "auto_exposure": 0,
+            "auto_focus": 1,
+            "brightness": 128,
+            "camera_type": "webcam_logi",
+            "contrast": 128,
+            "exposure": 1,
+            "focus": 30,
+            "gain": 0,
+            "name": "Basic",
+            "pan": 0,
+            "resolution": [
+                1920,
+                1080
+            ],
+            "saturation": 128,
+            "sharpness": 128,
+            "tilt": 0,
+            "uid": "c27eff4a-3b47-4e20-889d-939bf77cf9d3",
+            "zoom": 0
+        }
+    }
+}

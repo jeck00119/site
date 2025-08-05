@@ -1,3 +1,18 @@
-version https://git-lfs.github.com/spec/v1
-oid sha256:21981924707d4709a008ab84db0a82a0e7ac85a20e298875979267ed64fef714
-size 595
+# Linux-specific requirements
+# Include all base requirements
+-r requirements.txt
+
+# Linux-specific packages
+pyudev>=0.24.0  # USB device detection
+
+# Additional Linux packages that might be needed
+# Note: Some packages may require system-level dependencies
+
+# For camera support on Linux, you may need:
+# sudo apt-get install v4l-utils libv4l-dev (Ubuntu/Debian)
+# sudo yum install v4l-utils v4l2-devel (CentOS/RHEL)
+# sudo dnf install v4l-utils v4l2-devel (Fedora)
+
+# For USB access, add user to dialout group:
+# sudo usermod -a -G dialout $USER
+# Then log out and log back in

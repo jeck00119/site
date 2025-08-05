@@ -1,3 +1,101 @@
-version https://git-lfs.github.com/spec/v1
-oid sha256:412b57d2c78e3cb85188ebd4cbe6f6598da81a008f0d5bc596ef2cbaba61ec5f
-size 3318
+{
+    "inspections": {
+        "1": {
+            "column_types": [
+                "String",
+                "String",
+                "String",
+                "String",
+                "String",
+                "String",
+                "String",
+                "String",
+                "String",
+                "String",
+                "String",
+                "String"
+            ],
+            "columns": [
+                "Inspection\r\n No.",
+                "Name",
+                "Value",
+                "ValueType",
+                "Meas Unit",
+                "Meas Lower Limit",
+                "Meas Upper Limit",
+                "Meas Type",
+                "Offset",
+                "Skip",
+                "Group",
+                "Sub-Group"
+            ],
+            "inspections": {
+                "clip_count": {
+                    "Group": "CABLE",
+                    "Inspection\r\n No.": 1,
+                    "Meas Type": "B",
+                    "Meas Unit": "N/A",
+                    "Meas Lower Limit": 2,
+                    "Meas Upper Limit": 2,
+                    "Offset": "N/A",
+                    "Skip": "false",
+                    "Sub-Group": "CABLE",
+                    "Value": "Integer",
+                    "ValueType": "N"
+                },
+                "head_blue_count": {
+                    "Group": "CABLE",
+                    "Inspection\r\n No.": 4,
+                    "Meas Lower Limit": 0,
+                    "Meas Type": "B",
+                    "Meas Unit": "N/A",
+                    "Meas Upper Limit": 0,
+                    "Offset": "N/A",
+                    "Skip": "false",
+                    "Sub-Group": "CABLE",
+                    "Value": "Integer",
+                    "ValueType": "N"
+                },
+                "head_none_count": {
+                    "Group": "CABLE",
+                    "Inspection\r\n No.": 2,
+                    "Meas Lower Limit": 1,
+                    "Meas Type": "B",
+                    "Meas Unit": "N/A",
+                    "Meas Upper Limit": 1,
+                    "Offset": "N/A",
+                    "Skip": "false",
+                    "Sub-Group": "CABLE",
+                    "Value": "Integer",
+                    "ValueType": "N"
+                },
+                "head_red_count": {
+                    "Group": "CABLE",
+                    "Inspection\r\n No.": 3,
+                    "Meas Lower Limit": 0,
+                    "Meas Type": "B",
+                    "Meas Unit": "N/A",
+                    "Meas Upper Limit": 0,
+                    "Offset": "N/A",
+                    "Skip": "false",
+                    "Sub-Group": "CABLE",
+                    "Value": "Integer",
+                    "ValueType": "N"
+                },
+                "head_black_count": {
+                    "Group": "CABLE",
+                    "Inspection\r\n No.": 5,
+                    "Meas Lower Limit": 0,
+                    "Meas Type": "B",
+                    "Meas Unit": "N/A",
+                    "Meas Upper Limit": 0,
+                    "Offset": "N/A",
+                    "Skip": "false",
+                    "Sub-Group": "CABLE",
+                    "Value": "Integer",
+                    "ValueType": "N"
+                }
+            }
+        }
+    }
+}

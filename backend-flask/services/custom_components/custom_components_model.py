@@ -1,3 +1,9 @@
-version https://git-lfs.github.com/spec/v1
-oid sha256:e09962856ec626c7e2650583bb5879374e5393364d6fc7314ec133d9219ce0b4
-size 205
+from src.utils import generate_uid, CamelModel
+
+
+class CustomComponentModel(CamelModel):
+    uid: str = generate_uid(length=8)
+    name: str
+    image_source_uid: str
+    algorithms: list
+    blocks: list

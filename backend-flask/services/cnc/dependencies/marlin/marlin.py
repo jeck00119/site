@@ -1,3 +1,591 @@
-version https://git-lfs.github.com/spec/v1
-oid sha256:0c728227fba8c908ea54c63b6d93b48d03d541fbe38e119863e4ca00cca09ebf
-size 23211
+import atexit
+import logging
+import re
+import threading
+import time
+import traceback
+from queue import Queue
+
+from services.cnc.dependencies.gerbil.callbackloghandler import CallbackLogHandler
+from services.cnc.dependencies.gerbil.gcode_machine import GcodeMachine
+from services.cnc.dependencies.gerbil.interface import Interface
+
+
+class Marlin:
+    def __init__(self, callback):
+        self.name = "marlin"
+        self.current_mode = "Idle"
+        self.current_position = (0, 0, 0)
+        self.current_work_position = (0, 0, 0)
+        self.gps = [
+            "0",
+            "54",
+            "17",
+            "21",
+            "90",
+            "94",
+            "0",
+            "0",
+            "5",
+            "0",
+            "99",
+            "0",
+        ]
+        self.poll_interval = 0.2
+        self.settings = {}
+        self.settings_hash = {
+            "G54": (0, 0, 0),
+            "G55": (0, 0, 0),
+            "G56": (0, 0, 0),
+            "G57": (0, 0, 0),
+            "G58": (0, 0, 0),
+            "G59": (0, 0, 0),
+            "G28": (0, 0, 0),
+            "G30": (0, 0, 0),
+            "G92": (0, 0, 0),
+            "TLO": 0,
+            "PRB": (0, 0, 0),
+        }
+        self.gcode_parser_state_requested = False
+        self.hash_state_requested = False
+        self.logger = logging.getLogger("marlin")
+        self.logger.setLevel(5)
+        self.logger.propagate = False
+        self.target = "firmware"
+        self.connected = False
+        self.initialized = False
+        self.preprocessor = GcodeMachine()
+        self.preprocessor.callback = self._preprocessor_callback
+        self.travel_dist_buffer = {}
+        self.travel_dist_current = {}
+        self.is_standstill = False
+        self.is_homing = False
+        self._ifacepath = None
+        self._last_mode = None
+        self._last_position = (0, 0, 0)
+        self._last_work_position = (0, 0, 0)
+        self._rx_buffer_size = 128
+        self._rx_buffer_fill = []
+        self._rx_buffer_backlog = []
+        self._rx_buffer_backlog_line_number = []
+        self._rx_buffer_fill_percent = 0
+        self._current_line = ""
+        self._current_line_sent = True
+        self._streaming_mode = None
+        self._wait_empty_buffer = False
+        self.streaming_complete = True
+        self.job_finished = True
+        self._streaming_src_end_reached = True
+        self._streaming_enabled = True
+        self._error = False
+        self._incremental_streaming = False
+        self.buffer = []
+        self.buffer_size = 0
+        self._current_line_nr = 0
+        self.buffer_stash = []
+        self.buffer_size_stash = 0
+        self._current_line_nr_stash = 0
+        self._poll_keep_alive = False
+        self._iface_read_do = False
+        self._thread_polling = None
+        self._thread_read_iface = None
+        self._iface = None
+        self._queue = Queue()
+        self._loghandler = None
+        self.callback = callback
+        self.INSTRUCTIONS = {
+            "$0": "(Steps per unit X)",
+            "$1": "(Steps per unit Y)",
+            "$2": "(Steps per unit Z)",
+            "$3": "(Steps per unit E)",
+            "$4": "(Max feedrate X)",
+            "$5": "(Max feedrate Y)",
+            "$6": "(Max feedrate Z)",
+            "$7": "(Max feedrate E)",
+            "$8": "(Acceleration X)",
+            "$9": "(Acceleration Y)",
+            "$10": "(Acceleration Z)",
+            "$11": "(Acceleration E)",
+            "$12": "(Junction Deviation)",
+            "$13": "(Print/Travel acceleration)",
+            "$20": "(Min feedrate)",
+            "$21": "(Min travel feedrate)",
+            "$22": "(Min segment time)",
+            "$30": "(Max X position)",
+            "$31": "(Max Y position)",
+            "$32": "(Max Z position)",
+            "$100": "(X home dir)",
+            "$101": "(Y home dir)",
+            "$102": "(Z home dir)",
+            "$130": "(Home offset X)",
+            "$131": "(Home offset Y)",
+            "$132": "(Home offset Z)",
+        }
+        atexit.register(self.disconnect)
+
+    def setup_logging(self, handler=None):
+        if handler:
+            self._loghandler = handler
+        else:
+            lh = CallbackLogHandler()
+            self._loghandler = lh
+        self.logger.addHandler(self._loghandler)
+        self._loghandler.callback = self.callback
+
+    def connect(self, path=None, baudrate=115200):
+        if path is None or path.strip() == "":
+            return
+        else:
+            self._ifacepath = path
+        if self._iface is None:
+            self.logger.debug("{}: Setting up interface on {}".format(self.name, self._ifacepath))
+            self._iface = Interface("iface_" + self.name, self._ifacepath, baudrate)
+            self._iface.start(self._queue)
+            print("{}: Setting up interface on {}".format(self.name, self._ifacepath))
+        else:
+            self.logger.info(
+                "{}: Cannot start another interface. There is already an interface {}.".format(self.name, self._iface))
+        self._iface_read_do = True
+        self._thread_read_iface = threading.Thread(target=self._onread)
+        self._thread_read_iface.name = "Marlin interface thread"
+        self._thread_read_iface.start()
+        self._on_bootup()
+
+    def disconnect(self):
+        if not self.is_connected(): return
+        self.hash_state_requested = True
+        self.gcode_parser_state_requested = True
+        self.poll_stop()
+        self._iface.stop()
+        self.logger.debug("{}: Please wait until reading thread has joined...".format(self.name))
+        self._iface_read_do = False
+        self._queue.put("dummy_msg_for_joining_thread")
+        self._thread_read_iface.join()
+        self.logger.debug("{}: Reading thread successfully joined.".format(self.name))
+        self.connected = False
+        self._iface = None
+        self.callback("on_disconnected")
+
+    def set_callback(self, callback):
+        self.callback = callback
+
+    def soft_reset(self):
+        self._iface.write("M999\n")
+        self.update_preprocessor_position()
+
+    def abort(self):
+        if not self.is_connected(): return
+        del self._rx_buffer_fill[:]
+        del self._rx_buffer_backlog[:]
+        self._streaming_enabled = False
+        self._wait_empty_buffer = False
+        self._streaming_src_end_reached = True
+        self._set_streaming_complete(True)
+        self._set_job_finished(True)
+        self._iface_write("M112\n")
+
+    def hold(self):
+        if not self.is_connected(): return
+        self._iface_write("!\n")
+
+    def resume(self):
+        if not self.is_connected(): return
+        self._iface_write("~\n")
+
+    def home(self):
+        self.is_homing = True
+        self._iface_write("G28\n")
+
+    def poll_start(self):
+        if not self.is_connected(): return
+        self._poll_keep_alive = True
+        self._last_mode = None
+        if self._thread_polling is None:
+            self._thread_polling = threading.Thread(target=self._poll_state)
+            self._thread_polling.name = "Marlin polling thread"
+            self._thread_polling.start()
+            self.logger.debug("{}: Polling thread started".format(self.name))
+        else:
+            self.logger.debug("{}: Polling thread already running...".format(self.name))
+
+    def poll_stop(self):
+        if not self.is_connected():
+            self._poll_keep_alive = False
+            return
+        if self._thread_polling is not None:
+            self._poll_keep_alive = False
+            self.logger.debug("{}: Please wait until polling thread has joined...".format(self.name))
+            self._thread_polling.join()
+            self.logger.debug("{}: Polling thread has successfully joined...".format(self.name))
+        else:
+            self.logger.debug("{}: Cannot start a polling thread. Another one is already running.".format(self.name))
+        self._thread_polling = None
+
+    def set_feed_override(self, val):
+        self.preprocessor.do_feed_override = val
+
+    def request_feed(self, requested_feed):
+        self.preprocessor.request_feed = float(requested_feed)
+
+    @property
+    def incremental_streaming(self):
+        return self._incremental_streaming
+
+    @incremental_streaming.setter
+    def incremental_streaming(self, on_off):
+        self._incremental_streaming = on_off
+        if self._incremental_streaming:
+            self._wait_empty_buffer = True
+        self.logger.debug("{}: Incremental streaming set to {}".format(self.name, self._incremental_streaming))
+
+    def send_immediately(self, line):
+        bytes_in_firmware_buffer = sum(self._rx_buffer_fill)
+        if bytes_in_firmware_buffer > 0:
+            self.logger.error(
+                "Firmware buffer has {:d} unprocessed bytes in it. Will not send {}".format(bytes_in_firmware_buffer,
+                                                                                            line))
+            return
+        if self.current_mode == "Error":
+            self.logger.error("Marlin is in ERROR state. Will not send {}.".format(line))
+            return
+        self.preprocessor.set_line(line)
+        self.preprocessor.strip()
+        self.preprocessor.tidy()
+        self.preprocessor.parse_state()
+        self.preprocessor.override_feed()
+        self._iface_write(self.preprocessor.line + "\n")
+
+    def stream(self, lines):
+        self._load_lines_into_buffer(lines)
+        self.job_run()
+
+    def write(self, lines):
+        if type(lines) is list:
+            lines = "\n".join(lines)
+        self._load_lines_into_buffer(lines)
+
+    def job_run(self, line_nr=None):
+        if self.buffer_size == 0:
+            self.logger.warning("{}: Cannot run job. Nothing in the buffer!".format(self.name))
+            return
+        if line_nr:
+            self.current_line_number = line_nr
+        self.travel_dist_current = {}
+        self._set_streaming_src_end_reached(False)
+        self._set_streaming_complete(False)
+        self._streaming_enabled = True
+        self._current_line_sent = True
+        self._set_job_finished(False)
+        self._stream()
+
+    def job_halt(self):
+        self._streaming_enabled = False
+
+    def job_new(self):
+        del self.buffer[:]
+        self.buffer_size = 0
+        self._current_line_nr = 0
+        self._set_streaming_complete(True)
+        self._set_job_finished(True)
+        self._set_streaming_src_end_reached(True)
+        self._error = False
+        self._current_line = ""
+        self._current_line_sent = True
+        self.travel_dist_buffer = {}
+        self.travel_dist_current = {}
+
+    @property
+    def current_line_number(self):
+        return self._current_line_nr
+
+    @current_line_number.setter
+    def current_line_number(self, linenr):
+        if linenr < self.buffer_size:
+            self._current_line_nr = linenr
+
+    def request_settings(self):
+        self._iface_write("M503\n")
+
+    def update_preprocessor_position(self):
+        self.preprocessor.position_m = list(self.current_position)
+
+    def is_connected(self):
+        return self.connected
+
+    def _preprocessor_callback(self, event, *data):
+        if event == "on_preprocessor_var_undefined":
+            self.logger.critical("HALTED JOB BECAUSE UNDEFINED VAR {}".format(data[0]))
+            self._set_streaming_src_end_reached(True)
+            self.job_halt()
+        else:
+            self.callback(event, *data)
+
+    def _stream(self):
+        if self._streaming_src_end_reached:
+            return
+        if not self._streaming_enabled:
+            return
+        if self.target == "firmware":
+            if self._incremental_streaming:
+                self._set_next_line()
+                if not self._streaming_src_end_reached:
+                    self._send_current_line()
+                else:
+                    self._set_job_finished(True)
+            else:
+                self._fill_rx_buffer_until_full()
+        elif self.target == "simulator":
+            buf = []
+            while not self._streaming_src_end_reached:
+                self._set_next_line(True)
+                if self._current_line_nr < self.buffer_size:
+                    buf.append(self._current_line)
+            self._set_next_line(True)
+            buf.append(self._current_line)
+            self._set_job_finished(True)
+            self.callback("on_simulation_finished", buf)
+
+    def _fill_rx_buffer_until_full(self):
+        while True:
+            if self._current_line_sent:
+                self._set_next_line()
+            if self._streaming_src_end_reached == False and self._rx_buf_can_receive_current_line():
+                self._send_current_line()
+            else:
+                break
+
+    def _set_next_line(self, send_comments=False):
+        if self._current_line_nr < self.buffer_size:
+            line = self.buffer[self._current_line_nr].strip()
+            self.preprocessor.set_line(line)
+            self.preprocessor.substitute_vars()
+            self.preprocessor.parse_state()
+            self.preprocessor.override_feed()
+            self.preprocessor.scale_spindle()
+            if send_comments:
+                self._current_line = self.preprocessor.line + self.preprocessor.comment
+            else:
+                self._current_line = self.preprocessor.line
+            self._current_line_sent = False
+            self._current_line_nr += 1
+            self.preprocessor.done()
+        else:
+            self._set_streaming_src_end_reached(True)
+
+    def _send_current_line(self):
+        self._set_streaming_complete(False)
+        line_length = len(self._current_line) + 1
+        self._rx_buffer_fill.append(line_length)
+        self._rx_buffer_backlog.append(self._current_line)
+        self._rx_buffer_backlog_line_number.append(self._current_line_nr)
+        self._iface_write(self._current_line + "\n")
+        self._current_line_sent = True
+        if self.current_mode != "Jog":
+            self.current_mode = "Jog"
+            self.callback("on_stateupdate", self.current_mode, self.current_position, self.current_work_position)
+
+    def _rx_buf_can_receive_current_line(self):
+        rx_free_bytes = self._rx_buffer_size - sum(self._rx_buffer_fill)
+        required_bytes = len(self._current_line) + 1
+        return rx_free_bytes >= required_bytes
+
+    def _rx_buffer_fill_pop(self):
+        if len(self._rx_buffer_fill) > 0:
+            self._rx_buffer_fill.pop(0)
+            processed_command = self._rx_buffer_backlog.pop(0)
+            ln = self._rx_buffer_backlog_line_number.pop(0) - 1
+        if self._streaming_src_end_reached == True and len(self._rx_buffer_fill) == 0:
+            self._set_job_finished(True)
+            self._set_streaming_complete(True)
+
+    def _iface_write(self, line):
+        if self._iface:
+            self._iface.write(line)
+
+    def _onread(self):
+        while self._iface_read_do:
+            line = self._queue.get()
+            if len(line) > 0:
+                if "echo:busy: processing" in line:
+                    self.current_mode = "Jog"
+                    self.callback("on_stateupdate", self.current_mode, self.current_position,
+                                  self.current_work_position)
+                elif re.search(r'X:(-?[\d.]+) Y:(-?[\d.]+) Z:(-?[\d.]+)', line):
+                    self._update_state_from_m114(line)
+                elif line.startswith("echo:"):
+                    self._parse_settings(line)
+                    self.callback("on_read", line)
+                elif line == "ok":
+                    self._handle_ok()
+                    self.callback("on_read", line)
+                elif line.startswith("Error:"):
+                    self._error = True
+                    self.current_mode = "Error"
+                    self.callback("on_stateupdate", self.current_mode, self.current_position,
+                                  self.current_work_position)
+                    self.callback("on_read", line)
+                    self.callback("on_error", line, "", 0)
+                elif "Marlin" in line:
+                    self.callback("on_read", line)
+                    self.hash_state_requested = True
+                    self.request_settings()
+                    self.gcode_parser_state_requested = True
+                else:
+                    self.callback("on_read", line)
+
+    def _handle_ok(self):
+        if not self.streaming_complete:
+            self._rx_buffer_fill_pop()
+            if not (self._wait_empty_buffer and len(self._rx_buffer_fill) > 0):
+                self._wait_empty_buffer = False
+                self._stream()
+
+        if self.is_homing:
+            self.is_homing = False
+            if self.current_mode != "Error":
+                self.current_mode = "Idle"
+                self.callback("on_idle", "idle")
+
+    def _on_bootup(self):
+        self._onboot_init()
+        self.initialized = True
+        self.connected = True
+        self.logger.debug("{}: Marlin has booted!".format(self.name))
+        self.callback("on_boot")
+        self.poll_start()
+
+    def _update_state_from_m114(self, line):
+        try:
+            x_match = re.search(r'X:(-?[\d.]+)', line)
+            y_match = re.search(r'Y:(-?[\d.]+)', line)
+            z_match = re.search(r'Z:(-?[\d.]+)', line)
+
+            if x_match and y_match and z_match:
+                w_pos_x = float(x_match.group(1))
+                w_pos_y = float(y_match.group(1))
+                w_pos_z = float(z_match.group(1))
+
+                self.current_work_position = (w_pos_x, w_pos_y, w_pos_z)
+                self.current_position = self.current_work_position
+
+                if self.current_position != self._last_position:
+                    if self.is_standstill:
+                        self.is_standstill = False
+                        self.callback("on_movement")
+                else:
+                    if not self.is_standstill:
+                        self.is_standstill = True
+                        self.callback("on_standstill")
+                        if self.current_mode == "Jog":
+                            self.current_mode = "Idle"
+                            self.callback("on_idle", "idle")
+
+                if (self.current_mode != self._last_mode or
+                        self.current_position != self._last_position or
+                        self.current_work_position != self._last_work_position):
+                    self.callback("on_stateupdate", self.current_mode, self.current_position,
+                                  self.current_work_position)
+
+                self._last_mode = self.current_mode
+                self._last_position = self.current_position
+                self._last_work_position = self.current_work_position
+        except Exception as e:
+            self.logger.error(f"Error parsing M114 response: {e} from line: {line}")
+
+    def _parse_settings(self, line):
+        try:
+            step_match = re.search(r'M92 X(\d+\.\d+) Y(\d+\.\d+) Z(\d+\.\d+) E(\d+\.\d+)', line)
+            if step_match:
+                self.settings[0] = {"val": step_match.group(1), "cmt": "Steps per unit X"}
+                self.settings[1] = {"val": step_match.group(2), "cmt": "Steps per unit Y"}
+                self.settings[2] = {"val": step_match.group(3), "cmt": "Steps per unit Z"}
+                self.settings[3] = {"val": step_match.group(4), "cmt": "Steps per unit E"}
+            feedrate_match = re.search(r'M203 X(\d+\.\d+) Y(\d+\.\d+) Z(\d+\.\d+) E(\d+\.\d+)', line)
+            if feedrate_match:
+                self.settings[4] = {"val": feedrate_match.group(1), "cmt": "Max feedrate X"}
+                self.settings[5] = {"val": feedrate_match.group(2), "cmt": "Max feedrate Y"}
+                self.settings[6] = {"val": feedrate_match.group(3), "cmt": "Max feedrate Z"}
+                self.settings[7] = {"val": feedrate_match.group(4), "cmt": "Max feedrate E"}
+            accel_match = re.search(r'M201 X(\d+) Y(\d+) Z(\d+) E(\d+)', line)
+            if accel_match:
+                self.settings[8] = {"val": accel_match.group(1), "cmt": "Acceleration X"}
+                self.settings[9] = {"val": accel_match.group(2), "cmt": "Acceleration Y"}
+                self.settings[10] = {"val": accel_match.group(3), "cmt": "Acceleration Z"}
+                self.settings[11] = {"val": accel_match.group(4), "cmt": "Acceleration E"}
+            home_offset_match = re.search(r'M206 X([-\d.]+) Y([-\d.]+) Z([-\d.]+)', line)
+            if home_offset_match:
+                self.settings[130] = {"val": home_offset_match.group(1), "cmt": "Home offset X"}
+                self.settings[131] = {"val": home_offset_match.group(2), "cmt": "Home offset Y"}
+                self.settings[132] = {"val": home_offset_match.group(3), "cmt": "Home offset Z"}
+                x = float(home_offset_match.group(1))
+                y = float(home_offset_match.group(2))
+                z = float(home_offset_match.group(3))
+                self.settings_hash["G54"] = (x, y, z)
+                self.callback("on_settings_downloaded", self.settings)
+                self.callback("on_hash_stateupdate", self.settings_hash)
+        except Exception as e:
+            self.logger.error(f"Error parsing settings: {e}")
+
+    def _onboot_init(self):
+        del self._rx_buffer_fill[:]
+        del self._rx_buffer_backlog[:]
+        del self._rx_buffer_backlog_line_number[:]
+        self._set_streaming_complete(True)
+        self._set_job_finished(True)
+        self._set_streaming_src_end_reached(True)
+        self._error = False
+        self._current_line = ""
+        self._current_line_sent = True
+        self._clear_queue()
+        self.is_standstill = False
+        self.preprocessor.reset()
+
+    def _clear_queue(self):
+        try:
+            junk = self._queue.get_nowait()
+            self.logger.debug("Discarding junk %s", junk)
+        except:
+            pass
+
+    def _poll_state(self):
+        while self._poll_keep_alive:
+            try:
+                self._iface_write("M114 R\n")
+            except:
+                traceback.print_exc()
+                break
+            time.sleep(self.poll_interval)
+        self.logger.debug("{}: Polling has been stopped".format(self.name))
+
+    def _get_state(self):
+        self._iface_write("?\n")
+
+    def _set_streaming_src_end_reached(self, a):
+        self._streaming_src_end_reached = a
+
+    def _set_streaming_complete(self, a):
+        self.streaming_complete = a
+
+    def _set_job_finished(self, a):
+        if a is True:
+            self.callback("on_job_completed")
+
+    def _load_line_into_buffer(self, line):
+        self.preprocessor.set_line(line)
+        split_lines = self.preprocessor.split_lines()
+        for l1 in split_lines:
+            self.preprocessor.set_line(l1)
+            self.preprocessor.strip()
+            self.preprocessor.tidy()
+            self.preprocessor.parse_state()
+            self.preprocessor.find_vars()
+            fractionized_lines = self.preprocessor.fractionize()
+            for l2 in fractionized_lines:
+                self.buffer.append(l2)
+                self.buffer_size += 1
+            self.preprocessor.done()
+
+    def _load_lines_into_buffer(self, string):
+        lines = string.split("\n")
+        for line in lines:
+            self._load_line_into_buffer(line)

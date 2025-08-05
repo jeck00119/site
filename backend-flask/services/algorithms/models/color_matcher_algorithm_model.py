@@ -1,3 +1,35 @@
-version https://git-lfs.github.com/spec/v1
-oid sha256:d1cf242526fc942883a718eee49eccb6024d9d37fb73af4e8f32d2e24b1dc64e
-size 886
+from services.algorithms.models.algorithm_parameters_model import AlgorithmParametersModel
+
+
+class ColorMatcherAlgorithmModel(AlgorithmParametersModel):
+    threshold: int = 30
+    expected_color_code: str = "#000000"
+
+    graphics: list = [
+        {
+            "color": "rgba(140, 235, 52, 0.5)",
+            "rotation": 0,
+            "bound": [
+                10,
+                10,
+                100,
+                100
+            ],
+            "offset": [
+                0,
+                0
+            ],
+            "rect": [
+                10,
+                10,
+                100,
+                100
+            ],
+            "masks": [],
+            "masksColors": []
+        }
+    ]
+    golden_position: list = [0, 0]
+
+    def get_ui_from_type(self):
+        return self.load_ui_dictionary("services/algorithms/implementation/ui_objects/color_matcher.json")

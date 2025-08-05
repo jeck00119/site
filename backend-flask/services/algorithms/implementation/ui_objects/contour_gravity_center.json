@@ -1,3 +1,42 @@
-version https://git-lfs.github.com/spec/v1
-oid sha256:18e21153d7f876d0d5a1376c7690baec5aa7d8e1acfd0183a938622afc3bd49d
-size 909
+[
+    {
+        "name": "gaussian_blur_kernel_size",
+        "type": "integer",
+        "default": 11
+    },
+    {
+        "name": "gaussian_blur_sigma",
+        "type": "float",
+        "default": 0.0
+    },
+    {
+        "name": "bin_low_threshold",
+        "type": "integer",
+        "default": 127
+    },
+    {
+        "name": "closing_kernel_size",
+        "type": "integer",
+        "default": 5
+    },
+    {
+        "name": "invert_thresholding",
+        "type": "bool",
+        "default": false
+    },
+    {
+        "name": "graphics",
+        "type": "graphics",
+        "default": [
+            {
+                "bound": [10, 10, 100, 100],
+                "rect": [10, 10, 100, 100],
+                "offset": [0, 0],
+                "rotation": 0.0,
+                "color": "rgba(140, 235, 52, 0.5)",
+                "masks": [],
+                "masksColors": []
+            }
+        ]
+    }
+]

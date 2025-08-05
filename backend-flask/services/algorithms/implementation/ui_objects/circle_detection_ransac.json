@@ -1,3 +1,37 @@
-version https://git-lfs.github.com/spec/v1
-oid sha256:4ce3d3fd02d470fe83ac1677180536c0a8f8aaee2300a62ea1c19ce04a05e81a
-size 796
+[
+    {
+        "name": "median_blur_kernel",
+        "type": "integer",
+        "default": 0
+    },
+    {
+        "name": "canny_lower_thresh",
+        "type": "integer",
+        "default": 0
+    },
+    {
+        "name": "canny_upper_thresh",
+        "type": "integer",
+        "default": 0
+    },
+    {
+        "name": "ransac_max_trials",
+        "type": "integer",
+        "default": 0
+    },
+    {
+        "name": "graphics",
+        "type": "graphics",
+        "default": [
+            {
+                "bound": [10, 10, 100, 100],
+                "rect": [10, 10, 100, 100],
+                "offset": [0, 0],
+                "rotation": 0.0,
+                "color": "rgba(140, 235, 52, 0.5)",
+                "masks": [],
+                "masksColors": []
+            }
+        ]
+    }
+]

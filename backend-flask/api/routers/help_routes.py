@@ -1,3 +1,16 @@
-version https://git-lfs.github.com/spec/v1
-oid sha256:48e5d66ae488956f73cc468a938bfcf10022c86b9ac40ff03eeb4e2389ee177b
-size 312
+import base64
+
+from fastapi import APIRouter
+
+router = APIRouter(
+    tags=["help"],
+    prefix="/help"
+)
+
+
+@router.get("")
+async def get_help_document():
+    with open("assets/help/ibs_help.pdf", "rb") as pdf_file:
+        pdf_encoded = base64.b64encode(pdf_file.read()).decode("utf-8")
+
+    return pdf_encoded

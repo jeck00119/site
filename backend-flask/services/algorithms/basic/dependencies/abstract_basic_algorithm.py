@@ -1,3 +1,31 @@
-version https://git-lfs.github.com/spec/v1
-oid sha256:1d6125203aa12805083589b7779586b1bda1fcc60bd863bca8830f5b214927e6
-size 921
+from services.algorithms.basic.models.data_representation import SimpleBlock
+
+
+class AbstractBasicAlgorithm(object):
+    def __init__(self):
+        super(AbstractBasicAlgorithm, self).__init__()
+
+    def to_dict(self):
+        """
+        This method returns the json representation of the algorithm.
+        :return: a dictionary
+        """
+        data = self.__dict__
+        return data
+
+    @classmethod
+    def from_dict(cls, data: dict):
+        """
+        This method creates an instance of the desired AbstractBasicAlgorithm
+        :param data: a dictionary
+        :return: an instance of AbstractAlgorithm
+        """
+        return cls()
+
+    def execute(self, block: SimpleBlock = None):
+        """
+        This method does the algorithm execution
+        :param block: passable object between algorithms
+        :return: It returns a passable object between algorithms
+        """
+        return block

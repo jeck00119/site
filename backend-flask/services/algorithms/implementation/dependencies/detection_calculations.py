@@ -1,3 +1,18 @@
-version https://git-lfs.github.com/spec/v1
-oid sha256:80e80519a8501399e3dad355ac7e12ac83b4ba26f4d397ba778403c86e5f8fe3
-size 362
+class Point:
+    def __init__(self, x, y):
+        self.x = x
+        self.y = y
+
+    def set(self, x, y):
+        self.x = x
+        self.y = y
+
+    def get_x(self):
+        return self.x
+
+    def get_y(self):
+        return self.y
+
+    # set the print_debuged text of the class
+    def __str__(self):
+        return "X: " + str(self.x) + " / Y: " + str(self.y)

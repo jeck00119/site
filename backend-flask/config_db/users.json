@@ -1,3 +1,16 @@
-version https://git-lfs.github.com/spec/v1
-oid sha256:74271c00195d297dc08e8eacb978604989de7bf8b9932bfa943925ccded24358
-size 498
+{
+    "users": {
+        "1": {
+            "level": "operator",
+            "password": "$2b$12$o2ZRNk3XUz.T63TlSHzVd.SAOdyCp4ag658Fu/7umFyUtCwFbsGC6",
+            "uid": "test-user-123",
+            "username": "testuser"
+        },
+        "2": {
+            "level": "",
+            "password": "$2b$12$a0U5ro7NWJd5Qp7Jd14mb.nKQTLNSf5U9rqRiuSyXtA/4AldTozuO",
+            "uid": "5abf61bc-08e2-4c32-99bd-65f052d66698",
+            "username": "sadasd@forvia.com"
+        }
+    }
+}

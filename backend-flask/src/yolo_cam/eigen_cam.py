@@ -1,3 +1,25 @@
-version https://git-lfs.github.com/spec/v1
-oid sha256:3a48f97e754bab19e2eac4f6884078462d1a927466bfa9a987eef94f85f51431
-size 897
+
+
+# https://arxiv.org/abs/2008.00299
+from src.yolo_cam.base_cam import BaseCAM
+from src.yolo_cam.utils.svd_on_activations import get_2d_projection
+
+
+class EigenCAM(BaseCAM):
+    def __init__(self, model, target_layers, task: str = 'od', #use_cuda=False,
+                 reshape_transform=None):
+        super(EigenCAM, self).__init__(model,
+                                       target_layers,
+                                       task,
+                                       #use_cuda,
+                                       reshape_transform,
+                                       uses_gradients=False)
+
+    def get_cam_image(self,
+                      input_tensor,
+                      target_layer,
+                      target_category,
+                      activations,
+                      grads,
+                      eigen_smooth):
+        return get_2d_projection(activations)

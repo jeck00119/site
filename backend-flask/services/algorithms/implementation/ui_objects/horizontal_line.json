@@ -1,3 +1,32 @@
-version https://git-lfs.github.com/spec/v1
-oid sha256:27adf9cd52583f87ed7c6bf38ad678074b0455af30b85930c25553af8253b07a
-size 691
+[
+    {
+        "name": "binary_threshold",
+        "type": "integer",
+        "default": 0
+    },
+    {
+        "name": "horizontal_start",
+        "type": "integer",
+        "default": 0
+    },
+    {
+        "name": "horizontal_stop",
+        "type": "integer",
+        "default": 0
+    },
+    {
+        "name": "graphics",
+        "type": "graphics",
+        "default": [
+            {
+                "bound": [10, 10, 100, 100],
+                "rect": [10, 10, 100, 100],
+                "offset": [0, 0],
+                "rotation": 0.0,
+                "color": "rgba(140, 235, 52, 0.5)",
+                "masks": [],
+                "masksColors": []
+            }
+        ]
+    }
+]

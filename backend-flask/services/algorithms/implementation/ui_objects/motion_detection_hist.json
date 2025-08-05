@@ -1,3 +1,37 @@
-version https://git-lfs.github.com/spec/v1
-oid sha256:7e72d2f1f867bffeea3ad639111bc56e34148c1223d3ba8fe562606570a9f73c
-size 785
+[
+    {
+        "name": "history",
+        "type": "integer",
+        "default": 0
+    },
+    {
+        "name": "variation_threshold",
+        "type": "float",
+        "default": 0.0
+    },
+    {
+        "name": "detect_shadows",
+        "type": "bool",
+        "default": false
+    },
+    {
+        "name": "detection_threshold",
+        "type": "integer",
+        "default": 0
+    },
+    {
+        "name": "graphics",
+        "type": "graphics",
+        "default": [
+            {
+                "bound": [10, 10, 100, 100],
+                "rect": [10, 10, 100, 100],
+                "offset": [0, 0],
+                "rotation": 0.0,
+                "color": "rgba(140, 235, 52, 0.5)",
+                "masks": [],
+                "masksColors": []
+            }
+        ]
+    }
+]

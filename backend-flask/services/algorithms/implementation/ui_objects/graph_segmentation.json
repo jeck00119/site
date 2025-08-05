@@ -1,3 +1,43 @@
-version https://git-lfs.github.com/spec/v1
-oid sha256:7de304962efc0f7490354fb754a58cadf77983a0f203f915609585a553c90f78
-size 909
+[
+    {
+        "name": "k",
+        "type": "integer",
+        "default": 300
+    },
+    {
+        "name": "min_size",
+        "type": "integer",
+        "default": 100
+    },
+    {
+        "name": "segmentation_type",
+        "type": "dropdown",
+        "default": "GRAYSCALE",
+        "values": ["GRAYSCALE", "RGB"]
+    },
+    {
+        "name": "blur_kernel_size",
+        "type": "integer",
+        "default": 1
+    },
+    {
+        "name": "sigma",
+        "type": "float",
+        "default": 0.00
+    },
+    {
+        "name": "graphics",
+        "type": "graphics",
+        "default": [
+            {
+                "bound": [10, 10, 100, 100],
+                "rect": [10, 10, 100, 100],
+                "offset": [0, 0],
+                "rotation": 0.0,
+                "color": "rgba(140, 235, 52, 0.5)",
+                "masks": [],
+                "masksColors": []
+            }
+        ]
+    }
+]

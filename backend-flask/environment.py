@@ -1,3 +1,8 @@
-version https://git-lfs.github.com/spec/v1
-oid sha256:54c9948f619ba3731f2d7a0433fe88acb6476829e421555a0640674935bc21af
-size 333
+import os
+from src.platform_utils import PathHandler, PlatformSpecificConfig
+
+# Initialize platform-specific environment
+PlatformSpecificConfig.setup_environment()
+
+# Environment configuration for data paths - cross-platform compatible
+COGNEX_DATA_PATH = PathHandler.join_paths(PathHandler.get_data_directory(), "cognex", "DMC.csv")

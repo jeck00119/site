@@ -1,3 +1,35 @@
-version https://git-lfs.github.com/spec/v1
-oid sha256:13ec5426f5412547d8829c0e8fba9d7be005222a16bf525f1e275f172ed6a4de
-size 884
+from services.algorithms.models.algorithm_parameters_model import AlgorithmParametersModel
+
+
+class ColorAveragingAlgorithmModel(AlgorithmParametersModel):
+    bottom_threshold: int = 0
+    upper_threshold: int = 0
+
+    graphics: list = [
+        {
+            "color": "rgba(140, 235, 52, 0.5)",
+            "rotation": 0,
+            "bound": [
+                10,
+                10,
+                100,
+                100
+            ],
+            "offset": [
+                0,
+                0
+            ],
+            "rect": [
+                10,
+                10,
+                100,
+                100
+            ],
+            "masks": [],
+            "masksColors": []
+        }
+    ]
+    golden_position: list = [0, 0]
+
+    def get_ui_from_type(self):
+        return self.load_ui_dictionary("services/algorithms/implementation/ui_objects/color_averaging.json")

@@ -1,3 +1,10 @@
-version https://git-lfs.github.com/spec/v1
-oid sha256:100d00c19a61db5afd3833c5769633649a08a8d207e882e849bfef5caf87a0fa
-size 335
+# Windows-specific requirements
+# Include all base requirements
+-r requirements.txt
+
+# Windows-specific packages
+pywin32>=306  # Windows Management Instrumentation (WMI) access
+
+# Additional Windows packages
+# DirectShow support is included with opencv-python
+# No additional packages typically needed for basic camera support

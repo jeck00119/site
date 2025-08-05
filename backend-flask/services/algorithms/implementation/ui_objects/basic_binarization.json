@@ -1,3 +1,32 @@
-version https://git-lfs.github.com/spec/v1
-oid sha256:8d036194ea8dd9c6ca7bc31cc3d80df04b43267ca417080beae1d9699deb1027
-size 687
+[
+    {
+        "name": "binary_threshold",
+        "type": "integer",
+        "default": 120
+    },
+    {
+        "name": "white_ratio",
+        "type": "float",
+        "default": 0.5
+    },
+    {
+        "name": "binary_inverse",
+        "type": "bool",
+        "default": true
+    },
+    {
+        "name": "graphics",
+        "type": "graphics",
+        "default": [
+            {
+                "bound": [10, 10, 100, 100],
+                "rect": [10, 10, 100, 100],
+                "offset": [0, 0],
+                "rotation": 0.0,
+                "color": "rgba(140, 235, 52, 0.5)",
+                "masks": [],
+                "masksColors": []
+            }
+        ]
+    }
+]

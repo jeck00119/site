@@ -1,3 +1,26 @@
-version https://git-lfs.github.com/spec/v1
-oid sha256:9519e0bb7d8310cb36a524d7f318a91c7bf3b23c028589f44c1281a027e5bc92
-size 513
+from enum import Enum
+from typing import Any
+
+from src.utils import generate_uid, CamelModel
+
+
+class ImgSrcEnum(str, Enum):
+    DYNAMIC = 'dynamic'
+    STATIC = 'static'
+
+
+class ImageSourceModel(CamelModel):
+    uid: Any = generate_uid(length=8)
+    name: str = f'ImageSource{uid}'
+
+    image_source_type: ImgSrcEnum
+    camera_uid: Any
+    camera_settings_uid: Any
+    camera_calibration_uid: Any
+    image_generator_uid: Any
+
+    location_name: Any
+    settle_time: Any
+    activate_location: Any
+
+    fps: Any

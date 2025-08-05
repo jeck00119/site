@@ -1,3 +1,32 @@
-version https://git-lfs.github.com/spec/v1
-oid sha256:61b58d4031d9b3cda53bef2de85b172e7183d8ffba473ef47aa13855b85b3381
-size 814
+from services.algorithms.models.algorithm_parameters_model import AlgorithmParametersModel
+
+
+class MobileSAMAlgorithmModel(AlgorithmParametersModel):
+    graphics: list = [
+        {
+            "color": "rgba(140, 235, 52, 0.5)",
+            "rotation": 0,
+            "bound": [
+                10,
+                10,
+                100,
+                100
+            ],
+            "offset": [
+                0,
+                0
+            ],
+            "rect": [
+                10,
+                10,
+                100,
+                100
+            ],
+            "masks": [],
+            "masksColors": []
+        }
+    ]
+    golden_position: list = [0, 0]
+
+    def get_ui_from_type(self):
+        return self.load_ui_dictionary("services/algorithms/implementation/ui_objects/mobile_sam.json")

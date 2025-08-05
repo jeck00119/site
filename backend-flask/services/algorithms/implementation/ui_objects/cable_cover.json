@@ -1,3 +1,68 @@
-version https://git-lfs.github.com/spec/v1
-oid sha256:4aa553153fd6f59f6b82c0597c51a32cf47933e11af4cecb16f9430e0ec71120
-size 1492
+[
+    {
+        "name": "median_blur",
+        "type": "integer",
+        "default": 0
+    },
+    {
+        "name": "bin_thresh",
+        "type": "integer",
+        "default": 0
+    },
+    {
+        "name": "kernel_opening",
+        "type": "integer",
+        "default": 0
+    },
+    {
+        "name": "kernel_closing",
+        "type": "integer",
+        "default": 0
+    },
+    {
+        "name": "iteration_opening",
+        "type": "integer",
+        "default": 0
+    },
+    {
+        "name": "iteration_closing",
+        "type": "integer",
+        "default": 0
+    },
+    {
+        "name": "no_cover_area_thresh",
+        "type": "integer",
+        "default": 0
+    },
+    {
+        "name": "black_silicone_cover_ext_x_min_dist",
+        "type": "integer",
+        "default": 0
+    },
+    {
+        "name": "blue_cover_ext_x_min_dist",
+        "type": "integer",
+        "default": 0
+    },
+    {
+        "name": "expected_result",
+        "type": "dropdown",
+        "default": "No Cover",
+        "values": ["No Cover", "Blue Cover", "Black-Plastic Cover", "Black-Silicone Cover"]
+    },
+    {
+        "name": "graphics",
+        "type": "graphics",
+        "default": [
+            {
+                "bound": [10, 10, 100, 100],
+                "rect": [10, 10, 100, 100],
+                "offset": [0, 0],
+                "rotation": 0.0,
+                "color": "rgba(140, 235, 52, 0.5)",
+                "masks": [],
+                "masksColors": []
+            }
+        ]
+    }
+]

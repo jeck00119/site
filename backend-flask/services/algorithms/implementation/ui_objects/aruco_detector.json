@@ -1,3 +1,26 @@
-version https://git-lfs.github.com/spec/v1
-oid sha256:c43755b4b9648f134db000a7bce7517095c4ff6de586948fbf80fbf6ef61ee6f
-size 839
+[
+    {
+        "name": "dictionary",
+        "type": "dropdown",
+        "default": "DICT_4x4_100",
+        "values": ["DICT_4x4_50", "DICT_4x4_100", "DICT_4x4_250", "DICT_4x4_1000",
+                   "DICT_5x5_50", "DICT_5x5_100", "DICT_5x5_250", "DICT_5x5_1000",
+                   "DICT_6x6_50", "DICT_6x6_100", "DICT_6x6_250", "DICT_6x6_1000",
+                   "DICT_7x7_50", "DICT_7x7_100", "DICT_7x7_250", "DICT_7x7_1000"]
+    },
+    {
+        "name": "graphics",
+        "type": "graphics",
+        "default": [
+            {
+                "bound": [10, 10, 100, 100],
+                "rect": [10, 10, 100, 100],
+                "offset": [0, 0],
+                "rotation": 0.0,
+                "color": "rgba(140, 235, 52, 0.5)",
+                "masks": [],
+                "masksColors": []
+            }
+        ]
+    }
+]

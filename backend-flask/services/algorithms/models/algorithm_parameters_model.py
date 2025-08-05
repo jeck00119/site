@@ -1,3 +1,8 @@
-version https://git-lfs.github.com/spec/v1
-oid sha256:50131ca0defd1f16844a584c8b1f6f968c8aafe5a51c55319d11c589dace67d2
-size 134
+from src.utils import CamelModel
+
+
+class AlgorithmParametersModel(CamelModel):
+    pass
+
+    def get_ui_from_type(self):
+        pass

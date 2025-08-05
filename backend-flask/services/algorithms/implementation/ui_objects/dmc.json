@@ -1,3 +1,72 @@
-version https://git-lfs.github.com/spec/v1
-oid sha256:9d303a78e9b49de90c487542cfbe76685ccc8c3c55cde84d729679334e7a9342
-size 1383
+[
+    {
+        "name": "threshold",
+        "type": "integer",
+        "default": 0
+    },
+    {
+        "name": "gap_size",
+        "type": "integer",
+        "default": 0
+    },
+    {
+        "name": "deviation",
+        "type": "integer",
+        "default": 0
+    },
+    {
+        "name": "char_number",
+        "type": "integer",
+        "default": 0
+    },
+    {
+        "name": "shrink",
+        "type": "integer",
+        "default": 1
+    },
+    {
+        "name": "shape",
+        "type": "integer",
+        "default": 0
+    },
+    {
+        "name": "max_count",
+        "type": "integer",
+        "default": 0
+    },
+    {
+        "name": "min_edge",
+        "type": "integer",
+        "default": 0
+    },
+    {
+        "name": "max_edge",
+        "type": "integer",
+        "default": 0
+    },
+    {
+        "name": "corrections",
+        "type": "integer",
+        "default": 0
+    },
+    {
+        "name": "timeout",
+        "type": "integer",
+        "default": 0
+    },
+    {
+        "name": "graphics",
+        "type": "graphics",
+        "default": [
+            {
+                "bound": [10, 10, 100, 100],
+                "rect": [10, 10, 100, 100],
+                "offset": [0, 0],
+                "rotation": 0.0,
+                "color": "rgba(140, 235, 52, 0.5)",
+                "masks": [],
+                "masksColors": []
+            }
+        ]
+    }
+]

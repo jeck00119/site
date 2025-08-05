@@ -1,3 +1,23 @@
-version https://git-lfs.github.com/spec/v1
-oid sha256:1508e6c1e2d7f55435b701f6f952a5560c1309c9c9c5e0e9ab08aac388b27000
-size 630
+{
+    "cameras": {
+        "1": {
+            "camera_settings_uid": null,
+            "camera_type": "webcam_logi",
+            "name": "Web",
+            "opencv_index_id": 0,
+            "uid": "1d5913ac-e19c-4686-a736-9ec6e0e00a42"
+        },
+        "2": {
+            "camera_type": "webcam_logi",
+            "name": "IBS",
+            "opencv_index_id": 1,
+            "uid": "a63b86ec-eee7-4eb0-94cc-397362ad8626"
+        },
+        "3": {
+            "camera_type": "webcam_logi",
+            "name": "Cables",
+            "opencv_index_id": 4,
+            "uid": "b32f71a7-d775-4af1-9080-bf318f452bb5"
+        }
+    }
+}

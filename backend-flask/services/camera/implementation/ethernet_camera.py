@@ -1,3 +1,24 @@
-version https://git-lfs.github.com/spec/v1
-oid sha256:1b1133297fb44e8299e60a353e3fde7c52defd1cf3472a2decd07a3f1fdeee64
-size 451
+from services.camera.implementation.interface_camera import CameraInterface
+
+
+class EthernetCamera(CameraInterface):
+    def __init__(self, data):
+        super(EthernetCamera, self).__init__(data)
+
+    def get_frame(self):
+        pass
+
+    def release(self):
+        pass
+
+    def initialize(self):
+        pass
+
+    def status_check(self):
+        pass
+
+    def load_config(self, data: dict):
+        pass
+
+    def get_settings(self):
+        pass

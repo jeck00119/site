@@ -1,3 +1,10 @@
-version https://git-lfs.github.com/spec/v1
-oid sha256:6d6cac382049bff8456f408fa28206193608389632d563495c9de6592215aa5b
-size 205
+{
+    "cnc": {
+        "3": {
+            "name": "Marlin_Top",
+            "port": "/dev/ttyACM0",
+            "type": "Marlin",
+            "uid": "158709d1-8b1c-4bed-beca-ca80e7ec0bfe"
+        }
+    }
+}

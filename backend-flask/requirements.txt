@@ -1,3 +1,79 @@
-version https://git-lfs.github.com/spec/v1
-oid sha256:fa32ac59303a4d3ddacaa03cccc5a43f8e28b5c4c655bffe56dec298f3785421
-size 1421
+# Core Framework
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+starlette>=0.27.0
+pydantic>=2.0.0
+
+# HTTP and WebSocket
+aiofiles
+anyio
+python-multipart
+wsproto
+
+# Computer Vision and Image Processing
+opencv-python>=4.8.0
+numpy>=1.24.0
+Pillow>=10.0.0
+imutils
+scikit-image
+matplotlib
+
+# Machine Learning and AI
+torch>=2.0.0
+torchvision>=0.15.0
+ultralytics
+segment-anything-py
+supervision
+easyocr
+pytesseract
+
+# Data Processing and Storage
+tinydb
+openpyxl
+scipy
+humps
+shortuuid
+
+# Security and Authentication
+python-jose[cryptography]
+passlib[bcrypt]
+bcrypt>=4.0.0
+
+# Computer Vision Libraries
+pyzbar
+pylibdmtx
+
+# Hardware Integration
+pyserial
+pygame
+
+# Industrial Equipment
+pymycobot
+xarm
+
+# Platform-specific dependencies
+pywin32>=306; sys_platform == "win32"
+# Linux USB device detection (optional)
+pyudev; sys_platform == "linux"
+
+# Computer Vision Backends
+# Windows-specific
+# DirectShow backend is included with opencv-python
+
+# Linux-specific (these are typically system packages)
+# For Ubuntu/Debian, install: sudo apt-get install v4l-utils
+# For CentOS/RHEL, install: sudo yum install v4l-utils
+
+# Optional dependencies for enhanced functionality
+patched-yolo-infer
+ttach
+transitions
+filelock
+
+# Camera hardware support
+pypylon  # Basler cameras
+
+# Development and testing
+pytest>=7.0.0
+pytest-asyncio
+requests  # For testing HTTP endpoints

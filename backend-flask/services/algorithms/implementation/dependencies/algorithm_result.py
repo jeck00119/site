@@ -1,3 +1,15 @@
-version https://git-lfs.github.com/spec/v1
-oid sha256:3e9a375330721df17135c33e45d747a517045bdd1dc874232151133f0403fce1
-size 429
+class AlgorithmResult:
+    def __init__(self):
+        self.name = None
+        self.image = None
+        self.imageRoi = None
+        self.debugImages = []
+        self.data = None
+        self.detailsType = None
+        self.roiCoordinates = None
+        self.referencePoints = None
+        self.referenceData = None
+        self.detailedDebug = {}
+        self.reference_debugImages = None
+        self.inspections_name = {}
+

@@ -1,3 +1,37 @@
-version https://git-lfs.github.com/spec/v1
-oid sha256:5aeca29483e886940fcaec6b4199258db06a968ccc8ddfaebc96b6910404212f
-size 932
+from services.logger.formatter import TraceabilityFormatter
+from services.logger.handler import FileHandler
+from services.logger.logger_model import Entry
+from src.metaclasses.singleton import Singleton
+
+
+class Logger(metaclass=Singleton):
+    def __init__(self):
+        self.handler = None
+
+    def create_handler(self):
+        pass
+
+    def read(self):
+        if self.handler:
+            return self.handler.read()
+
+        return None
+
+    def add(self, entry: Entry):
+        if self.handler:
+            self.handler.write(entry)
+
+    def remove(self, idx: int):
+        if self.handler:
+            self.handler.remove(idx)
+
+
+class AppLogger(Logger):
+    def __init__(self):
+        super(AppLogger, self).__init__()
+
+    def create_handler(self):
+        self.handler = FileHandler(file_path="app.log")
+        formatter = TraceabilityFormatter()
+        self.handler.set_formatter(formatter)
+        self.handler.init()

@@ -1,3 +1,27 @@
-version https://git-lfs.github.com/spec/v1
-oid sha256:f89260639981d158e6ce3f6f90aa0098f060abbec5412a695cc3bbe48ccd74e7
-size 592
+[
+    {
+        "name": "template_thresh",
+        "type": "float",
+        "default": 0.00
+    },
+    {
+        "name": "template_path",
+        "type": "string",
+        "default": ""
+    },
+    {
+        "name": "graphics",
+        "type": "graphics",
+        "default": [
+            {
+                "bound": [10, 10, 100, 100],
+                "rect": [10, 10, 100, 100],
+                "offset": [0, 0],
+                "rotation": 0.0,
+                "color": "rgba(140, 235, 52, 0.5)",
+                "masks": [],
+                "masksColors": []
+            }
+        ]
+    }
+]

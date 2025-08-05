@@ -1,3 +1,47 @@
-version https://git-lfs.github.com/spec/v1
-oid sha256:9ecfa53b38090c65fbc24e99c38fb9e9837ae5782dd98de8aa3b6562a82a6bc2
-size 923
+[
+    {
+        "name": "min_h",
+        "type": "integer",
+        "default": 0
+    },
+    {
+        "name": "max_h",
+        "type": "integer",
+        "default": 255
+    },
+    {
+        "name": "min_s",
+        "type": "integer",
+        "default": 0
+    },
+    {
+        "name": "max_s",
+        "type": "integer",
+        "default": 255
+    },
+    {
+        "name": "min_v",
+        "type": "integer",
+        "default": 0
+    },
+    {
+        "name": "max_v",
+        "type": "integer",
+        "default": 255
+    },
+    {
+        "name": "graphics",
+        "type": "graphics",
+        "default": [
+            {
+                "bound": [10, 10, 100, 100],
+                "rect": [10, 10, 100, 100],
+                "offset": [0, 0],
+                "rotation": 0.0,
+                "color": "rgba(140, 235, 52, 0.5)",
+                "masks": [],
+                "masksColors": []
+            }
+        ]
+    }
+]

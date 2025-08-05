@@ -1,3 +1,16 @@
-version https://git-lfs.github.com/spec/v1
-oid sha256:61d0bdcdd143fb37ad7d3fa8bf40cee756af169a9c99c1b16c75b1b6d7f13d7d
-size 498
+{
+    "image_source": {
+        "1": {
+            "activate_location": false,
+            "camera_settings_uid": "c27eff4a-3b47-4e20-889d-939bf77cf9d3",
+            "camera_uid": "1d5913ac-e19c-4686-a736-9ec6e0e00a42",
+            "fps": 30,
+            "image_generator_uid": "",
+            "image_source_type": "dynamic",
+            "location_name": "",
+            "name": "WebCamera",
+            "settle_time": 0,
+            "uid": "cb4c65e6-f831-4b8c-be0a-bfd259b2c2de"
+        }
+    }
+}

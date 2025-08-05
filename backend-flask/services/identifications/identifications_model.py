@@ -1,3 +1,12 @@
-version https://git-lfs.github.com/spec/v1
-oid sha256:e68fade6b1ae362e00995838fe40226a5185916053c313ea5be76b0dae385450
-size 260
+from typing import Any
+
+from src.utils import generate_uid, CamelModel
+
+
+class IdentificationModel(CamelModel):
+    uid: str = generate_uid(length=8)
+    name: str
+    image_source_uid: Any
+    algorithm_uid: Any
+    algorithm_type: Any
+    reference_uid: Any

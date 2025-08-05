@@ -1,3 +1,73 @@
-version https://git-lfs.github.com/spec/v1
-oid sha256:71109aedf2292b7fc21dfc19fb908251de48ab5798b8ff09ee36fea746e5150b
-size 1599
+[
+    {
+        "name": "expected_text",
+        "type": "string",
+        "default": ""
+    },
+    {
+        "name": "width_resize_factor",
+        "type": "float",
+        "default": 2.10
+    },
+    {
+        "name": "height_resize_factor",
+        "type": "float",
+        "default": 2.00
+    },
+    {
+        "name": "adaptive_threshold_block_size",
+        "type": "integer",
+        "default": 15
+    },
+    {
+        "name": "adaptive_threshold_block_constant",
+        "type": "integer",
+        "default": 10
+    },
+    {
+        "name": "blur_kernel_size",
+        "type": "integer",
+        "default": 5
+    },
+    {
+        "name": "opening_kernel_size",
+        "type": "integer",
+        "default": 2
+    },
+    {
+        "name": "closing_kernel_size",
+        "type": "integer",
+        "default": 2
+    },
+    {
+        "name": "trained_data_file",
+        "type": "string",
+        "default": ""
+    },
+    {
+        "name": "chars_to_detect",
+        "type": "string",
+        "default": ""
+    },
+    {
+        "name": "segmentation_mode",
+        "type": "dropdown",
+        "default": "0",
+        "values": ["0", "1", "3", "4", "5", "6", "7", "8", "9", "10", "11", "13"]
+    },
+    {
+        "name": "graphics",
+        "type": "graphics",
+        "default": [
+            {
+                "bound": [10, 10, 100, 100],
+                "rect": [10, 10, 100, 100],
+                "offset": [0, 0],
+                "rotation": 0.0,
+                "color": "rgba(140, 235, 52, 0.5)",
+                "masks": [],
+                "masksColors": []
+            }
+        ]
+    }
+]

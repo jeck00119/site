@@ -1,3 +1,132 @@
-version https://git-lfs.github.com/spec/v1
-oid sha256:b62ccb1f429768f94822ee7ee4145a0767e8b075cd72b6a3a005115d817278bd
-size 2577
+[
+    {
+        "name": "white_threshold",
+        "type": "integer",
+        "default": 0
+    },
+    {
+        "name": "black_threshold",
+        "type": "integer",
+        "default": 0
+    },
+    {
+        "name": "gamma",
+        "type": "float",
+        "default": 0.01
+    },
+    {
+        "name": "erode_kernel",
+        "type": "integer",
+        "default": 0
+    },
+    {
+        "name": "erode_iterations",
+        "type": "integer",
+        "default": 0
+    },
+    {
+        "name": "dilate_kernel",
+        "type": "integer",
+        "default": 0
+    },
+    {
+        "name": "dilate_iterations",
+        "type": "integer",
+        "default": 0
+    },
+    {
+        "name": "blur_kernel",
+        "type": "integer",
+        "default": 0
+    },
+    {
+        "name": "part_area_min",
+        "type": "float",
+        "default": 0.00
+    },
+    {
+        "name": "part_area_max",
+        "type": "float",
+        "default": 0.00
+    },
+    {
+        "name": "white_lower_h",
+        "type": "integer",
+        "default": 0
+    },
+    {
+        "name": "white_lower_s",
+        "type": "integer",
+        "default": 0
+    },
+    {
+        "name": "white_lower_v",
+        "type": "integer",
+        "default": 0
+    },
+    {
+        "name": "white_upper_h",
+        "type": "integer",
+        "default": 0
+    },
+    {
+        "name": "white_upper_s",
+        "type": "integer",
+        "default": 0
+    },
+    {
+        "name": "white_upper_v",
+        "type": "integer",
+        "default": 0
+    },
+    {
+        "name": "black_lower_h",
+        "type": "integer",
+        "default": 0
+    },
+    {
+        "name": "black_lower_s",
+        "type": "integer",
+        "default": 0
+    },
+    {
+        "name": "black_lower_v",
+        "type": "integer",
+        "default": 0
+    },
+    {
+        "name": "black_upper_h",
+        "type": "integer",
+        "default": 0
+    },
+    {
+        "name": "black_upper_s",
+        "type": "integer",
+        "default": 0
+    },
+    {
+        "name": "black_upper_v",
+        "type": "integer",
+        "default": 0
+    },
+    {
+        "name": "enable_inv_binarization",
+        "type": "bool",
+        "default": false
+    },
+    {
+        "name": "graphics",
+        "type": "graphics",
+        "default": [
+            {
+                "bound": [10, 10, 100, 100],
+                "rect": [10, 10, 100, 100],
+                "offset": [0, 0],
+                "rotation": 0.0,
+                "color": "rgba(140, 235, 52, 0.5)",
+                "masks": [],
+                "masksColors": []
+            }
+        ]
+    }
+]

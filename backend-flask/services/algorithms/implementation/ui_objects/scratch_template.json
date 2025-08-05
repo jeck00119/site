@@ -1,3 +1,143 @@
-version https://git-lfs.github.com/spec/v1
-oid sha256:e45e6cc9df22eb4a60c186fc4cf5444ceb12ce245e076f570e7df3551bbf033c
-size 2889
+[
+    {
+        "name": "mode",
+        "type": "dropdown",
+        "default": "Reference",
+        "values": ["Reference", "Detection"]
+    },
+    {
+        "name": "width_downsize_factor",
+        "type": "integer",
+        "default": 1
+    },
+    {
+        "name": "height_downsize_factor",
+        "type": "integer",
+        "default": 1
+    },
+    {
+        "name": "alpha",
+        "type": "float",
+        "default": 2.00
+    },
+    {
+        "name": "beta",
+        "type": "float",
+        "default": 0.00
+    },
+    {
+        "name": "image_denoising_strength",
+        "type": "integer",
+        "default": 31
+    },
+    {
+        "name": "template_window_size",
+        "type": "integer",
+        "default": 7
+    },
+    {
+        "name": "search_window_size",
+        "type": "integer",
+        "default": 21
+    },
+    {
+        "name": "first_blur_kernel",
+        "type": "integer",
+        "default": 3
+    },
+    {
+        "name": "sobel_kernel",
+        "type": "integer",
+        "default": 3
+    },
+    {
+        "name": "second_blur_kernel",
+        "type": "integer",
+        "default": 3
+    },
+    {
+        "name": "threshold",
+        "type": "integer",
+        "default": 49
+    },
+    {
+        "name": "closing_kernel",
+        "type": "integer",
+        "default": 1
+    },
+    {
+        "name": "opening_kernel",
+        "type": "integer",
+        "default": 1
+    },
+    {
+        "name": "min_obj_area",
+        "type": "integer",
+        "default": 170
+    },
+    {
+        "name": "hough_threshold",
+        "type": "integer",
+        "default": 62
+    },
+    {
+        "name": "min_line_length",
+        "type": "integer",
+        "default": 10
+    },
+    {
+        "name": "max_gap",
+        "type": "integer",
+        "default": 10
+    },
+    {
+        "name": "dilation_kernel",
+        "type": "integer",
+        "default": 1
+    },
+    {
+        "name": "adaptive_threshold_block_size",
+        "type": "integer",
+        "default": 3
+    },
+    {
+        "name": "adaptive_threshold_constant",
+        "type": "integer",
+        "default": 1
+    },
+    {
+        "name": "gaussian_kernel",
+        "type": "integer",
+        "default": 1
+    },
+    {
+        "name": "gaussian_sigma",
+        "type": "float",
+        "default": 0.00
+    },
+    {
+        "name": "template_save_location",
+        "type": "string",
+        "default": ""
+    },
+    {
+        "name": "template_load_location",
+        "type": "string",
+        "default": ""
+    },
+    {
+        "name": "graphics",
+        "type": "graphics",
+        "default": [
+            {
+                "bound": [10, 10, 100, 100],
+                "rect": [10, 10, 100, 100],
+                "offset": [0, 0],
+                "rotation": 0.0,
+                "color": "rgba(140, 235, 52, 0.5)",
+                "masks": [],
+                "masksColors": []
+            }
+        ]
+    }
+]

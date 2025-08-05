@@ -1,3 +1,30 @@
-version https://git-lfs.github.com/spec/v1
-oid sha256:8a3e35017a8f3bd75b9ed8b03f13f6ada95d18441844542a38a982263042969f
-size 1020
+{
+    "image_source": {
+        "1": {
+            "activate_location": null,
+            "camera_calibration_uid": null,
+            "camera_settings_uid": "",
+            "camera_uid": "1d5913ac-e19c-4686-a736-9ec6e0e00a42",
+            "fps": 30,
+            "image_generator_uid": "",
+            "image_source_type": "dynamic",
+            "location_name": null,
+            "name": "WebCamera",
+            "settle_time": null,
+            "uid": "cb4c65e6-f831-4b8c-be0a-bfd259b2c2de"
+        },
+        "2": {
+            "activate_location": false,
+            "camera_calibration_uid": null,
+            "camera_settings_uid": "c27eff4a-3b47-4e20-889d-939bf77cf9d3",
+            "camera_uid": "b32f71a7-d775-4af1-9080-bf318f452bb5",
+            "fps": 30,
+            "image_generator_uid": "",
+            "image_source_type": "dynamic",
+            "location_name": "",
+            "name": "IBSCamera",
+            "settle_time": 0,
+            "uid": "827d4d11-7179-4513-911c-bfc7d9899db5"
+        }
+    }
+}

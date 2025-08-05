@@ -1,3 +1,42 @@
-version https://git-lfs.github.com/spec/v1
-oid sha256:72f5a3fb7ccf561a30234fddda7495388b817e1b3a45ef50a83d530c89cf46a8
-size 1034
+[
+    {
+        "name": "iterations",
+        "type": "integer",
+        "default": 1
+    },
+    {
+        "name": "current_mode",
+        "type": "dropdown",
+        "default": "RECTANGLE",
+        "values": ["RECTANGLE", "MASK", "BOTH"]
+    },
+    {
+        "name": "mask_path",
+        "type": "string",
+        "default": ""
+    },
+    {
+        "name": "graphics",
+        "type": "graphics",
+        "default": [
+            {
+                "bound": [10, 10, 100, 100],
+                "rect": [10, 10, 100, 100],
+                "offset": [0, 0],
+                "rotation": 0.0,
+                "color": "rgba(140, 235, 52, 0.5)",
+                "masks": [],
+                "masksColors": []
+            },
+            {
+                "bound": [10, 10, 100, 100],
+                "rect": [10, 10, 100, 100],
+                "offset": [0, 0],
+                "rotation": 0.0,
+                "color": "rgba(235, 98, 52, 0.5)",
+                "masks": [],
+                "masksColors": []
+            }
+        ]
+    }
+]

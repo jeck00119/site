@@ -1,3 +1,15 @@
-version https://git-lfs.github.com/spec/v1
-oid sha256:5c394df0d08aa0e2400b43b8e2c83e12f281870ec171c84c70b0cc9ee2c42d59
-size 277
+from pydantic import BaseModel
+
+from src.utils import CamelModel
+
+
+class CameraCalibrationParametersModel(BaseModel):
+    rows: int
+    cols: int
+    square_size: float
+
+
+class CameraIntrinsicsModel(CamelModel):
+    uid: str
+    camera_matrix: list
+    distortion_coeffs: list

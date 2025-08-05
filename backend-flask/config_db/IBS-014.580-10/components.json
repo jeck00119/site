@@ -1,3 +1,12 @@
-version https://git-lfs.github.com/spec/v1
-oid sha256:416253366eeb47bc0f16e9840b6e765e6730d04cfe978b24fd58390b40438f48
-size 371
+{
+    "components": {
+        "1": {
+            "algorithm_type": "Cable YOLO v8",
+            "algorithm_uid": "bc75a7cb-4ef1-42fc-921d-f2f90b8e208e",
+            "image_source_uid": "cb4c65e6-f831-4b8c-be0a-bfd259b2c2de",
+            "name": "CableDetection",
+            "reference_uid": "",
+            "uid": "31b14d2e-f276-4136-9c85-b14b2824a235"
+        }
+    }
+}

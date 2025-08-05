@@ -1,3 +1,27 @@
-version https://git-lfs.github.com/spec/v1
-oid sha256:dec92cd2abbe513d5957fea5fcb3216d90fe7f547de746502bbf7efb3f5db4d4
-size 454
+[
+    {
+        "name": "rho",
+        "type": "float",
+        "default": 1.0
+    },
+    {
+        "name": "theta",
+        "type": "float",
+        "default": 1.0
+    },
+    {
+        "name": "threshold",
+        "type": "integer",
+        "default": 50
+    },
+    {
+        "name": "min_line_length",
+        "type": "integer",
+        "default": 50
+    },
+    {
+        "name": "max_line_gap",
+        "type": "integer",
+        "default": 10
+    }
+]

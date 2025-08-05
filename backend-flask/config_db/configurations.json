@@ -1,3 +1,118 @@
-version https://git-lfs.github.com/spec/v1
-oid sha256:ce2ac3e79e830c341ad94d62896a2adfeedd6815ea24b9e3141b2fc8c11ce994
-size 3654
+{
+    "configurations": {
+        "10": {
+            "name": "IBS-014.580-10",
+            "part_number": "014.580-10",
+            "type": "IBS",
+            "uid": "3ded1131-213c-4085-acea-322a98b227dc"
+        },
+        "11": {
+            "name": "IBS-014.581-01",
+            "part_number": "014.581-01",
+            "type": "IBS",
+            "uid": "cd922f1b-eccf-475e-9dc8-67fb873806f9"
+        },
+        "12": {
+            "name": "IBS-014.583-01",
+            "part_number": "014.583-01",
+            "type": "IBS",
+            "uid": "63f80228-3f00-4eaa-adc0-7a1867a7e5ed"
+        },
+        "13": {
+            "name": "IBS-014.752-11",
+            "part_number": "014.752-11",
+            "type": "IBS",
+            "uid": "e00dd070-cc0c-431f-91ca-81afb3c6c4d9"
+        },
+        "14": {
+            "name": "IBS-014.752-21",
+            "part_number": "014.752-21",
+            "type": "IBS",
+            "uid": "c7bf42a3-c535-42e7-aa74-01736ab75888"
+        },
+        "15": {
+            "name": "IBS-014.752-31",
+            "part_number": "014.752-31",
+            "type": "IBS",
+            "uid": "f65201e0-e3a5-432c-9fb4-2b781dc40249"
+        },
+        "16": {
+            "name": "IBS-014.583-10",
+            "part_number": "014.583-10",
+            "type": "IBS",
+            "uid": "07822503-9791-4904-a914-58577ac0f46f"
+        },
+        "17": {
+            "name": "IBS-014.752-80",
+            "part_number": "014.752-80",
+            "type": "IBS",
+            "uid": "140a5bb4-90f2-4b2b-86a9-782bb3bad3f6"
+        },
+        "18": {
+            "name": "IBS-014.751-00",
+            "part_number": "014.751-00",
+            "type": "IBS",
+            "uid": "adfcc950-c6c6-444b-9b07-13fc4b902fe4"
+        },
+        "19": {
+            "name": "IBS-014.583-05",
+            "part_number": "014.583-05",
+            "type": "IBS",
+            "uid": "67b5d017-3057-40ca-a758-d40abe71fc61"
+        },
+        "2": {
+            "name": "IBS-012.787-07",
+            "part_number": "012.787-07",
+            "type": "IBS",
+            "uid": "d1983757-b7c2-49cd-90d7-6fa54b0d9f2d"
+        },
+        "20": {
+            "name": "IBS-012.787-66",
+            "part_number": "012.787-66",
+            "type": "IBS",
+            "uid": "48c97930-03e3-42d3-a115-a92b4d86ce67"
+        },
+        "3": {
+            "name": "IBS-012.787-12",
+            "part_number": "012.787-12",
+            "type": "IBS",
+            "uid": "0c48a8f1-b263-4927-a09f-7debc657c017"
+        },
+        "4": {
+            "name": "IBS-012.787-22",
+            "part_number": "012.787-22",
+            "type": "IBS",
+            "uid": "1d443bd3-0157-432f-8378-c943fd0afe75"
+        },
+        "5": {
+            "name": "IBS-012.787-42",
+            "part_number": "012.787-42",
+            "type": "IBS",
+            "uid": "70b25407-d802-46e1-86d1-6e0ce9be9aa2"
+        },
+        "6": {
+            "name": "IBS-012.787-32",
+            "part_number": "012.787-32",
+            "type": "IBS",
+            "uid": "280fcbbd-9ac2-4ea8-8412-1d3e9fba7ddd"
+        },
+        "7": {
+            "name": "IBS-012.787-52",
+            "part_number": "012.787-52",
+            "type": "IBS",
+            "uid": "262e781a-7173-4109-affc-0d86c122c4f0"
+        },
+        "8": {
+            "name": "IBS-012.787-61",
+            "part_number": "012.787-61",
+            "type": "IBS",
+            "uid": "415fc2c3-c1e4-437b-a84a-b398beedeccc"
+        },
+        "9": {
+            "name": "IBS-012.787-62",
+            "part_number": "012.787-62",
+            "type": "IBS",
+            "uid": "703ec8e2-6ca6-4c81-aa12-eac9c1d65838"
+        }
+    }
+}

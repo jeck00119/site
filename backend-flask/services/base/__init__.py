@@ -1,3 +1,24 @@
-version https://git-lfs.github.com/spec/v1
-oid sha256:588077401fa23961607e6c5ff16071f12be61a69902802be3e9b7073f97b217b
-size 576
+"""
+Base Services Package
+
+Provides common base classes and mixins for all service implementations.
+"""
+
+from .base_service import BaseService, EntityManagerMixin, ConfigurableServiceMixin
+from .repository_factory import (
+    RepositoryFactory, 
+    ServiceRepositoryMixin,
+    create_standard_service_repositories,
+    get_repository_for_service
+)
+
+__all__ = [
+    'BaseService',
+    'EntityManagerMixin', 
+    'ConfigurableServiceMixin',
+    'RepositoryFactory',
+    'ServiceRepositoryMixin',
+    'create_standard_service_repositories',
+    'get_repository_for_service'
+]
+

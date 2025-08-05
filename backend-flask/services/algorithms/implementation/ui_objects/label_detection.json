@@ -1,3 +1,68 @@
-version https://git-lfs.github.com/spec/v1
-oid sha256:9a6c75019db994043a67c17b35593576ce85e11fb6c88407e58b3a1c5486c857
-size 1619
+[
+    {
+        "name": "blur_kernel_size",
+        "type": "integer",
+        "default": 7
+    },
+    {
+        "name": "bin_lower_threshold",
+        "type": "integer",
+        "default": 185
+    },
+    {
+        "name": "bin_upper_threshold",
+        "type": "integer",
+        "default": 255
+    },
+    {
+        "name": "canny_first_threshold",
+        "type": "integer",
+        "default": 30
+    },
+    {
+        "name": "canny_second_threshold",
+        "type": "integer",
+        "default": 200
+    },
+    {
+        "name": "white_region_threshold",
+        "type": "integer",
+        "default": 170
+    },
+    {
+        "name": "board_angle_offset",
+        "type": "dropdown",
+        "default": 0,
+        "values": [0, 90, 180, 270]
+    },
+    {
+        "name": "app_type",
+        "type": "dropdown",
+        "default": "BMU EVO",
+        "values": ["BMU EVO", "BMU PLUGIN", "CMU EVO", "CMU PLUGIN"]
+    },
+    {
+        "name": "graphics",
+        "type": "graphics",
+        "default": [
+            {
+                "bound": [10, 10, 100, 100],
+                "rect": [10, 10, 100, 100],
+                "offset": [0, 0],
+                "rotation": 0.0,
+                "color": "rgba(140, 235, 52, 0.5)",
+                "masks": [],
+                "masksColors": []
+            },
+            {
+                "bound": [10, 10, 100, 100],
+                "rect": [10, 10, 100, 100],
+                "offset": [0, 0],
+                "rotation": 0.0,
+                "color": "rgba(235, 98, 52, 0.5)",
+                "masks": [],
+                "masksColors": []
+            }
+        ]
+    }
+]
