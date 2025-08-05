@@ -1,3 +1,74 @@
-version https://git-lfs.github.com/spec/v1
-oid sha256:567393573d5b180312d7747313a55cca09bc40abb9cf58f57710154ac39722ab
-size 8833
+2025-08-04T23:41:12.218900;system;INFO;Application Startup;All services initialized successfully;
+2025-08-05T00:07:45.348060;system;INFO;Application Startup;All services initialized successfully;
+2025-08-05T00:18:11.762056;system;INFO;Application Startup;All services initialized successfully;
+2025-08-05T00:45:01.764616;system;INFO;Application Startup;All services initialized successfully;
+2025-08-05T00:45:53.112199;system;ERROR;Unhandled Exception;OPTIONS http://localhost:8000/configurations/current: 500: Internal security error;HTTPException
+2025-08-05T00:45:53.214285;system;ERROR;Unhandled Exception;OPTIONS http://localhost:8000/processing/offset/state: 500: Internal security error;HTTPException
+2025-08-05T00:45:53.222102;system;ERROR;Unhandled Exception;OPTIONS http://localhost:8000/processing/capability/state: 500: Internal security error;HTTPException
+2025-08-05T00:47:14.559472;system;INFO;Application Shutdown;All services shut down successfully;
+2025-08-05T00:50:12.512577;system;INFO;Application Startup;All services initialized successfully;
+2025-08-05T00:50:27.588148;system;ERROR;Unhandled Exception;GET http://localhost:8000/health: 500: Internal security error;HTTPException
+2025-08-05T00:50:32.103569;system;ERROR;HTTP 404 Error;GET http://localhost:8000/: Not Found;
+2025-08-05T00:50:32.105388;system;ERROR;Unhandled Exception;GET http://localhost:8000/: 500: Internal security error;HTTPException
+2025-08-05T00:55:09.097765;system;INFO;Application Startup;All services initialized successfully;
+2025-08-05T00:55:40.443056;system;ERROR;Unhandled Exception;POST http://localhost:8000/processing/c8c80a85-df18-45b1-a52a-5ba5950d55eb/ws/close: 403: CSRF token validation failed;HTTPException
+2025-08-05T00:56:05.071434;system;ERROR;Unhandled Exception;POST http://localhost:8000/auth/login: 403: CSRF token validation failed;HTTPException
+2025-08-05T00:56:58.626566;system;INFO;Application Shutdown;All services shut down successfully;
+2025-08-05T00:58:38.734228;system;INFO;Application Startup;All services initialized successfully;
+2025-08-05T00:58:45.895293;system;ERROR;Unhandled Exception;POST http://localhost:8000/auth/login: 403: CSRF token validation failed;HTTPException
+2025-08-05T01:00:57.656847;system;INFO;Application Startup;All services initialized successfully;
+2025-08-05T01:01:03.910064;system;WARNING;Request Validation Error;POST http://localhost:8000/auth/login;[{'type': 'missing', 'loc': ('body', 'username'), 'msg': 'Field required', 'input': None}, {'type': 'missing', 'loc': ('body', 'password'), 'msg': 'Field required', 'input': None}]
+2025-08-05T01:01:47.882792;system;INFO;Application Startup;All services initialized successfully;
+2025-08-05T01:02:08.634197;system;ERROR;HTTP 404 Error;GET http://127.0.0.1:8000/: Not Found;
+2025-08-05T01:02:08.683827;system;ERROR;HTTP 404 Error;GET http://127.0.0.1:8000/favicon.ico: Not Found;
+2025-08-05T01:02:25.395572;system;ERROR;HTTP 404 Error;GET http://localhost:8000/: Not Found;
+2025-08-05T01:02:25.435637;system;ERROR;HTTP 404 Error;GET http://localhost:8000/favicon.ico: Not Found;
+2025-08-05T01:12:46.720232;system;ERROR;HTTP 400 Error;POST http://localhost:8000/auth/login: There was an error parsing the body;
+2025-08-05T01:12:46.722287;system;ERROR;HTTP 400 Error;POST http://localhost:8000/auth/login: There was an error parsing the body;
+2025-08-05T01:13:14.545607;system;INFO;Application Startup;All services initialized successfully;
+2025-08-05T01:17:07.597379;system;INFO;Application Shutdown;All services shut down successfully;
+2025-08-05T01:22:34.169900;system;INFO;Application Startup;All services initialized successfully;
+2025-08-05T01:23:29.319154;system;ERROR;HTTP 500 Error;GET http://localhost:8000/configurations/cd922f1b-eccf-475e-9dc8-67fb873806f9: near "references": syntax error;
+2025-08-05T01:28:02.930830;system;INFO;Application Shutdown;All services shut down successfully;
+2025-08-05T01:28:16.489883;system;INFO;Application Startup;All services initialized successfully;
+2025-08-05T01:28:46.011540;system;ERROR;HTTP 500 Error;GET http://localhost:8000/configurations/cd922f1b-eccf-475e-9dc8-67fb873806f9: 'RobotService' object has no attribute 'start_robot_service';
+2025-08-05T01:28:56.934049;system;ERROR;HTTP 500 Error;GET http://localhost:8000/configurations/cd922f1b-eccf-475e-9dc8-67fb873806f9: 'RobotService' object has no attribute 'start_robot_service';
+2025-08-05T01:31:05.758761;system;INFO;Application Shutdown;All services shut down successfully;
+2025-08-05T01:34:09.853446;system;INFO;Application Startup;All services initialized successfully;
+2025-08-05T01:35:54.965253;system;INFO;Application Shutdown;All services shut down successfully;
+2025-08-05T01:37:52.631816;system;INFO;Application Startup;All services initialized successfully;
+2025-08-05T02:03:18.669121;system;INFO;Application Shutdown;All services shut down successfully;
+2025-08-05T02:03:36.672214;system;INFO;Application Startup;All services initialized successfully;
+2025-08-05T02:14:21.709374;system;ERROR;HTTP 500 Error;GET http://localhost:8000/cnc/ed9063d0-b3a5-4227-ad54-27f7916fcaa0/__API__/home: object Mock can't be used in 'await' expression;
+2025-08-05T03:07:11.120765;system;INFO;Application Shutdown;All services shut down successfully;
+2025-08-05T11:53:07.342112;system;INFO;Application Startup;All services initialized successfully;
+2025-08-05T12:10:14.217073;system;INFO;Application Startup;All services initialized successfully;
+2025-08-05T12:10:46.876622;system;ERROR;HTTP 500 Error;GET http://localhost:8000/algorithm: Failed to Algorithm list RouteHelper.list_entities() takes from 1 to 2 positional arguments but 3 were given;
+2025-08-05T12:17:44.180975;system;ERROR;Unhandled Exception;GET http://localhost:8000/reference: 500: Internal security error;HTTPException
+2025-08-05T12:24:13.303956;system;INFO;Application Startup;All services initialized successfully;
+2025-08-05T12:25:26.381942;system;INFO;Application Startup;All services initialized successfully;
+2025-08-05T12:26:16.420667;system;ERROR;Unhandled Exception;GET http://localhost:8000/identification: 500: Internal security error;HTTPException
+2025-08-05T12:26:24.345709;system;ERROR;Unhandled Exception;GET http://localhost:8000/custom_component: 500: Internal security error;HTTPException
+2025-08-05T12:27:52.544002;system;INFO;Application Shutdown;All services shut down successfully;
+2025-08-05T12:29:26.860791;system;INFO;Application Startup;All services initialized successfully;
+2025-08-05T12:32:27.955347;system;INFO;Application Startup;All services initialized successfully;
+2025-08-05T12:33:33.689583;system;ERROR;Unhandled Exception;GET http://localhost:8000/media/events: 500: Internal security error;HTTPException
+2025-08-05T12:35:10.478154;system;INFO;Application Shutdown;All services shut down successfully;
+2025-08-05T12:38:07.197376;system;INFO;Application Startup;All services initialized successfully;
+2025-08-05T12:41:11.480025;system;INFO;Application Startup;All services initialized successfully;
+2025-08-05T12:44:52.435383;system;ERROR;HTTP 404 Error;POST http://localhost:8000/shutdown: Not Found;
+2025-08-05T12:45:04.059935;system;INFO;Application Startup;All services initialized successfully;
+2025-08-05T12:45:06.443560;system;ERROR;HTTP 400 Error;GET http://localhost:8000/inspection_list: No configuration selected. Please load a configuration first;
+2025-08-05T12:45:31.656332;system;ERROR;HTTP 400 Error;GET http://localhost:8000/inspection_list: No configuration selected. Please load a configuration first;
+2025-08-05T12:46:00.024351;system;ERROR;HTTP 400 Error;GET http://localhost:8000/inspection_list: No configuration selected. Please load a configuration first;
+2025-08-05T12:46:11.700876;system;INFO;Application Startup;All services initialized successfully;
+2025-08-05T12:46:14.225196;system;ERROR;HTTP 400 Error;GET http://localhost:8000/inspection_list: No configuration selected. Please load a configuration first;
+2025-08-05T12:46:22.737872;system;ERROR;HTTP 404 Error;PUT http://localhost:8000/configurations/d1983757-b7c2-49cd-90d7-6fa54b0d9f2d/set_current: Not Found;
+2025-08-05T12:46:53.781147;system;ERROR;HTTP 400 Error;GET http://localhost:8000/inspection_list: No configuration selected. Please load a configuration first;
+2025-08-05T12:47:23.609772;system;INFO;Application Startup;All services initialized successfully;
+2025-08-05T12:59:51.917686;system;INFO;Application Startup;All services initialized successfully;
+2025-08-05T13:10:15.197649;system;INFO;Application Shutdown;All services shut down successfully;
+2025-08-05T13:10:35.215210;system;INFO;Application Startup;All services initialized successfully;
+2025-08-05T14:03:22.839861;system;INFO;Application Shutdown;All services shut down successfully;
+2025-08-05T14:18:53.389815;system;INFO;Application Startup;All services initialized successfully;
+2025-08-05T14:36:01.745808;system;ERROR;HTTP 500 Error;GET http://localhost:8000/algorithm/reference/types/Contour Gravity Center,Circle Detection Ransac,Template Detection,Line Reference,Vertical Line,Horizontal Line,Clips Reference,YOLO,RTDETR: Failed to get reference parameter UI algorithm: 'NoneType' object has no attribute 'get_ui_from_type';
