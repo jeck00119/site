@@ -48,14 +48,14 @@ site/
 
 ## Configuration
 
-Copy `.env.example` to `.env` and update:
+Copy `.env.example` to `backend-flask/.env` and update:
 
 ```bash
 SERVER_HOST=0.0.0.0
 SERVER_PORT=8000
-DATABASE_URL=sqlite:///./aoi_database.db
-SECRET_KEY=your-secret-key-here
-CORS_ORIGINS=["http://localhost:5173"]
+DATABASE_URL=sqlite:///./cnc_database.db
+SECRET_KEY=your-secret-key-here-change-this-in-production
+CORS_ORIGINS=["http://localhost:5173", "http://127.0.0.1:5173"]
 ```
 
 ## Usage
