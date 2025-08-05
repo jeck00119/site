@@ -1,5 +1,5 @@
 import { ipAddress, getPort } from '../url.ts';
-import { get, post, update, remove, patch, put, postStream, upload_image } from './requests.js';
+import { get, post, update, remove, patch, put, postStream, upload_image } from './requests.ts';
 import type { ApiResponse } from '../types/api';
 
 /**

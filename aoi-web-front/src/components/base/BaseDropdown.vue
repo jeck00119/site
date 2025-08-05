@@ -1,5 +1,5 @@
 <template>
-    <select :style="{width: width}" v-model="currentValue" :disabled="disabled">
+    <select :style="{width: width}" v-model="currentValue" :disabled="disabled || false">
         <option v-for="value in values" :value="value">{{ convertValueToStr(value) }}</option>
     </select>
 </template>
@@ -37,7 +37,7 @@ function convertValueToStr(val: string | number): string {
     const valAsStr = val.toString();
     
     if (valAsStr.length > 0) {
-        return valAsStr[0].toUpperCase() + valAsStr.substring(1);
+        return valAsStr.charAt(0).toUpperCase() + valAsStr.substring(1);
     } else {
         return valAsStr;
     }

@@ -1,4 +1,12 @@
-async function get(url, headers){
+// Type definitions for HTTP requests
+type Headers = Record<string, string>;
+
+interface RequestResponse<T = any> {
+    response: Response;
+    responseData: T;
+}
+
+async function get<T = any>(url: string, headers?: Headers): Promise<RequestResponse<T>> {
     headers = headers ? headers : {
         'content-type': 'application/json'
     };
@@ -17,7 +25,7 @@ async function get(url, headers){
     }
 }
 
-async function post(url, payload, headers){
+async function post<T = any>(url: string, payload?: any, headers?: Headers): Promise<RequestResponse<T>> {
     headers = headers ? headers : {
         'content-type': 'application/json'
     };
@@ -37,26 +45,20 @@ async function post(url, payload, headers){
     };
 }
 
-async function postStream(url, payload, headers){
-    headers = headers ? headers : {
-        'Content-Type': 'multipart/form-data'
-    };
-
+async function postStream<T = any>(url: string, payload?: any, headers?: Headers): Promise<RequestResponse<T>> {
     try {
+        headers = headers ? headers : {
+            'content-type': 'application/json'
+        };
+
         const response = await fetch(url, {
             method: 'POST',
             headers: headers,
-            body: payload,
-            signal: AbortSignal.timeout(30000) // 30 second timeout for file uploads
+            body: JSON.stringify(payload),
+            signal: AbortSignal.timeout(30000) // 30 second timeout for stream requests
         });
 
-        let responseData = null;
-        try {
-            responseData = await response.json();
-        } catch (e) {
-            // If response is not JSON, that's okay for some endpoints
-            responseData = null;
-        }
+        const responseData = await response.json();
 
         return {
             response,
@@ -68,7 +70,7 @@ async function postStream(url, payload, headers){
     }
 }
 
-async function update(url, payload, headers){
+async function update<T = any>(url: string, payload?: any, headers?: Headers): Promise<RequestResponse<T>> {
     headers = headers ? headers : {
         'content-type': 'application/json'
     };
@@ -88,7 +90,7 @@ async function update(url, payload, headers){
     };
 }
 
-async function remove(url, headers){
+async function remove<T = any>(url: string, headers?: Headers): Promise<RequestResponse<T>> {
     headers = headers ? headers : {
         'content-type': 'application/json'
     };
@@ -107,7 +109,7 @@ async function remove(url, headers){
     };
 }
 
-async function patch(url, payload, headers){
+async function patch(url: string, payload?: any, headers?: Headers): Promise<Response> {
     headers = headers ? headers : {
         'content-type': 'application/json'
     };
@@ -122,7 +124,7 @@ async function patch(url, payload, headers){
     return response;
 }
 
-async function put(url, payload, headers){
+async function put(url: string, payload?: any, headers?: Headers): Promise<Response> {
     headers = headers ? headers : {
         'content-type': 'application/json'
     };
@@ -136,7 +138,7 @@ async function put(url, payload, headers){
     return response;
 }
 
-async function upload_image(url, payload){
+async function upload_image(url: string, payload: FormData): Promise<Response> {
     const response = await fetch(url, {
         method: 'POST',
         // headers: {
@@ -148,4 +150,6 @@ async function upload_image(url, payload){
     return response;
 }
 
-export {get, post, update, remove, patch, put, postStream, upload_image}
+export { get, post, update, remove, patch, put, postStream, upload_image };
+export type { Headers, RequestResponse };
+
