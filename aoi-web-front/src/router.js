@@ -38,7 +38,7 @@ const router = createRouter({
     history: createWebHistory(),
     routes: [
         {
-            path: '/', redirect: '/inspections-and-results'
+            path: '/', redirect: '/login'
         },
         {
             path: '/aoi', component: HomeComponent
@@ -121,7 +121,7 @@ router.beforeEach(function(to, _, next) {
 
     if(to.meta.requiresUnauth && store.getters["auth/isAuthenticated"])
     {
-        next('/');
+        next('/configurations');
         return;
     }
 

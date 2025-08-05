@@ -132,7 +132,7 @@ export default{
                 try {
                     await store.dispatch("auth/login", user);
 
-                    router.replace('/');
+                    router.replace('/configurations');
                 }catch(e) {
                     setNotification(3000, `Something went wrong. Please try again.`, 'bi-exclamation-circle-fill');
                 }
