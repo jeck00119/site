@@ -3,26 +3,27 @@
     :value="current" @input="handleInput" :style="{width: width}">
 </template>
 
-<script>
-import { watch, onMounted, ref, toRef } from 'vue';
+<script setup lang="ts">
+interface Props {
+  min: number;
+  max: number;
+  step: number;
+  name: string;
+  current: number;
+  width?: string;
+  icon?: string;
+}
 
+interface Emits {
+  (e: 'update-value', name: string, value: number): void;
+}
 
-export default {
-    props: ['min', 'max', 'step', 'name', 'current', 'width', 'icon'],
-    emits: ['update-value'],
+const props = defineProps<Props>();
+const emit = defineEmits<Emits>();
 
-    setup(props, context){
-        
-        const handleInput = (event) => {
-            context.emit('update-value', props.name, event.target.value);
-        };
-
-        return {
-            handleInput
-        };
-    },
-
-    
+const handleInput = (event: Event) => {
+  const target = event.target as HTMLInputElement;
+  emit('update-value', props.name, Number(target.value));
 };
 </script>
 

@@ -5,8 +5,10 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview"
+    "build": "vue-tsc && vite build",
+    "preview": "vite preview",
+    "type-check": "vue-tsc --noEmit",
+    "build-only": "vite build"
   },
   "dependencies": {
     "@coreui/vue": "^5.5.0",
@@ -29,7 +31,11 @@
     "vuex": "^4.1.0"
   },
   "devDependencies": {
+    "@types/node": "^24.2.0",
     "@vitejs/plugin-vue": "^6.0.1",
-    "vite": "^7.0.6"
+    "@vue/tsconfig": "^0.7.0",
+    "typescript": "^5.9.2",
+    "vite": "^7.0.6",
+    "vue-tsc": "^3.0.5"
   }
 }

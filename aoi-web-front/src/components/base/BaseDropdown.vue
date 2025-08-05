@@ -4,42 +4,42 @@
     </select>
 </template>
 
-<script>
+<script setup lang="ts">
 import { ref, watch, toRef } from 'vue';
 
-export default {
-    props: ['current', 'values', 'width', 'name', 'disabled'],
-    emits: ['update-value'],
+interface Props {
+  current: string | number;
+  values: (string | number)[];
+  width?: string;
+  name: string;
+  disabled?: boolean;
+}
 
-    setup(props, context){
-        const currentProp = toRef(props, "current");
-        const currentValue = ref(props.current);
+interface Emits {
+  (e: 'update-value', name: string, value: string | number): void;
+}
 
-        watch(currentValue, (newValue) => {
-            context.emit('update-value', props.name, newValue);
-        });
+const props = defineProps<Props>();
+const emit = defineEmits<Emits>();
 
-        watch(currentProp, (newValue) => {
-            currentValue.value = newValue;
-        });
+const currentProp = toRef(props, "current");
+const currentValue = ref<string | number>(props.current);
 
-        function convertValueToStr(val) {
-            let valAsStr = val.toString();
-            
-            if(valAsStr.length > 0)
-            {
-                return valAsStr[0].toUpperCase() + valAsStr.substring(1);
-            }
-            else
-            {
-                return valAsStr;
-            }
-        }
+watch(currentValue, (newValue) => {
+    emit('update-value', props.name, newValue);
+});
 
-        return {
-            currentValue,
-            convertValueToStr
-        }
+watch(currentProp, (newValue) => {
+    currentValue.value = newValue;
+});
+
+function convertValueToStr(val: string | number): string {
+    const valAsStr = val.toString();
+    
+    if (valAsStr.length > 0) {
+        return valAsStr[0].toUpperCase() + valAsStr.substring(1);
+    } else {
+        return valAsStr;
     }
 }
 </script>

@@ -4,10 +4,15 @@
     </button>
 </template>
 
-<script>
-export default {
-    props: ["mode", 'width', 'height', 'fontSize']
+<script setup lang="ts">
+interface Props {
+  mode?: 'flat' | 'outline' | string;
+  width?: string;
+  height?: string;
+  fontSize?: string;
 }
+
+defineProps<Props>();
 </script>
 
 <style scoped>
