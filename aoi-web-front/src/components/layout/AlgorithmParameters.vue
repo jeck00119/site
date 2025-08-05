@@ -9,7 +9,7 @@
                 <div class="value-wrapper">
                     <base-integer-input
                         width="90%"
-                        :current="parameters[attribute.name]"
+                        :current="parameters[attribute.name] ?? attribute.default"
                         :name="attribute.name"
                         @update-value="updateValue"
                     ></base-integer-input>
@@ -21,7 +21,7 @@
                 </div>
                 <div class="value-wrapper">
                     <base-checkbox
-                        :current="parameters[attribute.name]"
+                        :current="parameters[attribute.name] ?? attribute.default"
                         :name="attribute.name"
                         @update-value="updateValue"
                     ></base-checkbox>
@@ -34,7 +34,7 @@
                 <div class="value-wrapper">
                     <base-dropdown
                         width="90%"
-                        :current="parameters[attribute.name]"
+                        :current="parameters[attribute.name] ?? attribute.default"
                         :values="attribute.values"
                         :name="attribute.name"
                         @update-value="updateValue"
@@ -48,7 +48,7 @@
                 <div class="value-wrapper">
                     <base-text-input 
                         width="90%"
-                        :current="parameters[attribute.name]"
+                        :current="parameters[attribute.name] ?? attribute.default"
                         :name="attribute.name"
                         @update-value="updateValue"
                     ></base-text-input>
@@ -61,7 +61,7 @@
                 <div class="value-wrapper">
                     <base-color-picker
                         width="10vw"
-                        :current="parameters[attribute.name]"
+                        :current="parameters[attribute.name] ?? attribute.default"
                         :name="attribute.name"
                         @update-value="updateValue"
                     ></base-color-picker>

@@ -71,7 +71,7 @@ export default {
         const cncs = context.getters.getCNCs;
         const token = context.rootGetters["auth/getToken"];
 
-        const { response } = await api.post('/cnc/save', cncs, {
+        const { response } = await api.post('/cnc/save', { cnc_list: cncs }, {
             "content-type": "application/json",
             "Authorization": token
         });

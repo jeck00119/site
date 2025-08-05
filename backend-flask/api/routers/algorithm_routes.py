@@ -175,10 +175,27 @@ async def get_ref_alg_param_ui(
         algorithm_service: AlgorithmsService = Depends(get_service_by_type(AlgorithmsService))
 ) -> Dict[str, Any]:
     try:
-        result = {
-            'parameters': algorithm_service.get_ui_from_reference_type(algorithm_type)
-        }
-        return RouteHelper.create_success_response(result)
+        # Handle both single and comma-separated algorithm types
+        if ',' in algorithm_type:
+            # Multiple algorithm types - return parameters for the first valid one
+            # or combine them as needed
+            algorithm_types = [t.strip() for t in algorithm_type.split(',')]
+            for algo_type in algorithm_types:
+                try:
+                    result = {
+                        'parameters': algorithm_service.get_ui_from_reference_type(algo_type)
+                    }
+                    return RouteHelper.create_success_response(result)
+                except:
+                    continue
+            # If none worked, return empty parameters
+            return RouteHelper.create_success_response({'parameters': []})
+        else:
+            # Single algorithm type
+            result = {
+                'parameters': algorithm_service.get_ui_from_reference_type(algorithm_type)
+            }
+            return RouteHelper.create_success_response(result)
     except Exception as e:
         raise create_error_response(
             operation="get reference parameter UI",
@@ -280,7 +297,7 @@ async def set_live_algorithm(
         algorithm_service.set_live_algorithm(algorithm_type)
         base_alg_type = {
             'parameters': algorithm_service.get_ui_from_type(algorithm_type),
-            'alg_model': algorithm_service.get_model_from_type(algorithm_type)
+            'alg_model': algorithm_service.get_model_from_type(algorithm_type).model_dump()
         }
         return RouteHelper.create_success_response(base_alg_type)
     except Exception as e:

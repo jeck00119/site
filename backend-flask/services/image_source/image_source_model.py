@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import Any
+from typing import Any, Optional
 
 from src.utils import generate_uid, CamelModel
 
@@ -16,7 +16,7 @@ class ImageSourceModel(CamelModel):
     image_source_type: ImgSrcEnum
     camera_uid: Any
     camera_settings_uid: Any
-    camera_calibration_uid: Any
+    camera_calibration_uid: Optional[Any] = None
     image_generator_uid: Any
 
     location_name: Any

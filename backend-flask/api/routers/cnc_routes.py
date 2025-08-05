@@ -1,6 +1,7 @@
 from asyncio import sleep
 
 from fastapi import APIRouter, HTTPException, Depends
+from pydantic import BaseModel
 from starlette import status
 from starlette.responses import JSONResponse
 from starlette.websockets import WebSocket, WebSocketDisconnect
@@ -100,16 +101,19 @@ async def post_cnc(
         )
 
 
+class CncListModel(BaseModel):
+    cnc_list: list
+
 @router.post("/save")
 async def post_cncs(
-        cnc_list: list,
+        cnc_data: CncListModel,
         user: dict = Depends(require_authentication("save CNCs")),
         cnc_repository: CncRepository = Depends(get_service_by_type(CncRepository)),
         cnc_service: CncService = Depends(get_service_by_type(CncService))
 ):
     try:
         cnc_models = []
-        for cnc in cnc_list:
+        for cnc in cnc_data.cnc_list:
             cnc_models.append(CncModel(**cnc))
         add, update, delete = cnc_service.update_cncs(cnc_models)
         for cnc_model in cnc_models:

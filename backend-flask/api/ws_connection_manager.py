@@ -57,6 +57,11 @@ class ConnectionManager(metaclass=Singleton):
 
     async def disconnect(self, uid):
         from starlette.websockets import WebSocketState
+        # Check if the socket still exists in active connections
+        if uid not in self.active_connections:
+            print(f"SOCKET ALREADY REMOVED: {uid}")
+            return
+            
         socket = self.active_connections[uid].get_websocket()
         try:
             # Only close if the WebSocket is still connected
@@ -71,5 +76,8 @@ class ConnectionManager(metaclass=Singleton):
         self.remove_websocket(uid)
 
     def remove_websocket(self, uid):
-        print(f"REMOVING SOCKET: {uid} FROM ACTIVE SOCKETS LIST")
-        del self.active_connections[uid]
+        if uid in self.active_connections:
+            print(f"REMOVING SOCKET: {uid} FROM ACTIVE SOCKETS LIST")
+            del self.active_connections[uid]
+        else:
+            print(f"SOCKET {uid} NOT IN ACTIVE CONNECTIONS LIST")

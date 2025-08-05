@@ -133,9 +133,22 @@ export default {
             return store.getters["media/getFiles"];
         });
 
-        const eventName = ref(events.value.length !== 0 ? events.value[0] : "");
+        // Handle both array of strings and array of objects
+        const getInitialEventName = () => {
+            if (events.value.length === 0) return "";
+            const firstEvent = events.value[0];
+            return typeof firstEvent === 'string' ? firstEvent : firstEvent.name || "";
+        };
+        
+        const getInitialFileName = () => {
+            if (files.value.length === 0) return "";
+            const firstFile = files.value[0];
+            return typeof firstFile === 'string' ? firstFile : firstFile.name || "";
+        };
+        
+        const eventName = ref(getInitialEventName());
         const timeout = ref(0);
-        const filename = ref(files.value.length !== 0 ? files.value[0] : "");
+        const filename = ref(getInitialFileName());
         const channel = ref("");
         const priority = ref("LOW");
         let priorityIdx = 0;

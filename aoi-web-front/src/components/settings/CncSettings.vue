@@ -11,6 +11,7 @@
                     width="90%"
                     :current="cnc.port"
                     :values="availablePorts"
+                    name="port"
                     @update-value="(name, value) => updatePort(cnc.uid, name, value)"
                 ></base-dropdown>
             </div>

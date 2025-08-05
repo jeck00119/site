@@ -16,11 +16,11 @@ export default {
         {
             const imageSources = [];
 
-            for(const key in responseData)
+            for(const imageSourceData of responseData.message)
             {
                 const imageSource = {
-                    uid: responseData[key].uid,
-                    name: responseData[key].name
+                    uid: imageSourceData.uid,
+                    name: imageSourceData.name
                 };
 
                 imageSources.push(imageSource);

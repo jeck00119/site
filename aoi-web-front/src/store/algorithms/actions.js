@@ -15,10 +15,10 @@ export default {
             } else {
                 const algorithms = []
 
-                for (const key in responseData) {
+                for (const algorithmType of responseData.message) {
                     const algorithm = {
                         uid: uuid.v4(),
-                        type: responseData[key]
+                        type: algorithmType
                     };
 
                     algorithms.push(algorithm);
@@ -40,7 +40,7 @@ export default {
                 const error = new Error(responseData.detail || "Failed to fetch basic algorithms!");
                 throw error;
             } else {
-                context.commit('setBasicAlgorithms', responseData);
+                context.commit('setBasicAlgorithms', responseData.message);
             }
         } catch (error) {
             console.error('Failed to load basic algorithms:', error);
@@ -58,10 +58,10 @@ export default {
             } else {
                 const algorithms = []
 
-                for (const key in responseData) {
+                for (const algorithmType of responseData.message) {
                     const algorithm = {
                         uid: uuid.v4(),
-                        type: responseData[key]
+                        type: algorithmType
                     };
 
                     algorithms.push(algorithm);
@@ -197,7 +197,7 @@ export default {
         }
         else
         {
-            context.commit('setCurrentAlgorithmAttributes', responseData.parameters);
+            context.commit('setCurrentAlgorithmAttributes', responseData.message.parameters);
         }
     },
 
@@ -211,7 +211,7 @@ export default {
         }
         else
         {
-            context.commit('setCurrentReferenceAlgorithmAttributes', responseData.parameters);
+            context.commit('setCurrentReferenceAlgorithmAttributes', responseData.message.parameters);
         }
     },
 
@@ -749,7 +749,7 @@ export default {
             }
             else
             {
-                context.commit('addBasicAlgorithmAttributes', responseData.parameters);
+                context.commit('addBasicAlgorithmAttributes', responseData.message.parameters);
             }
         }
     },
