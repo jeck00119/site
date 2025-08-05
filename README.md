@@ -53,7 +53,7 @@ Copy `.env.example` to `backend-flask/.env` and customize these settings:
 ```bash
 SERVER_HOST=0.0.0.0          # Server IP (0.0.0.0 = all interfaces)
 SERVER_PORT=8000             # Backend API port
-DATABASE_URL=sqlite:///./cnc_database.db  # Database file location
+DATABASE_URL=sqlite:///./aoi_database.db  # Database file location
 SECRET_KEY=your-secret-key-here           # JWT token encryption key
 CORS_ORIGINS=["http://localhost:5173"]    # Allowed frontend URLs
 ```
