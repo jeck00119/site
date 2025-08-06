@@ -37,7 +37,11 @@
       "Bash(../venv/Scripts/python -c \"import tinydb\")",
       "Bash(venv/Scripts/pip install:*)",
       "Bash(rm:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(find:*)",
+      "Bash(true)"
     ],
     "deny": []
   }
