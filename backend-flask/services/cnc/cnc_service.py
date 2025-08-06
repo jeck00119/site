@@ -41,6 +41,29 @@ class CncService(metaclass=Singleton):
     def start_cnc_service(self):
         pass
 
+    def shutdown_cnc_service(self):
+        """Shutdown all CNC connections and clean up resources"""
+        try:
+            self.logger.info("Shutting down CNC service...")
+            active_cnc_uids = list(self._cnc_objects.keys())
+            for uid in active_cnc_uids:
+                try:
+                    self.logger.debug(f"Disconnecting CNC {uid}")
+                    self._deinit_cnc(uid)
+                except Exception as e:
+                    self.logger.error(f"Error disconnecting CNC {uid}: {e}")
+            
+            # Clear all data structures
+            self._cnc_objects.clear()
+            self._callbacks_buffers.clear()
+            self._batch_buffers.clear()
+            self._last_batch_time.clear()
+            self._connection_errors.clear()
+            
+            self.logger.info("CNC service shutdown completed")
+        except Exception as e:
+            self.logger.error(f"Error during CNC service shutdown: {e}")
+
     def reinitialize_all_cncs(self):
         active_cnc_uids = list(self._cnc_objects.keys())
         for uid in active_cnc_uids:
@@ -83,7 +106,8 @@ class CncService(metaclass=Singleton):
             event = buffed[0]
             
             message = self._format_message(event, buffed, cnc_type)
-            if message:
+            # Only add non-None messages (filters out simple "ok" messages)
+            if message is not None:
                 messages_collected.append(message)
         
         # Add collected messages to batch buffer
@@ -119,7 +143,18 @@ class CncService(metaclass=Singleton):
             return {'event': event, 'state': state, 'mPos': m_pos, 'wPos': w_pos}
 
         elif event in ["on_idle", "on_read", "on_alarm"]:
-            return {'event': event, "message": buffed[1]}
+            message_content = buffed[1]
+            
+            # Filter out simple "ok" messages from on_read to reduce terminal spam
+            # But keep important responses like "echo:", error messages, etc.
+            if event == "on_read":
+                stripped_msg = message_content.strip().lower()
+                # Only filter simple "ok" responses, not important messages
+                if stripped_msg == "ok":
+                    return None  # Don't send simple "ok" messages to terminal
+                # Always show echo messages (M503 responses), errors, etc.
+            
+            return {'event': event, "message": message_content}
 
         elif event == "on_settings_downloaded":
             return {'event': event, "message": buffed[1]}

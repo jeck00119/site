@@ -173,10 +173,36 @@ class CncMachineMarlin():
     def move_by(self, x: float = None, y: float = None, z: float = None, feed_rate: int = None):
         if self._marlin:
             try:
-                self._marlin.stream(f"G91 G1 {self.parse_coordinates(x, y, z, feed_rate)}")
-                self._marlin.stream("G90")
+                # Match Pronterface command sequence exactly
+                print(f"[MOVE_BY DEBUG] Using Pronterface command sequence")
+                print(f"[MOVE_BY DEBUG] Params: X={x} Y={y} Z={z} F={feed_rate}")
+                
+                # Send G91 first as separate command (like Pronterface)
+                self._marlin._iface_write("G91\n")
+                
+                # Use G0 (rapid move) instead of G1, with proper spacing like Pronterface
+                command = f"G0 {self.parse_coordinates_with_decimals(x, y, z, feed_rate)}"
+                print(f"[MOVE_BY DEBUG] Movement command: {command}")
+                self._marlin._iface_write(command + "\n")
+                
+                # Return to absolute mode
+                self._marlin._iface_write("G90\n")
+                
             except Exception as e:
                 raise e
+                
+    def parse_coordinates_with_decimals(self, x, y, z, feed_rate):
+        """Parse coordinates with .0 decimals like Pronterface does"""
+        line = ""
+        if x is not None:
+            line += f"X{x:.1f}"
+        if y is not None:
+            line += f" Y{y:.1f}"
+        if z is not None:
+            line += f" Z{z:.1f}"
+        if feed_rate is not None:
+            line += f" F{int(feed_rate)}"
+        return line.strip()
 
     def abort(self):
         if self._marlin:

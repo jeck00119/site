@@ -166,15 +166,35 @@ class Gerbil:
 
     def disconnect(self):
         if not self.is_connected(): return
+        self.logger.info("{}: Disconnecting and stopping all threads...".format(self.name))
+        
+        # Stop polling first
         self.hash_state_requested = True
         self.gcode_parser_state_requested = True
-        self._iface.stop()
-        self.logger.debug("{}: Please wait until reading thread has joined...".format(self.name))
+        self.poll_stop()
+        
+        # Stop the interface
+        try:
+            self._iface.stop()
+        except Exception as e:
+            self.logger.warning(f"{self.name}: Error stopping interface: {e}")
+        
+        # Stop reading thread
+        self.logger.debug("{}: Stopping reading thread...".format(self.name))
         self._iface_read_do = False
         self._queue.put("dummy_msg_for_joining_thread")
-        self._thread_read_iface.join()
-        self.logger.debug("{}: Reading thread successfully joined.".format(self.name))
-        self.poll_stop()
+        
+        # Join with timeout to prevent hanging
+        try:
+            self._thread_read_iface.join(timeout=2.0)  # 2 second timeout
+            if self._thread_read_iface.is_alive():
+                self.logger.warning(f"{self.name}: Reading thread did not stop within timeout")
+            else:
+                self.logger.debug("{}: Reading thread successfully joined.".format(self.name))
+        except Exception as e:
+            self.logger.warning(f"{self.name}: Error joining reading thread: {e}")
+            
+        self.logger.info("{}: Disconnect completed.".format(self.name))
         self.connected = False
         self._iface = None
         self.callback("on_disconnected")

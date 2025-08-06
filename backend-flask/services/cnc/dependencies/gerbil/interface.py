@@ -35,13 +35,30 @@ class Interface:
         self.logger.debug("Serial interface {} connected to port={}, baudrate={}".format(self.name, self.port, self.baudrate))
 
     def stop(self):
+        self.logger.debug("Serial interface {}: Stopping...".format(self.name))
         self._do_read = False
+        
+        # Close serial port first to interrupt any blocking reads
+        if self._serial:
+            try:
+                self._serial.close()
+                self.logger.debug("Serial interface {}: Serial port closed".format(self.name))
+            except Exception as e:
+                self.logger.warning("Serial interface {}: Error closing serial: {}".format(self.name, e))
+            self._serial = None
+        
+        # Join the read thread with timeout
         if self._thread_read:
             if self._thread_read.is_alive():
-                self._thread_read.join()
-        if self._serial:
-            self._serial.close()
-            self._serial = None
+                try:
+                    self._thread_read.join(timeout=2.0)  # 2 second timeout
+                    if self._thread_read.is_alive():
+                        self.logger.warning("Serial interface {}: Read thread did not stop within timeout".format(self.name))
+                    else:
+                        self.logger.debug("Serial interface {}: Read thread stopped successfully".format(self.name))
+                except Exception as e:
+                    self.logger.warning("Serial interface {}: Error joining read thread: {}".format(self.name, e))
+        
         self.logger.debug("Serial interface {} closed.".format(self.name))
 
     def write(self, data):

@@ -1,4 +1,7 @@
+import logging
 from typing import Union
+
+logger = logging.getLogger(__name__)
 
 from services.algorithms.algorithms_service import AlgorithmsService
 from services.authentication.auth_service import AuthService
@@ -12,7 +15,7 @@ from services.inspection_list.inspection_list_service import InspectionListServi
 from services.logger.logger_service import AppLogger
 from services.masks.masks_service import MasksService
 from services.media.pygame_audio_service import PygameAudioService
-from services.port_manager.port_manager import PortManager
+from services.port_manager.port_manager import UnifiedUSBManager
 from services.processing.process_service import ProcessService
 from services.robot.robot_service import RobotService
 
@@ -23,7 +26,7 @@ class ServiceManager:
     algorithms_service: Union[None, AlgorithmsService] = None
     components_service: Union[None, ComponentsService] = None
     cnc_service: Union[None, CncService] = None
-    port_manager: Union[None, PortManager] = None
+    usb_manager: Union[None, UnifiedUSBManager] = None
     load_image_service: Union[None, LoadImageService] = None
     robot_service: Union[None, RobotService] = None
     process_service: Union[None, ProcessService] = None
@@ -44,12 +47,19 @@ class ServiceManager:
         cls.algorithms_service = AlgorithmsService()
         cls.components_service = ComponentsService()
         cls.cnc_service = CncService()
-        cls.port_manager = PortManager()
+        cls.usb_manager = UnifiedUSBManager()
         cls.load_image_service = LoadImageService()
         cls.robot_service = RobotService()
         cls.process_service = ProcessService()
         cls.configuration_service = ConfigurationService()
-        cls.audio_service = PygameAudioService()
+        # Initialize audio service with fallback for systems without audio
+        try:
+            cls.audio_service = PygameAudioService()
+            logger.info("Audio service initialized successfully")
+        except Exception as e:
+            logger.warning(f"Audio service initialization failed: {e}")
+            logger.info("Continuing without audio service - industrial functions will work normally")
+            cls.audio_service = None
         cls.auth_service = AuthService()
         cls.app_log = AppLogger()
         cls.app_log.create_handler()
@@ -60,4 +70,31 @@ class ServiceManager:
 
     @classmethod
     def un_init_services(cls):
-        pass
+        """Gracefully shutdown all services"""
+        import asyncio
+        from api.ws_connection_manager import ConnectionManager
+        
+        try:
+            # Shutdown CNC service and close serial connections
+            if cls.cnc_service:
+                try:
+                    cls.cnc_service.shutdown_cnc_service()
+                except Exception as e:
+                    logger.warning(f"Error shutting down CNC service: {e}")
+            
+            # Close all WebSocket connections
+            connection_manager = ConnectionManager()
+            if hasattr(connection_manager, '_disconnect_all'):
+                # Try to run the async disconnect in a new event loop
+                try:
+                    loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop)
+                    loop.run_until_complete(connection_manager._disconnect_all())
+                    loop.close()
+                except Exception as e:
+                    logger.warning(f"Error disconnecting WebSockets during shutdown: {e}")
+                    
+        except Exception as e:
+            logger.warning(f"Error during service cleanup: {e}")
+            
+        logger.info("Service cleanup completed")

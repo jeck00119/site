@@ -153,15 +153,44 @@ class Marlin:
 
     def disconnect(self):
         if not self.is_connected(): return
+        self.logger.info("{}: Disconnecting and stopping all threads...".format(self.name))
+        
+        # Stop polling first
         self.hash_state_requested = True
         self.gcode_parser_state_requested = True
         self.poll_stop()
-        self._iface.stop()
-        self.logger.debug("{}: Please wait until reading thread has joined...".format(self.name))
+        
+        # Stop the interface
+        try:
+            self._iface.stop()
+        except Exception as e:
+            self.logger.warning(f"{self.name}: Error stopping interface: {e}")
+        
+        # Stop reading thread
+        self.logger.debug("{}: Stopping reading thread...".format(self.name))
         self._iface_read_do = False
         self._queue.put("dummy_msg_for_joining_thread")
-        self._thread_read_iface.join()
-        self.logger.debug("{}: Reading thread successfully joined.".format(self.name))
+        
+        # Join with timeout to prevent hanging
+        try:
+            self._thread_read_iface.join(timeout=2.0)  # 2 second timeout
+            if self._thread_read_iface.is_alive():
+                self.logger.warning(f"{self.name}: Reading thread did not stop within timeout - forcing termination")
+            else:
+                self.logger.debug("{}: Reading thread successfully joined.".format(self.name))
+        except Exception as e:
+            self.logger.warning(f"{self.name}: Error joining reading thread: {e}")
+        
+        # Also need to stop the polling thread with timeout
+        if self._thread_polling and self._thread_polling.is_alive():
+            try:
+                self._thread_polling.join(timeout=1.0)  # 1 second timeout
+                if self._thread_polling.is_alive():
+                    self.logger.warning(f"{self.name}: Polling thread did not stop within timeout")
+            except Exception as e:
+                self.logger.warning(f"{self.name}: Error joining polling thread: {e}")
+            
+        self.logger.info("{}: Disconnect completed.".format(self.name))
         self.connected = False
         self._iface = None
         self.callback("on_disconnected")
@@ -256,6 +285,12 @@ class Marlin:
         self._iface_write(self.preprocessor.line + "\n")
 
     def stream(self, lines):
+        # For single line terminal commands, send directly instead of buffering
+        if isinstance(lines, str) and '\n' not in lines.strip():
+            self.logger.debug(f"Sending terminal command directly: {lines}")
+            self._iface_write(lines.strip() + "\n")
+            return
+        
         self._load_lines_into_buffer(lines)
         self.job_run()
 
@@ -380,9 +415,12 @@ class Marlin:
         self._rx_buffer_backlog_line_number.append(self._current_line_nr)
         self._iface_write(self._current_line + "\n")
         self._current_line_sent = True
-        if self.current_mode != "Jog":
-            self.current_mode = "Jog"
-            self.callback("on_stateupdate", self.current_mode, self.current_position, self.current_work_position)
+        
+        # Only set to Jog mode for actual movement commands, not status queries
+        if not self._is_status_command(self._current_line):
+            if self.current_mode != "Jog":
+                self.current_mode = "Jog"
+                self.callback("on_stateupdate", self.current_mode, self.current_position, self.current_work_position)
 
     def _rx_buf_can_receive_current_line(self):
         rx_free_bytes = self._rx_buffer_size - sum(self._rx_buffer_fill)
@@ -433,6 +471,20 @@ class Marlin:
                 else:
                     self.callback("on_read", line)
 
+    def _is_status_command(self, line):
+        """Check if a command is just for status/info and doesn't cause movement"""
+        status_commands = [
+            'M114',  # Get current position
+            'M503',  # Get configuration
+            'M119',  # Get endstop status  
+            'M105',  # Get temperature (if applicable)
+            'M115',  # Get firmware info
+            '?',     # Grbl status query
+        ]
+        
+        line_upper = line.strip().upper()
+        return any(line_upper.startswith(cmd) for cmd in status_commands)
+
     def _handle_ok(self):
         if not self.streaming_complete:
             self._rx_buffer_fill_pop()
@@ -468,7 +520,11 @@ class Marlin:
                 self.current_work_position = (w_pos_x, w_pos_y, w_pos_z)
                 self.current_position = self.current_work_position
 
-                if self.current_position != self._last_position:
+                # Handle position change detection
+                if self._last_position is None:
+                    # First position report after connection - assume standstill
+                    self.is_standstill = True
+                elif self.current_position != self._last_position:
                     if self.is_standstill:
                         self.is_standstill = False
                         self.callback("on_movement")
@@ -476,9 +532,13 @@ class Marlin:
                     if not self.is_standstill:
                         self.is_standstill = True
                         self.callback("on_standstill")
-                        if self.current_mode == "Jog":
-                            self.current_mode = "Idle"
-                            self.callback("on_idle", "idle")
+                
+                # If we're standing still and in Jog mode, switch to Idle
+                # This handles the case where homing completed but we're stuck in Jog
+                if self.is_standstill and self.current_mode == "Jog":
+                    self.current_mode = "Idle"
+                    self.callback("on_idle", "idle")
+                    self.logger.debug(f"{self.name}: Switched from Jog to Idle (standstill detected)")
 
                 if (self.current_mode != self._last_mode or
                         self.current_position != self._last_position or
@@ -537,7 +597,10 @@ class Marlin:
         self._current_line = ""
         self._current_line_sent = True
         self._clear_queue()
-        self.is_standstill = False
+        self.is_standstill = True  # Assume standstill initially until we detect movement
+        # Reset position tracking to avoid false movement detection on first position report
+        self._last_position = None
+        self._last_work_position = None
         self.preprocessor.reset()
 
     def _clear_queue(self):
@@ -550,6 +613,7 @@ class Marlin:
     def _poll_state(self):
         while self._poll_keep_alive:
             try:
+                # Send M114 R for real-time position reporting
                 self._iface_write("M114 R\n")
             except:
                 traceback.print_exc()
