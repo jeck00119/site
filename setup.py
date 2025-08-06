@@ -10,6 +10,8 @@ import sys
 import subprocess
 import platform
 import shutil
+import threading
+import time
 from pathlib import Path
 
 class AutoSetup:
@@ -20,6 +22,7 @@ class AutoSetup:
         self.is_windows = self.system == "Windows"
         self.is_linux = self.system == "Linux"
         self.arch = platform.machine().lower()
+        self._stop_progress = False
         
         if not (self.is_windows or self.is_linux):
             print("ERROR: This setup script only supports Windows and Linux")
@@ -45,6 +48,79 @@ class AutoSetup:
         except subprocess.CalledProcessError as e:
             return False, e.stderr.strip() if e.stderr else str(e)
         except Exception as e:
+            return False, str(e)
+
+    def show_progress(self, message, delay=0.5):
+        """Show a spinning progress indicator"""
+        def animate():
+            chars = "|/-\\"
+            idx = 0
+            while not self._stop_progress:
+                print(f"\r{message} {chars[idx % len(chars)]}", end="", flush=True)
+                idx += 1
+                time.sleep(delay)
+            print()  # New line when done
+        
+        self._stop_progress = False
+        thread = threading.Thread(target=animate)
+        thread.daemon = True
+        thread.start()
+        return thread
+
+    def stop_progress(self):
+        """Stop the progress indicator"""
+        self._stop_progress = True
+        time.sleep(0.1)  # Give time for the thread to finish
+
+    def run_command_with_progress(self, command, message, shell=None, cwd=None, show_output=False, timeout=600):
+        """Run a command with progress indicator and optional real-time output"""
+        progress_thread = None
+        if not show_output:
+            progress_thread = self.show_progress(message)
+        else:
+            print(f"{message}...")
+        
+        try:
+            if shell is None:
+                shell = self.is_windows
+            
+            if show_output:
+                # Show real-time output with timeout
+                result = subprocess.run(command, shell=shell, cwd=cwd, text=True, timeout=timeout)
+                success = result.returncode == 0
+                output = ""
+            else:
+                # Capture output with timeout
+                result = subprocess.run(command, shell=shell, cwd=cwd, 
+                                      capture_output=True, text=True, timeout=timeout)
+                success = result.returncode == 0
+                output = result.stdout.strip() if success else result.stderr.strip()
+            
+            if progress_thread:
+                self.stop_progress()
+                
+            if success:
+                print(f"✓ {message} - completed successfully")
+            else:
+                print(f"✗ {message} - failed")
+                if output and not show_output:
+                    print(f"Error: {output}")
+                    
+            return success, output
+            
+        except subprocess.TimeoutExpired:
+            if progress_thread:
+                self.stop_progress()
+            print(f"✗ {message} - timed out after {timeout} seconds")
+            print("This operation is taking longer than expected. You can:")
+            print("1. Try running the setup again")
+            print("2. Check your internet connection")
+            print("3. Manually install dependencies")
+            return False, "Timeout"
+        except Exception as e:
+            if progress_thread:
+                self.stop_progress()
+            print(f"✗ {message} - error: {e}")
             return False, str(e)
 
     def check_port_availability(self, port=8000):
@@ -310,15 +386,20 @@ class AutoSetup:
         # Check npm (should come with Node.js)
         print("\nChecking npm...")
         npm_ok = False
-        try:
-            result = subprocess.run(["npm", "--version"], capture_output=True, text=True)
-            if result.returncode == 0:
-                version = result.stdout.strip()
-                print(f"Found: npm {version}")
-                print("OK: npm is available")
-                npm_ok = True
-        except:
-            pass
+        # Try different npm commands for Windows and Linux
+        npm_commands = ["npm.cmd", "npm"] if self.is_windows else ["npm"]
+        
+        for cmd in npm_commands:
+            try:
+                result = subprocess.run([cmd, "--version"], capture_output=True, text=True)
+                if result.returncode == 0:
+                    version = result.stdout.strip()
+                    print(f"Found: npm {version}")
+                    print("OK: npm is available")
+                    npm_ok = True
+                    break
+            except:
+                continue
             
         if not npm_ok:
             print("WARNING: npm not found")
@@ -354,7 +435,9 @@ class AutoSetup:
         import subprocess
         import sys
         
-        print("\nSetting up backend...")
+        print("\n" + "=" * 60)
+        print("🔧 BACKEND SETUP")
+        print("=" * 60)
         
         # Check if port 8000 is available before setting up
         print("Checking backend port availability...")
@@ -370,15 +453,13 @@ class AutoSetup:
         # Create virtual environment in root directory
         venv_dir = Path("venv")  # Create venv in project root
         if not venv_dir.exists():
-            print("Creating virtual environment...")
-            try:
-                result = subprocess.run([sys.executable, "-m", "venv", "venv"], 
-                                      cwd=".", capture_output=True, text=True)
-                if result.returncode != 0:
-                    print(f"ERROR: Failed to create virtual environment: {result.stderr}")
-                    return False
-            except Exception as e:
-                print(f"ERROR: Virtual environment creation failed: {e}")
+            success, output = self.run_command_with_progress(
+                [sys.executable, "-m", "venv", "venv"],
+                "Creating virtual environment",
+                cwd="."
+            )
+            if not success:
+                print(f"ERROR: Failed to create virtual environment: {output}")
                 return False
         
         # Get virtual environment paths
@@ -390,17 +471,15 @@ class AutoSetup:
             venv_pip = venv_dir / "bin" / "pip"
         
         # Upgrade pip in virtual environment
-        print("Upgrading pip...")
-        try:
-            result = subprocess.run([str(venv_pip), "install", "--upgrade", "pip"], 
-                                  cwd=backend_dir, capture_output=True, text=True)
-            if result.returncode != 0:
-                print("WARNING: Could not upgrade pip")
-        except Exception:
-            print("WARNING: Could not upgrade pip")
+        success, output = self.run_command_with_progress(
+            [str(venv_python), "-m", "pip", "install", "--upgrade", "pip"],
+            "Upgrading pip in virtual environment",
+            cwd="."  # Run from project root where venv exists
+        )
+        if not success:
+            print("WARNING: Could not upgrade pip - continuing with current version")
         
         # Install requirements
-        print("Installing Python dependencies...")
         # Try backend-specific requirements first, then fall back to root requirements
         backend_requirements = backend_dir / "requirements.txt"
         if backend_requirements.exists():
@@ -410,14 +489,14 @@ class AutoSetup:
             requirements_path = Path("requirements.txt").resolve()
             print(f"Using root requirements: {requirements_path}")
         
-        try:
-            result = subprocess.run([str(venv_pip), "install", "-r", str(requirements_path)], 
-                                  capture_output=True, text=True)
-            if result.returncode != 0:
-                print(f"ERROR: Failed to install requirements: {result.stderr}")
-                return False
-        except Exception as e:
-            print(f"ERROR: Failed to install requirements: {e}")
+        success, output = self.run_command_with_progress(
+            [str(venv_python), "-m", "pip", "install", "-r", str(requirements_path)],
+            "Installing Python dependencies (this may take a few minutes)",
+            cwd=".",
+            show_output=True  # Show real-time pip output
+        )
+        if not success:
+            print(f"ERROR: Failed to install requirements")
             return False
         
         # Copy environment file
@@ -431,14 +510,16 @@ class AutoSetup:
         logs_dir = backend_dir / "logs"
         logs_dir.mkdir(exist_ok=True)
         
-        print("Backend setup complete")
+        print("✅ Backend setup complete")
         return True
 
     def setup_frontend(self):
         """Setup frontend environment and dependencies"""
         import subprocess
         
-        print("\nSetting up frontend...")
+        print("\n" + "=" * 60)
+        print("🌐 FRONTEND SETUP")
+        print("=" * 60)
         
         frontend_dir = Path("aoi-web-front")
         if not frontend_dir.exists():
@@ -446,8 +527,6 @@ class AutoSetup:
             return False
         
         # Install npm dependencies
-        print("Installing Node.js dependencies...")
-        
         # Try different npm command approaches
         npm_commands = []
         if self.is_windows:
@@ -464,10 +543,14 @@ class AutoSetup:
         success = False
         for cmd in npm_commands:
             try:
-                result = subprocess.run(cmd, cwd=frontend_dir, 
-                                      capture_output=True, text=True, shell=False)
-                if result.returncode == 0:
-                    success = True
+                success, output = self.run_command_with_progress(
+                    cmd,
+                    "Installing Node.js dependencies (this may take a few minutes)",
+                    cwd=frontend_dir,
+                    shell=False,
+                    show_output=True  # Show real-time npm output
+                )
+                if success:
                     break
                 # Continue trying other commands if this one fails
             except FileNotFoundError:
@@ -476,12 +559,15 @@ class AutoSetup:
                 continue
         
         if not success:
-            # Fallback: try with shell=True (will fail in Git Bash but try anyway)
+            # Fallback: try with shell=True
             try:
-                result = subprocess.run("npm install", shell=True, cwd=frontend_dir, 
-                                      capture_output=True, text=True)
-                if result.returncode == 0:
-                    success = True
+                success, output = self.run_command_with_progress(
+                    "npm install",
+                    "Installing Node.js dependencies (fallback method)",
+                    cwd=frontend_dir,
+                    shell=True,
+                    show_output=True
+                )
             except Exception:
                 pass
         
@@ -490,7 +576,7 @@ class AutoSetup:
             print("Please run manually: cd aoi-web-front && npm install")
             print("This is required before running the frontend server")
         
-        print("Frontend setup complete")
+        print("✅ Frontend setup complete")
         return True
 
     def create_start_scripts(self):
