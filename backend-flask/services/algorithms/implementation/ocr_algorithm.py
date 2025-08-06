@@ -40,7 +40,12 @@ class OCRAlgorithm(AbstractAlgorithm):
         self.segmentation_mode = segmentation_mode
         self.similarity_threshold = similarity_threshold
 
-        pytesseract.tesseract_cmd = TESSERACT_INSTALLATION_DIR + "\\tesseract.exe"
+        # Set cross-platform Tesseract executable path
+        from src.platform_utils import is_windows
+        import os
+        
+        executable_name = "tesseract.exe" if is_windows() else "tesseract"
+        pytesseract.tesseract_cmd = os.path.join(TESSERACT_INSTALLATION_DIR, executable_name)
 
     def execute(self, frame: np.ndarray):
         self.algorithm_result = AlgorithmResult()

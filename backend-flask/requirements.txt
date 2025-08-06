@@ -3,6 +3,7 @@ fastapi>=0.104.0
 uvicorn[standard]>=0.24.0
 starlette>=0.27.0
 pydantic>=2.0.0
+pydantic-settings>=2.0.0
 
 # HTTP and WebSocket
 aiofiles
@@ -38,6 +39,7 @@ shortuuid
 python-jose[cryptography]
 passlib[bcrypt]
 bcrypt>=4.0.0
+PyJWT>=2.8.0
 
 # Computer Vision Libraries
 pyzbar

@@ -4,89 +4,140 @@ A modern AOI (Automated Optical Inspection) platform for industrial automation w
 
 ## Features
 
-- **Multi-Module Platform**: Camera systems, robots, CNC, profilometer
+- **Multi-Module Platform**: Camera systems, robots, CNC, profilometer integration
 - **Real-time Monitoring**: Live updates from connected industrial modules  
 - **Industrial Configurations**: Support for multiple production setups
-- **Inspection Analytics**: Detection and quality control algorithms
+- **Inspection Analytics**: YOLO detection, OCR, and quality control algorithms
+- **Cross-Platform**: Windows and Linux support with automated setup
+- **Computer Vision**: OpenCV, pre-trained ML models, fabric.js canvas
 
 ## Quick Start
 
 ### Prerequisites
 
-- **Python 3.8+**
-- **Node.js 16+**
+- **Python 3.8-3.13** (automatically detected, latest preferred)
+- **Node.js 16+** (LTS recommended)
+- **Git** (for cloning)
 
 ### Installation
 
 1. **Clone and setup**:
 ```bash
-git clone https://github.com/jeck00119/site.git
+git clone https://github.com/jeck00119/site.git -b site-manus
 cd site
 python setup.py
 ```
 
 2. **Start the application**:
 ```bash
+# Start entire platform (recommended)
 # Windows
 start_aoi_system.bat
 
 # Linux/macOS  
 ./start_aoi_system.sh
+
+# Or start components individually
+# Backend only: start_backend.bat/sh
+# Frontend only: start_frontend.bat/sh
 ```
 
-3. **Access**: Open http://localhost:5173
+3. **Access**: 
+   - Frontend UI: http://localhost:5173
+   - Backend API: http://localhost:8000
 
 ## Project Structure
 
 ```
-site/
+AOI-Site/
 ├── backend-flask/          # Python FastAPI backend
-├── aoi-web-front/          # Vue.js frontend
-├── requirements.txt        # Python dependencies
-└── .env.example           # Environment configuration
+│   ├── src/                # Core backend modules
+│   ├── services/           # Hardware integration services
+│   ├── requirements.txt    # Python dependencies
+│   └── main.py            # API entry point
+├── aoi-web-front/          # Vue.js + TypeScript frontend
+│   ├── src/               # Vue components and logic
+│   ├── package.json       # Node.js dependencies
+│   └── tsconfig.json      # TypeScript configuration
+├── venv/                  # Python virtual environment (auto-created)
+├── setup.py               # Cross-platform setup script
+└── start_*.bat/sh         # Launch scripts
 ```
 
 ## Configuration
 
-Copy `.env.example` to `backend-flask/.env` and customize these settings:
+**No manual configuration required!** The platform uses intelligent defaults:
 
-```bash
-SERVER_HOST=0.0.0.0          # Server IP (0.0.0.0 = all interfaces)
-SERVER_PORT=8000             # Backend API port
-DATABASE_URL=sqlite:///./aoi_database.db  # Database file location
-SECRET_KEY=your-secret-key-here           # JWT token encryption key
-CORS_ORIGINS=["http://localhost:5173"]    # Allowed frontend URLs
-```
+- **Database**: TinyDB (JSON-based, no setup needed)
+- **Security**: Auto-generated JWT keys
+- **CORS**: Pre-configured for development
+- **Python Environment**: Automatically created virtual environment
+- **Dependencies**: Auto-installed on first run
+
+## Hardware Integration
+
+The platform supports various industrial hardware:
+
+- **Cameras**: Real-time image capture and processing
+- **Robots**: xArm integration for automated handling
+- **CNC Controllers**: Manufacturing process integration  
+- **Profilometers**: Gocator 3D measurement systems
+- **OCR Systems**: Tesseract text recognition (cross-platform)
 
 ## Usage
 
-1. Select your part number configuration
-2. Configure cameras and hardware modules
-3. Set up inspection algorithms
-4. Run automated inspection workflows
+1. **First Time**: Run `python setup.py` - creates environment and installs everything
+2. **Launch Platform**: Use `start_aoi_system.bat/sh` for complete system
+3. **Configure Hardware**: Connect cameras, robots, and measurement devices
+4. **Set Inspection Parameters**: Configure detection algorithms and quality thresholds
+5. **Run Inspection**: Execute automated optical inspection workflows
 
 ## Development
 
-**Backend**:
+The platform automatically handles environment setup. For manual development:
+
+**Backend Development**:
 ```bash
+# Activate the auto-created venv
+source venv/bin/activate  # Linux/macOS
+# or
+venv\Scripts\activate.bat  # Windows
+
 cd backend-flask
-pip install -r requirements.txt
-uvicorn main:app --reload
+python main.py
 ```
 
-**Frontend**:
+**Frontend Development**:
 ```bash
 cd aoi-web-front
-npm install
 npm run dev
 ```
 
+## Technology Stack
+
+- **Backend**: Python FastAPI, Pydantic, TinyDB, OpenCV, YOLOv8
+- **Frontend**: Vue 3, TypeScript, Vite, CoreUI, Fabric.js
+- **Hardware**: Cross-platform driver integration
+- **Vision**: Pre-trained ML models, real-time processing
+
 ## Troubleshooting
 
-**Common Issues**:
-- Backend won't start: Check Python version and virtual environment
-- Frontend won't start: Check Node.js version, clear npm cache
-- Hardware issues: Verify connections and device permissions
+**Setup Issues**:
+- **Python not found**: Install Python 3.8-3.13 from python.org
+- **Node.js issues**: Install Node.js LTS from nodejs.org
+- **Permission errors**: Run as administrator (Windows) or check file permissions
+
+**Runtime Issues**:
+- **Backend fails**: Check `venv` exists, run `python setup.py` again
+- **Frontend fails**: Delete `node_modules`, run `npm install`
+- **Hardware not detected**: Verify USB connections and driver installation
+
+## Scripts Reference
+
+- `setup.py` - Initial setup (creates venv, installs dependencies)
+- `start_aoi_system.bat/sh` - Launch complete platform
+- `start_backend.bat/sh` - Backend API only
+- `start_frontend.bat/sh` - Frontend UI only
 
 ## License
 

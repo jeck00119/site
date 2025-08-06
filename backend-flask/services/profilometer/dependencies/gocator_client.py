@@ -1,4 +1,5 @@
 import json
+import os
 import socket
 import struct
 import subprocess
@@ -79,13 +80,13 @@ class ProcessingThread(threading.Thread):
 
     def run(self) -> None:
         if self.top:
-            width, length, z = self.read_points(self.configPath + "\\GocatorTopData3D.npz")
+            width, length, z = self.read_points(os.path.join(self.configPath, "GocatorTopData3D.npz"))
             if width != 0 and length != 0:
                 mesh = self.generate_mesh_points(width, length, z)
                 self.cntrl.set_top_mesh(mesh)
                 self.cntrl.meshTopSignal.emit(mesh)
         else:
-            width, length, z = self.read_points(self.configPath + "\\GocatorBottomData3D.npz")
+            width, length, z = self.read_points(os.path.join(self.configPath, "GocatorBottomData3D.npz"))
             if width != 0:
                 mesh = self.generate_mesh_points(width, length, z)
                 self.cntrl.set_bottom_mesh(mesh)

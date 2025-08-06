@@ -208,21 +208,20 @@ class AutoSetup:
                 if version_match:
                     major, minor, patch = map(int, version_match.groups())
                     
-                    # Check if version is 3.8 or higher
-                    if major >= 3 and minor >= 8:
+                    # Check if version is 3.8-3.13
+                    if major == 3 and 8 <= minor <= 13:
                         print("OK: Python version is compatible")
                         return True
                     else:
-                        print("WARNING: Python version is too old")
-                        print("Required: Python 3.8 or higher")
-                        print("Recommended: Python 3.11")
+                        print("WARNING: Python version not supported")
+                        print("Required: Python 3.8-3.13")
                         return False
                         
         except Exception:
             pass
             
         print("ERROR: Python not found")
-        print("Please install Python 3.8 or higher:")
+        print("Please install Python 3.8-3.13:")
         if self.is_windows:
             print("  Windows: Download from https://www.python.org/downloads/")
             print("  During installation, make sure to check 'Add Python to PATH'")
@@ -368,13 +367,13 @@ class AutoSetup:
             print("ERROR: Backend directory not found")
             return False
         
-        # Create virtual environment
-        venv_dir = backend_dir / "venv"
+        # Create virtual environment in root directory
+        venv_dir = Path("venv")  # Create venv in project root
         if not venv_dir.exists():
             print("Creating virtual environment...")
             try:
                 result = subprocess.run([sys.executable, "-m", "venv", "venv"], 
-                                      cwd=backend_dir, capture_output=True, text=True)
+                                      cwd=".", capture_output=True, text=True)
                 if result.returncode != 0:
                     print(f"ERROR: Failed to create virtual environment: {result.stderr}")
                     return False
@@ -402,10 +401,18 @@ class AutoSetup:
         
         # Install requirements
         print("Installing Python dependencies...")
-        requirements_path = Path("requirements.txt").resolve()
+        # Try backend-specific requirements first, then fall back to root requirements
+        backend_requirements = backend_dir / "requirements.txt"
+        if backend_requirements.exists():
+            requirements_path = backend_requirements
+            print(f"Using backend requirements: {requirements_path}")
+        else:
+            requirements_path = Path("requirements.txt").resolve()
+            print(f"Using root requirements: {requirements_path}")
+        
         try:
             result = subprocess.run([str(venv_pip), "install", "-r", str(requirements_path)], 
-                                  cwd=backend_dir, capture_output=True, text=True)
+                                  capture_output=True, text=True)
             if result.returncode != 0:
                 print(f"ERROR: Failed to install requirements: {result.stderr}")
                 return False
@@ -487,162 +494,427 @@ class AutoSetup:
         return True
 
     def create_start_scripts(self):
-        """Create convenient start scripts"""
-        print("\nCreating start scripts...")
+        """Create convenient start scripts for both Windows and Linux"""
+        print("\nCreating cross-platform start scripts...")
         
-        if self.is_windows:
-            # Windows batch files
-            backend_script = """@echo off
-echo Starting AOI Backend Server...
-cd /d "%~dp0backend-flask"
+        # Always create both Windows and Linux scripts for cross-platform compatibility
+        self.create_windows_scripts()
+        self.create_linux_scripts()
+        
+        print("Cross-platform start scripts created successfully")
+        return True
+    
+    def create_windows_scripts(self):
+        """Create Windows batch scripts"""
+        
+        # Use the improved Windows scripts
+        backend_script = """@echo off
+echo ========================================
+echo     AOI Backend Server
+echo ========================================
+echo.
+
+REM Go to project root
+cd /d "%~dp0"
+
+REM Check if venv exists in root
 if not exist "venv" (
-    echo Virtual environment not found! Please run setup.py first.
-    pause
-    exit /b 1
+    echo Virtual environment not found! Running setup...
+    echo.
+    call python setup.py
+    if errorlevel 1 (
+        echo Setup failed! Please check the errors above.
+        pause
+        exit /b 1
+    )
+    echo.
+    echo Setup completed successfully!
+    echo.
 )
+
+REM Activate virtual environment
+echo Activating virtual environment...
 call venv\\Scripts\\activate.bat
 if errorlevel 1 (
     echo Failed to activate virtual environment!
+    echo Please check if Python and venv are properly installed.
     pause
     exit /b 1
 )
-echo Virtual environment activated
+echo Virtual environment activated successfully
+echo.
+
+REM Change to backend directory
+cd backend-flask
+echo Starting backend server on http://localhost:8000...
+echo.
+
+REM Start the backend server
 python main.py
 if errorlevel 1 (
+    echo.
     echo Backend failed to start!
+    echo Please check the errors above.
     pause
     exit /b 1
 )
+echo.
+echo Backend server stopped.
 pause
 """
 
-            frontend_script = """@echo off
-echo Starting AOI Frontend Server...
+        frontend_script = """@echo off
+echo ========================================
+echo     AOI Frontend Server
+echo ========================================
+echo.
+
+REM Change to frontend directory
 cd /d "%~dp0aoi-web-front"
+
+REM Check if node_modules exists
 if not exist "node_modules" (
-    echo Node modules not found! Please run setup.py first.
-    pause
-    exit /b 1
+    echo Node modules not found! Installing dependencies...
+    echo.
+    call npm install
+    if errorlevel 1 (
+        echo Failed to install node modules!
+        echo Please ensure Node.js and npm are properly installed.
+        pause
+        exit /b 1
+    )
+    echo.
+    echo Dependencies installed successfully!
+    echo.
 )
-echo Starting development server...
-npm run dev
+
+REM Start the development server
+echo Starting frontend development server on http://localhost:5173...
+echo.
+echo Press Ctrl+C to stop the server
+echo.
+
+call npm run dev
 if errorlevel 1 (
+    echo.
     echo Frontend failed to start!
+    echo Please check the errors above.
     pause
     exit /b 1
 )
+echo.
+echo Frontend server stopped.
 pause
 """
 
-            system_script = """@echo off
-echo Starting Complete AOI Platform...
+        system_script = """@echo off
+title AOI Platform Launcher
+echo ================================================
+echo            AOI Platform Launcher
+echo         Industrial Vision & Automation
+echo ================================================
 echo.
-echo Starting Backend...
+
+REM Check if this is first-time setup
+if not exist "venv" (
+    echo [SETUP] First time setup detected...
+    echo [SETUP] Running initial configuration...
+    echo.
+    call python setup.py
+    if errorlevel 1 (
+        echo [ERROR] Setup failed! Please check the errors above.
+        echo.
+        pause
+        exit /b 1
+    )
+    echo.
+    echo [SETUP] Configuration completed successfully!
+    echo.
+)
+
+if not exist "aoi-web-front\\node_modules" (
+    echo [SETUP] Installing frontend dependencies...
+    echo.
+    cd aoi-web-front
+    call npm install
+    if errorlevel 1 (
+        echo [ERROR] Failed to install frontend dependencies!
+        cd ..
+        pause
+        exit /b 1
+    )
+    cd ..
+    echo [SETUP] Frontend dependencies installed!
+    echo.
+)
+
+echo [1/2] Starting Backend Server...
+echo       API will be available at: http://localhost:8000
 start "AOI Backend" cmd /k "%~dp0start_backend.bat"
-timeout /t 3 /nobreak > nul
-echo Starting Frontend...
+
+echo [WAIT] Waiting for backend to initialize...
+timeout /t 5 /nobreak > nul
+
+echo [2/2] Starting Frontend Server...
+echo       UI will be available at: http://localhost:5173
 start "AOI Frontend" cmd /k "%~dp0start_frontend.bat"
+
 echo.
-echo Both servers are starting...
-echo Backend will be available at: http://localhost:8000
-echo Frontend will be available at: http://localhost:5173
+echo ================================================
+echo            Platform Status
+echo ================================================
+echo Backend API:   http://localhost:8000
+echo Frontend UI:   http://localhost:5173
 echo.
-pause
+echo Both servers are starting in separate windows.
+echo Please wait ~30 seconds for full initialization.
+echo.
+echo ================================================
+echo To stop the platform:
+echo   1. Close both server windows
+echo   2. Or press Ctrl+C in each window
+echo ================================================
+echo.
+echo Press any key to close this launcher...
+pause > nul
 """
 
-            # Write scripts
-            Path("start_backend.bat").write_text(backend_script, encoding='utf-8')
-            Path("start_frontend.bat").write_text(frontend_script, encoding='utf-8')
-            Path("start_aoi_system.bat").write_text(system_script, encoding='utf-8')
-            
-            print("Created Windows batch files:")
-            print("   - start_backend.bat")
-            print("   - start_frontend.bat")
-            print("   - start_aoi_system.bat")
-            
-        else:
-            # Linux shell scripts
-            backend_script = """#!/bin/bash
-echo "Starting CNC Backend Server..."
-cd "$(dirname "$0")/backend-flask"
+        # Write Windows scripts
+        Path("start_backend.bat").write_text(backend_script, encoding='utf-8')
+        Path("start_frontend.bat").write_text(frontend_script, encoding='utf-8')
+        Path("start_aoi_system.bat").write_text(system_script, encoding='utf-8')
+        
+        print("Created Windows batch files:")
+        print("   - start_backend.bat")
+        print("   - start_frontend.bat")
+        print("   - start_aoi_system.bat")
+    
+    def create_linux_scripts(self):
+        """Create Linux shell scripts"""
+        
+        backend_script = """#!/bin/bash
+echo "========================================"
+echo "     AOI Backend Server"
+echo "========================================"
+echo
+
+# Get script directory
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR"
+
+# Check if venv exists in root
 if [ ! -d "venv" ]; then
-    echo "Virtual environment not found! Please run setup.py first."
-    read -p "Press enter to continue..."
-    exit 1
+    echo "Virtual environment not found! Running setup..."
+    echo
+    python3.13 setup.py 2>/dev/null || python3.12 setup.py 2>/dev/null || python3.11 setup.py 2>/dev/null || python3.10 setup.py 2>/dev/null || python3.9 setup.py 2>/dev/null || python3.8 setup.py 2>/dev/null || python3 setup.py || python setup.py
+    if [ $? -ne 0 ]; then
+        echo "Setup failed! Please check the errors above."
+        read -p "Press Enter to exit..."
+        exit 1
+    fi
+    echo
+    echo "Setup completed successfully!"
+    echo
 fi
+
+# Activate virtual environment
+echo "Activating virtual environment..."
 source venv/bin/activate
 if [ $? -ne 0 ]; then
     echo "Failed to activate virtual environment!"
-    read -p "Press enter to continue..."
+    echo "Please check if Python and venv are properly installed."
+    read -p "Press Enter to exit..."
     exit 1
 fi
-echo "Virtual environment activated"
+echo "Virtual environment activated successfully"
+echo
+
+# Change to backend directory
+cd backend-flask
+echo "Starting backend server on http://localhost:8000..."
+echo
+
+# Start the backend server
 python main.py
 if [ $? -ne 0 ]; then
+    echo
     echo "Backend failed to start!"
-    read -p "Press enter to continue..."
+    echo "Please check the errors above."
+    read -p "Press Enter to exit..."
     exit 1
 fi
+
+echo
+echo "Backend server stopped."
+read -p "Press Enter to exit..."
 """
 
-            frontend_script = """#!/bin/bash
-echo "Starting CNC Frontend Server..."
-cd "$(dirname "$0")/aoi-web-front"
+        frontend_script = """#!/bin/bash
+echo "========================================"
+echo "     AOI Frontend Server"
+echo "========================================"
+echo
+
+# Get script directory
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR"
+
+# Change to frontend directory
+cd aoi-web-front
+
+# Check if node_modules exists
 if [ ! -d "node_modules" ]; then
-    echo "Node modules not found! Please run setup.py first."
-    read -p "Press enter to continue..."
-    exit 1
+    echo "Node modules not found! Installing dependencies..."
+    echo
+    npm install
+    if [ $? -ne 0 ]; then
+        echo "Failed to install node modules!"
+        echo "Please ensure Node.js and npm are properly installed."
+        read -p "Press Enter to exit..."
+        exit 1
+    fi
+    echo
+    echo "Dependencies installed successfully!"
+    echo
 fi
-echo "Starting development server..."
+
+# Start the development server
+echo "Starting frontend development server on http://localhost:5173..."
+echo
+echo "Press Ctrl+C to stop the server"
+echo
+
 npm run dev
 if [ $? -ne 0 ]; then
+    echo
     echo "Frontend failed to start!"
-    read -p "Press enter to continue..."
+    echo "Please check the errors above."
+    read -p "Press Enter to exit..."
     exit 1
 fi
+
+echo
+echo "Frontend server stopped."
+read -p "Press Enter to exit..."
 """
 
-            system_script = """#!/bin/bash
-echo "Starting Complete CNC System..."
+        system_script = """#!/bin/bash
+echo "================================================"
+echo "            AOI Platform Launcher"
+echo "         Industrial Vision & Automation"
+echo "================================================"
 echo
-echo "Starting Backend..."
-gnome-terminal -- bash -c "$(dirname "$0")/start_backend.sh; exec bash" 2>/dev/null || \\
-xterm -e "$(dirname "$0")/start_backend.sh; exec bash" 2>/dev/null || \\
-"$(dirname "$0")/start_backend.sh" &
-sleep 3
-echo "Starting Frontend..."
-gnome-terminal -- bash -c "$(dirname "$0")/start_frontend.sh; exec bash" 2>/dev/null || \\
-xterm -e "$(dirname "$0")/start_frontend.sh; exec bash" 2>/dev/null || \\
-"$(dirname "$0")/start_frontend.sh" &
+
+# Get script directory
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR"
+
+# Check if this is first-time setup
+if [ ! -d "venv" ]; then
+    echo "[SETUP] First time setup detected..."
+    echo "[SETUP] Running initial configuration..."
+    echo
+    python3.13 setup.py 2>/dev/null || python3.12 setup.py 2>/dev/null || python3.11 setup.py 2>/dev/null || python3.10 setup.py 2>/dev/null || python3.9 setup.py 2>/dev/null || python3.8 setup.py 2>/dev/null || python3 setup.py || python setup.py
+    if [ $? -ne 0 ]; then
+        echo "[ERROR] Setup failed! Please check the errors above."
+        echo
+        read -p "Press Enter to exit..."
+        exit 1
+    fi
+    echo
+    echo "[SETUP] Configuration completed successfully!"
+    echo
+fi
+
+if [ ! -d "aoi-web-front/node_modules" ]; then
+    echo "[SETUP] Installing frontend dependencies..."
+    echo
+    cd aoi-web-front
+    npm install
+    if [ $? -ne 0 ]; then
+        echo "[ERROR] Failed to install frontend dependencies!"
+        cd ..
+        read -p "Press Enter to exit..."
+        exit 1
+    fi
+    cd ..
+    echo "[SETUP] Frontend dependencies installed!"
+    echo
+fi
+
+echo "[1/2] Starting Backend Server..."
+echo "       API will be available at: http://localhost:8000"
+
+# Start backend in background
+./start_backend.sh &
+BACKEND_PID=$!
+
+echo "[WAIT] Waiting for backend to initialize..."
+sleep 5
+
+echo "[2/2] Starting Frontend Server..."
+echo "       UI will be available at: http://localhost:5173"
+
+# Start frontend in background
+./start_frontend.sh &
+FRONTEND_PID=$!
+
 echo
-echo "Both servers are starting..."
-echo "Backend will be available at: http://localhost:8000"
-echo "Frontend will be available at: http://localhost:5173"
+echo "================================================"
+echo "            Platform Status"
+echo "================================================"
+echo "Backend API:   http://localhost:8000"
+echo "Frontend UI:   http://localhost:5173"
 echo
-read -p "Press enter to continue..."
+echo "Both servers are running in the background."
+echo "Please wait ~30 seconds for full initialization."
+echo
+echo "================================================"
+echo "To stop the platform:"
+echo "   Press Ctrl+C to stop both servers"
+echo "================================================"
+echo
+
+# Function to handle cleanup
+cleanup() {
+    echo
+    echo "Stopping servers..."
+    kill $BACKEND_PID 2>/dev/null
+    kill $FRONTEND_PID 2>/dev/null
+    echo "Servers stopped."
+    exit 0
+}
+
+# Set trap to handle Ctrl+C
+trap cleanup SIGINT
+
+# Wait for user input or processes to end
+echo "Press Ctrl+C to stop the platform..."
+wait
 """
 
-            # Write scripts and make executable
-            backend_file = Path("start_backend.sh")
-            frontend_file = Path("start_frontend.sh")
-            system_file = Path("start_aoi_system.sh")
-            
-            backend_file.write_text(backend_script, encoding='utf-8')
-            frontend_file.write_text(frontend_script, encoding='utf-8')
-            system_file.write_text(system_script, encoding='utf-8')
-            
-            # Make executable
+        # Write Linux scripts and make executable
+        backend_file = Path("start_backend.sh")
+        frontend_file = Path("start_frontend.sh")
+        system_file = Path("start_aoi_system.sh")
+        
+        backend_file.write_text(backend_script, encoding='utf-8')
+        frontend_file.write_text(frontend_script, encoding='utf-8')
+        system_file.write_text(system_script, encoding='utf-8')
+        
+        # Make executable
+        try:
             backend_file.chmod(0o755)
             frontend_file.chmod(0o755)
             system_file.chmod(0o755)
-            
-            print("Created Linux shell scripts:")
-            print("   - start_backend.sh")
-            print("   - start_frontend.sh")
-            print("   - start_aoi_system.sh")
+        except Exception:
+            # chmod might not work on Windows, but that's okay
+            pass
         
-        print("Start scripts created successfully")
-        return True
+        print("Created Linux shell scripts:")
+        print("   - start_backend.sh")
+        print("   - start_frontend.sh")
+        print("   - start_aoi_system.sh")
 
 def main():
     """Main setup function"""
@@ -680,14 +952,8 @@ def main():
     print("1. Review and update .env file in backend-flask directory")
     print("2. Connect your industrial hardware (cameras, robots, CNC, etc.)")
     
-    if setup.is_windows:
-        print("3. Run start_backend.bat to start the backend")
-        print("4. Run start_frontend.bat to start the frontend")
-        print("   Or run start_aoi_system.bat to start both")
-    else:
-        print("3. Run ./start_backend.sh to start the backend")
-        print("4. Run ./start_frontend.sh to start the frontend")
-        print("   Or run ./start_aoi_system.sh to start both")
+    print("3. For Windows: Run start_aoi_system.bat (or individual .bat files)")
+    print("4. For Linux: Run ./start_aoi_system.sh (or individual .sh files)")
     
     print("5. Open http://localhost:5173 in your browser")
     print("\nSetup completed successfully! Happy automating!")

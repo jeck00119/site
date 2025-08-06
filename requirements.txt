@@ -44,3 +44,4 @@ cryptography
 websockets
 python-dotenv
 sqlalchemy
+tinydb

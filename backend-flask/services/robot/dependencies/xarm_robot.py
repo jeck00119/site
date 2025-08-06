@@ -334,7 +334,7 @@ class XArmRobot(object):
         hash_table = {}
 
         try:
-            path_of_the_directory = os.path.join(pathlib.Path(__file__).parent.resolve(), 'Dictionaries\\BMS_Farasis')
+            path_of_the_directory = pathlib.Path(__file__).parent.resolve() / 'Dictionaries' / 'BMS_Farasis'
             dict_name = 'xArm_dictionary'
 
             for files in os.listdir(path_of_the_directory):

@@ -25,7 +25,19 @@
       "Bash(git rm:*)",
       "Bash(git commit:*)",
       "Bash(git push:*)",
-      "Bash(git lfs:*)"
+      "Bash(git lfs:*)",
+      "Bash(dir)",
+      "Bash(python:*)",
+      "Bash(venvScripts:*)",
+      "Bash(venv\\Scripts\\activate.bat:*)",
+      "Bash(ls:*)",
+      "Bash(echo)",
+      "Bash(timeout:*)",
+      "Bash(venv/Scripts/python:*)",
+      "Bash(../venv/Scripts/python -c \"import tinydb\")",
+      "Bash(venv/Scripts/pip install:*)",
+      "Bash(rm:*)",
+      "Bash(git add:*)"
     ],
     "deny": []
   }
