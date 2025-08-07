@@ -65,6 +65,40 @@ async def initialize_all_cncs(
         )
 
 
+@router.post("/{cnc_uid}/initialize")
+async def initialize_cnc(
+        cnc_uid: str,
+        cnc_service: CncService = Depends(get_service_by_type(CncService))
+):
+    try:
+        cnc_service.create_cnc(cnc_uid)
+        return RouteHelper.create_success_response(f"CNC {cnc_uid} initialized successfully")
+    except Exception as e:
+        raise create_error_response(
+            operation="initialize CNC",
+            entity_type="CNC",
+            entity_id=cnc_uid,
+            exception=e
+        )
+
+
+@router.post("/{cnc_uid}/deinitialize")
+async def deinitialize_cnc(
+        cnc_uid: str,
+        cnc_service: CncService = Depends(get_service_by_type(CncService))
+):
+    try:
+        cnc_service.delete_cnc(cnc_uid)
+        return RouteHelper.create_success_response(f"CNC {cnc_uid} deinitialized successfully")
+    except Exception as e:
+        raise create_error_response(
+            operation="deinitialize CNC",
+            entity_type="CNC",
+            entity_id=cnc_uid,
+            exception=e
+        )
+
+
 @router.get("/{cnc_uid}")
 async def get_cnc(
         cnc_uid: str,

@@ -48,6 +48,10 @@ class CncMachineMarlin():
         try:
             self._marlin: Marlin = Marlin(self.callback)
             self._marlin.connect(self._port)
+            # Wait longer for connection and protocol sync to stabilize
+            time.sleep(2) 
+            # Enable steppers after connection so motors can move
+            self.tension_on()
         except Exception as e:
             raise e
 
@@ -173,36 +177,37 @@ class CncMachineMarlin():
     def move_by(self, x: float = None, y: float = None, z: float = None, feed_rate: int = None):
         if self._marlin:
             try:
-                # Match Pronterface command sequence exactly
-                print(f"[MOVE_BY DEBUG] Using Pronterface command sequence")
+                # Use proper Marlin protocol with line numbering and checksums
+                print(f"[MOVE_BY DEBUG] Using proper Marlin protocol")
                 print(f"[MOVE_BY DEBUG] Params: X={x} Y={y} Z={z} F={feed_rate}")
                 
-                # Send G91 first as separate command (like Pronterface)
-                self._marlin._iface_write("G91\n")
+                # Use stream method to ensure proper line numbering and checksums
+                # Send G91 first as separate command
+                self._marlin.stream("G91")
                 
-                # Use G0 (rapid move) instead of G1, with proper spacing like Pronterface
+                # Use G0 (rapid move) with proper spacing
                 command = f"G0 {self.parse_coordinates_with_decimals(x, y, z, feed_rate)}"
                 print(f"[MOVE_BY DEBUG] Movement command: {command}")
-                self._marlin._iface_write(command + "\n")
+                self._marlin.stream(command)
                 
                 # Return to absolute mode
-                self._marlin._iface_write("G90\n")
+                self._marlin.stream("G90")
                 
             except Exception as e:
                 raise e
                 
     def parse_coordinates_with_decimals(self, x, y, z, feed_rate):
-        """Parse coordinates with .0 decimals like Pronterface does"""
-        line = ""
+        """Parse coordinates with proper spacing"""
+        parts = []
         if x is not None:
-            line += f"X{x:.1f}"
+            parts.append(f"X{x:.1f}")
         if y is not None:
-            line += f" Y{y:.1f}"
+            parts.append(f"Y{y:.1f}")
         if z is not None:
-            line += f" Z{z:.1f}"
+            parts.append(f"Z{z:.1f}")
         if feed_rate is not None:
-            line += f" F{int(feed_rate)}"
-        return line.strip()
+            parts.append(f"F{int(feed_rate)}")
+        return " ".join(parts)
 
     def abort(self):
         if self._marlin:
@@ -260,5 +265,9 @@ class CncMachineMarlin():
                 self._abort_requested = False
                 self._marlin.soft_reset()
                 self._marlin.disconnect()
+                # Clean up reference to allow reconnection
+                self._marlin = None
             except Exception as e:
+                # Still clean up even if disconnect fails
+                self._marlin = None
                 raise e

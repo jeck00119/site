@@ -7,6 +7,10 @@ export default {
         return state.cncs;
     },
 
+    getCNC: (state) => (uid) => {
+        return state.cncs.find(cnc => cnc.uid === uid);
+    },
+
     getCNCTypes(state) {
         return state.cncTypes;
     },

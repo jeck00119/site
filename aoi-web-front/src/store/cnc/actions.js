@@ -251,6 +251,34 @@ export default {
         }
     },
 
+    async initializeCNC(context, payload) {
+        try {
+            const { response, responseData } = await api.post(`/cnc/${payload.cncUid}/initialize`);
+            if (!response.ok) {
+                const error = new Error(responseData.detail || `Failed to initialize CNC ${payload.cncUid}`);
+                console.error('CNC Initialize Error:', error.message);
+                throw error;
+            }
+        } catch (error) {
+            console.error('CNC Initialize Exception:', error.message);
+            throw error;
+        }
+    },
+
+    async deinitializeCNC(context, payload) {
+        try {
+            const { response, responseData } = await api.post(`/cnc/${payload.cncUid}/deinitialize`);
+            if (!response.ok) {
+                const error = new Error(responseData.detail || `Failed to deinitialize CNC ${payload.cncUid}`);
+                console.error('CNC Deinitialize Error:', error.message);
+                throw error;
+            }
+        } catch (error) {
+            console.error('CNC Deinitialize Exception:', error.message);
+            throw error;
+        }
+    },
+
     async closeStateSocket(_, payload) {
         try {
             const { response, responseData } = await api.post(`/cnc/${payload.uid}/ws/close`);

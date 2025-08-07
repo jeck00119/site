@@ -1,7 +1,7 @@
 <template>
   <div class="steps-grid">
     <div class="title">
-      Steps
+      Movement Settings
     </div>
     <div class="actions-container">
       <div class="flex-row">
@@ -14,7 +14,7 @@
             type="radio" 
             :value="step" 
             :id="`step-${step}`" 
-            :checked="selectedSteps == step"
+            :checked="selectedSteps == step && !isCustomActive"
             @change="updateSteps"
           />
           <label :for="`step-${step}`">{{ step }}</label>
@@ -31,7 +31,7 @@
             type="radio" 
             :value="step" 
             :id="`step-${step}`" 
-            :checked="selectedSteps == step"
+            :checked="selectedSteps == step && !isCustomActive"
             @change="updateSteps"
           />
           <label :for="`step-${step}`">{{ step }}</label>
@@ -40,16 +40,34 @@
       
       <div class="flex-row">
         <div class="form-control spaced">
-          <label for="custom-step">Value:</label>
+          <label for="custom-step">Steps:</label>
           <input 
             type="number" 
             id="custom-step" 
             :value="customStep"
+            :class="{ 'custom-active': isCustomActive }"
             @input="updateCustomStep"
             @blur="validateCustomStep"
             min="0.001"
             step="0.001"
             placeholder="Custom"
+          />
+        </div>
+      </div>
+      
+      <!-- Feedrate Control -->
+      <div class="flex-row feedrate-row">
+        <div class="form-control spaced">
+          <label for="feedrate-input">Feedrate:</label>
+          <input 
+            type="number" 
+            id="feedrate-input" 
+            :value="feedrate"
+            @input="updateFeedrate"
+            @blur="validateFeedrate"
+            min="1"
+            step="1"
+            placeholder="1500"
           />
         </div>
       </div>
@@ -66,9 +84,13 @@ export default {
     selectedSteps: {
       type: [String, Number],
       required: true
+    },
+    feedrate: {
+      type: [String, Number],
+      required: true
     }
   },
-  emits: ['steps-changed'],
+  emits: ['steps-changed', 'feedrate-changed'],
   setup(props, { emit }) {
     const predefinedSteps = [1, 5, 10, 20, 30, 50, 100, 200];
     const customStep = ref("");
@@ -78,17 +100,23 @@ export default {
       return predefinedSteps.includes(Number(props.selectedSteps));
     });
 
-    // Update custom step field when selectedSteps changes
+    // Check if custom field is active (has a value)
+    const isCustomActive = computed(() => {
+      return customStep.value !== "" && customStep.value !== null;
+    });
+
+    // Update custom step field when selectedSteps changes from parent
     watch(() => props.selectedSteps, (newValue) => {
-      if (!isPredefinedStep.value) {
+      // Only update custom field if it's not a predefined step and custom field is empty
+      if (!isPredefinedStep.value && !isCustomActive.value) {
         customStep.value = newValue;
-      } else {
-        customStep.value = "";
       }
     }, { immediate: true });
 
     function updateSteps(event) {
       const value = Number(event.target.value);
+      // Clear custom field when selecting a predefined step
+      customStep.value = "";
       emit('steps-changed', value);
     }
 
@@ -125,13 +153,35 @@ export default {
       }
     }
 
+    function updateFeedrate(event) {
+      const value = parseInt(event.target.value);
+      if (!isNaN(value) && value > 0) {
+        emit('feedrate-changed', value);
+      }
+    }
+
+    function validateFeedrate(event) {
+      const value = parseInt(event.target.value);
+      if (isNaN(value) || value < 1) {
+        // Reset to previous valid value
+        event.target.value = props.feedrate;
+      } else if (value > 10000) {
+        // Cap at reasonable maximum
+        event.target.value = 10000;
+        emit('feedrate-changed', 10000);
+      }
+    }
+
     return {
       predefinedSteps,
       customStep,
       isPredefinedStep,
+      isCustomActive,
       updateSteps,
       updateCustomStep,
-      validateCustomStep
+      validateCustomStep,
+      updateFeedrate,
+      validateFeedrate
     };
   }
 };
@@ -155,14 +205,14 @@ export default {
   width: 100%;
   padding: 0.5rem;
   text-align: center;
-  margin-bottom: 1rem;
+  margin-bottom: 0.75rem;
 }
 
 .actions-container {
   display: flex;
   flex-direction: column;
   width: 100%;
-  gap: 0.5rem;
+  gap: 0.3rem;
 }
 
 .flex-row {
@@ -210,16 +260,31 @@ export default {
   background-color: rgb(51, 51, 51);
 }
 
+.form-control input[type="number"].custom-active {
+  background-color: rgb(224, 181, 102);
+  color: rgb(41, 41, 41);
+  font-weight: bold;
+}
+
+.form-control input[type="number"].custom-active:focus {
+  background-color: rgb(234, 191, 112);
+  outline: 2px solid rgb(244, 201, 122);
+}
+
 .spaced {
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: 80px 1fr;
   width: 90%;
   margin: auto;
-  gap: 1rem;
+  gap: 0.5rem;
+  align-items: center;
 }
 
 .spaced label {
   white-space: nowrap;
   font-weight: bold;
+  text-align: left;
+  font-size: 1.1rem;
 }
 
 /* Radio button styling */
@@ -234,6 +299,29 @@ export default {
 
 .form-control input[type="radio"]:checked:hover + label {
   color: rgb(224, 181, 102);
+}
+
+/* Feedrate row styling */
+.feedrate-row {
+  margin-top: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+#feedrate-input {
+  background-color: rgb(41, 41, 41);
+  border: none;
+  color: white;
+  text-align: center;
+  border-radius: 4px;
+  padding: 0.25rem;
+  width: 80px;
+  font-size: 0.9rem;
+}
+
+#feedrate-input:focus {
+  outline: 2px solid rgb(204, 161, 82);
+  background-color: rgb(51, 51, 51);
 }
 </style>
 

@@ -10,7 +10,9 @@ import serial
 class Interface:
     def __init__(self, name, port, baudrate=115200):
         self.name = name
-        self.port = port
+        # Extract actual port name from enhanced display name (e.g., "COM10 (STMicroelectronics)" -> "COM10")
+        self.port = self._extract_port_name(port)
+        self.original_port_display = port  # Keep original for logging
         self.baudrate = baudrate
         self._serial = None
         self._buf = ""
@@ -20,19 +22,27 @@ class Interface:
         self._do_readline = False
         self._thread_read = None
 
+    def _extract_port_name(self, port_display):
+        """Extract the actual port name from enhanced display name"""
+        # Handle cases like "COM10 (STMicroelectronics)" -> "COM10"
+        # Also handle cases like "/dev/ttyUSB0 (Arduino)" -> "/dev/ttyUSB0"
+        if '(' in port_display:
+            return port_display.split('(')[0].strip()
+        return port_display
+
     def start(self, out_queue):
         self.queue = out_queue
         try:
             self._serial = serial.Serial(self.port, self.baudrate, timeout=1)
         except (serial.SerialException, OSError) as e:
-            self.logger.error("Could not connect to {}:{} - {}".format(self.port, self.baudrate, e))
+            self.logger.error("Could not connect to {} ({}):{}  - {}".format(self.original_port_display, self.port, self.baudrate, e))
             raise e
         self._thread_read = threading.Thread(target=self._run)
         self._thread_read.daemon = True
         self._thread_read.name = "Serial port {}".format(self.port)
         self._do_read = True
         self._thread_read.start()
-        self.logger.debug("Serial interface {} connected to port={}, baudrate={}".format(self.name, self.port, self.baudrate))
+        self.logger.debug("Serial interface {} connected to port={} ({}), baudrate={}".format(self.name, self.original_port_display, self.port, self.baudrate))
 
     def stop(self):
         self.logger.debug("Serial interface {}: Stopping...".format(self.name))
@@ -79,7 +89,7 @@ class Interface:
         print(">>>> [INTERFACE] Read thread has started.")
         while self._do_read:
             try:
-                if self._serial.isOpen():
+                if self._serial and self._serial.isOpen():
                     print(">>>> [INTERFACE] Waiting for data from serial port...")
                     data = self._serial.read_until(bytes("\r\n", "ascii"))
                     if len(data) > 0:
@@ -99,10 +109,23 @@ class Interface:
                                     self.logger.log(9, "{}:READ: '{}'".format(self.name, match.group(1)))
                     else:
                         print(">>>> [INTERFACE] Serial read timed out (no data).")
+                else:
+                    # Serial port is closed, break the loop
+                    print(">>>> [INTERFACE] Serial port is closed, stopping read thread")
+                    break
                 time.sleep(0.04)
-            except (serial.SerialException, OSError):
+            except (serial.SerialException, OSError) as e:
+                if not self._do_read:
+                    # Expected exception when stopping
+                    print(">>>> [INTERFACE] Serial exception during shutdown (expected)")
+                    break
                 self.logger.error("Problem during reading the serial port. Retrying every 3 seconds.")
                 time.sleep(3)
             except Exception:
+                if not self._do_read:
+                    # Expected exception when stopping
+                    print(">>>> [INTERFACE] Exception during shutdown (expected)")
+                    break
                 self.logger.error("Unknown problem")
                 traceback.print_exc()
+        print(">>>> [INTERFACE] Read thread has stopped.")

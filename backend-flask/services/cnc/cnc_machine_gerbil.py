@@ -118,6 +118,9 @@ class CncMachineGerbil():
         try:
             self._gerbil: Gerbil = Gerbil(self.callback)
             self._gerbil.cnect(self._port)
+            # Enable steppers after connection so motors can move
+            time.sleep(1)  # Wait for connection to stabilize
+            self.tension_on()
         except Exception as e:
             raise e
 
@@ -275,5 +278,9 @@ class CncMachineGerbil():
             try:
                 self._gerbil.soft_reset()
                 self._gerbil.disconnect()
+                # Clean up reference to allow reconnection
+                self._gerbil = None
             except Exception as e:
+                # Still clean up even if disconnect fails
+                self._gerbil = None
                 raise e

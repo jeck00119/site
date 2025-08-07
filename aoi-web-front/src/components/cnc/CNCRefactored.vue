@@ -51,10 +51,9 @@
       <div class="feedrate-section">
         <FeedrateState
           :axis-uid="axisUid"
-          :feedrate="selectedFeedrate"
           :connection-status="webSocketState"
-          @feedrate-changed="onFeedrateChanged"
-          @reconnect-requested="reconnectToWs"
+          @connect-requested="handleConnect"
+          @disconnect-requested="handleDisconnect"
         />
       </div>
 
@@ -62,7 +61,9 @@
       <div class="steps-section">
         <StepsControl
           :selected-steps="selectedSteps"
+          :feedrate="selectedFeedrate"
           @steps-changed="onStepsChanged"
+          @feedrate-changed="onFeedrateChanged"
         />
       </div>
 
@@ -155,8 +156,8 @@ export default {
     const router = useRouter();
 
     // Reactive state
-    const selectedFeedrate = ref(100);
-    const selectedSteps = ref(1);
+    const selectedFeedrate = ref(1500);
+    const selectedSteps = ref(100);
     const ugsTerminalHistory = ref("");
     const webSocketState = ref("Disconnected");
     
@@ -190,9 +191,6 @@ export default {
         store.dispatch("cnc/addPositionData", {
           uid: props.axisUid
         });
-
-        // Connect to WebSocket
-        await connectToWs();
 
         // Fetch locations
         await store.dispatch("cnc/fetchLocations", props.axisUid);
@@ -315,6 +313,11 @@ export default {
           handleConnectionError(msg);
           break;
 
+        case "connection_success":
+          addToConsole(`Connection Success: ${msg.message}`);
+          webSocketState.value = "Connected";
+          break;
+
         default:
           console.log("Unhandled WebSocket message:", msg);
       }
@@ -428,6 +431,43 @@ export default {
       ugsTerminalHistory.value = "";
     }
 
+    // Connection handling methods
+    async function handleConnect() {
+      try {
+        // First initialize the CNC in the backend service
+        await store.dispatch("cnc/initializeCNC", {
+          cncUid: props.axisUid
+        });
+        
+        // Then connect to WebSocket
+        await connectToWs();
+        
+        addToConsole("CNC initialization and connection completed");
+        
+      } catch (error) {
+        console.error("Failed to initialize and connect CNC:", error);
+        addToConsole(`Connection failed: ${error.message}`);
+      }
+    }
+
+    async function handleDisconnect() {
+      try {
+        // First disconnect WebSocket
+        await disconnectFromWs();
+        
+        // Then deinitialize the CNC in the backend service
+        await store.dispatch("cnc/deinitializeCNC", {
+          cncUid: props.axisUid
+        });
+        
+        addToConsole("CNC disconnection and deinitialization completed");
+        
+      } catch (error) {
+        console.error("Failed to disconnect and deinitialize CNC:", error);
+        addToConsole(`Disconnection failed: ${error.message}`);
+      }
+    }
+
     return {
       // State
       selectedFeedrate,
@@ -441,7 +481,11 @@ export default {
       pos,
       
       // Methods
+      connectToWs,
+      disconnectFromWs,
       reconnectToWs,
+      handleConnect,
+      handleDisconnect,
       handleSystemSettingsRedirect,
       closePortErrorDialog,
       

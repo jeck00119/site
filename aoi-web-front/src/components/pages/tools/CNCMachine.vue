@@ -1,10 +1,5 @@
 <template>
   <div class="page-container">
-    <div class="actions-header">
-      <button @click="initializeConnections" class="initialize-button">
-        Initialize All CNCs
-      </button>
-    </div>
     <div class="flex-container">
       <div class="cnc" v-for="cnc in cncList" :key="cnc.id">
         <cnc 
@@ -17,7 +12,7 @@
 </template>
 
 <script>
-import { computed, onMounted, onUnmounted } from 'vue';
+import { computed, onMounted, onUnmounted, watch } from 'vue';
 import { useStore } from 'vuex';
 
 import cnc from "../../cnc/CNCRefactored.vue";
@@ -34,11 +29,20 @@ export default {
         return store.getters["configurations/getCurrentConfiguration"];
     });
 
-    onMounted(()=>{
-      if(currentConfiguration.value)
-      {
-        store.dispatch("cnc/loadCNCs");
+    // Watch for configuration changes and load CNCs when available
+    watch(currentConfiguration, (newConfig) => {
+      if (newConfig) {
+        try {
+          store.dispatch("cnc/loadCNCs");
+        } catch (error) {
+          console.error("Failed to load CNCs:", error);
+        }
       }
+    }, { immediate: true });
+
+    onMounted(() => {
+      // Configuration should be loaded by the parent component
+      // We'll rely on the watcher to trigger CNC loading
     });
 
     onUnmounted(() => {
@@ -50,18 +54,8 @@ export default {
       }
     });
 
-    function initializeConnections() {
-      console.log("Attempting to initialize all CNCs...");
-      store.dispatch("cnc/initializeAllCNCs").catch(error => {
-        console.error("Failed to initialize CNCs:", error);
-        // Show user-friendly error message
-        alert(`Failed to initialize CNCs: ${error.message || error}`);
-      });
-    }
-
     return {
-      cncList: computed(()=>store.getters["cnc/getCNCs"]),
-      initializeConnections
+      cncList: computed(()=>store.getters["cnc/getCNCs"])
     };
   },
 };
@@ -73,44 +67,36 @@ export default {
   flex-direction: column;
   width: 100%;
   height: 100%;
+  overflow-y: auto;
 }
 
-.actions-header {
-  padding: 1rem;
-  background-color: #2c2c2c;
-  display: flex;
-  justify-content: center;
-  align-items: center;
+.page-container::-webkit-scrollbar {
+  width: 8px;
 }
 
-.initialize-button {
-  padding: 0.75rem 1.5rem;
-  font-size: 1rem;
-  font-weight: bold;
-  color: white;
-  background-color: #4CAF50;
-  border: none;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: background-color 0.3s ease;
+.page-container::-webkit-scrollbar-track {
+  background: rgba(255,255,255,0.05);
 }
 
-.initialize-button:hover {
-  background-color: #45a049;
+.page-container::-webkit-scrollbar-thumb {
+  background: rgba(224, 181, 102, 0.3);
+  border-radius: 4px;
 }
+
+.page-container::-webkit-scrollbar-thumb:hover {
+  background: rgba(224, 181, 102, 0.5);
+}
+
 
 .flex-container {
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: flex-start;
   width: 100%;
   flex-grow: 1;
-  overflow-y: auto;
+  overflow: visible;
   margin: 0;
-}
-
-.cnc-container::-webkit-scrollbar { 
-    display: none;
+  margin-left: -1rem;
 }
 
 .cnc {

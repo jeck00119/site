@@ -85,6 +85,7 @@ class Marlin:
         self.buffer_stash = []
         self.buffer_size_stash = 0
         self._current_line_nr_stash = 0
+        self._line_number = 1  # Marlin line numbering starts at 1
         self._poll_keep_alive = False
         self._iface_read_do = False
         self._thread_polling = None
@@ -149,7 +150,11 @@ class Marlin:
         self._thread_read_iface = threading.Thread(target=self._onread)
         self._thread_read_iface.name = "Marlin interface thread"
         self._thread_read_iface.start()
-        self._on_bootup()
+        # Wait for bootup message or timeout
+        time.sleep(1)
+        # Force bootup initialization if not already done
+        if not self.initialized:
+            self._on_bootup()
 
     def disconnect(self):
         if not self.is_connected(): return
@@ -160,26 +165,33 @@ class Marlin:
         self.gcode_parser_state_requested = True
         self.poll_stop()
         
-        # Stop the interface
-        try:
-            self._iface.stop()
-        except Exception as e:
-            self.logger.warning(f"{self.name}: Error stopping interface: {e}")
-        
         # Stop reading thread
         self.logger.debug("{}: Stopping reading thread...".format(self.name))
         self._iface_read_do = False
-        self._queue.put("dummy_msg_for_joining_thread")
+        
+        # Stop the interface (this will close the serial port and interrupt blocking reads)
+        try:
+            if self._iface:
+                self._iface.stop()
+        except Exception as e:
+            self.logger.warning(f"{self.name}: Error stopping interface: {e}")
+        
+        # Add dummy message to wake up any blocked queue.get() calls
+        try:
+            self._queue.put("dummy_msg_for_joining_thread")
+        except:
+            pass
         
         # Join with timeout to prevent hanging
-        try:
-            self._thread_read_iface.join(timeout=2.0)  # 2 second timeout
-            if self._thread_read_iface.is_alive():
-                self.logger.warning(f"{self.name}: Reading thread did not stop within timeout - forcing termination")
-            else:
-                self.logger.debug("{}: Reading thread successfully joined.".format(self.name))
-        except Exception as e:
-            self.logger.warning(f"{self.name}: Error joining reading thread: {e}")
+        if self._thread_read_iface:
+            try:
+                self._thread_read_iface.join(timeout=2.0)  # 2 second timeout
+                if self._thread_read_iface.is_alive():
+                    self.logger.warning(f"{self.name}: Reading thread did not stop within timeout")
+                else:
+                    self.logger.debug("{}: Reading thread successfully joined.".format(self.name))
+            except Exception as e:
+                self.logger.warning(f"{self.name}: Error joining reading thread: {e}")
         
         # Also need to stop the polling thread with timeout
         if self._thread_polling and self._thread_polling.is_alive():
@@ -192,6 +204,7 @@ class Marlin:
             
         self.logger.info("{}: Disconnect completed.".format(self.name))
         self.connected = False
+        self.initialized = False  # Reset initialization flag
         self._iface = None
         self.callback("on_disconnected")
 
@@ -199,7 +212,7 @@ class Marlin:
         self.callback = callback
 
     def soft_reset(self):
-        self._iface.write("M999\n")
+        self._iface_write("M999")
         self.update_preprocessor_position()
 
     def abort(self):
@@ -211,19 +224,19 @@ class Marlin:
         self._streaming_src_end_reached = True
         self._set_streaming_complete(True)
         self._set_job_finished(True)
-        self._iface_write("M112\n")
+        self._iface_write("M112")
 
     def hold(self):
         if not self.is_connected(): return
-        self._iface_write("!\n")
+        self._iface_write("!")
 
     def resume(self):
         if not self.is_connected(): return
-        self._iface_write("~\n")
+        self._iface_write("~")
 
     def home(self):
         self.is_homing = True
-        self._iface_write("G28\n")
+        self._iface_write("G28")
 
     def poll_start(self):
         if not self.is_connected(): return
@@ -282,15 +295,18 @@ class Marlin:
         self.preprocessor.tidy()
         self.preprocessor.parse_state()
         self.preprocessor.override_feed()
-        self._iface_write(self.preprocessor.line + "\n")
+        self._iface_write(self.preprocessor.line)
 
     def stream(self, lines):
-        # For single line terminal commands, send directly instead of buffering
+        # For simple single-line commands, use direct sending to avoid preprocessor issues
         if isinstance(lines, str) and '\n' not in lines.strip():
-            self.logger.debug(f"Sending terminal command directly: {lines}")
-            self._iface_write(lines.strip() + "\n")
-            return
+            simple_commands = ['M17', 'M18', 'M503', 'M110', 'M999', 'G28', 'G90', 'G91', 'G0 ', 'G1 ']
+            if any(lines.strip().startswith(cmd) for cmd in simple_commands):
+                self.logger.debug(f"Sending simple command directly: {lines}")
+                self._iface_write(lines.strip())
+                return
         
+        # For complex commands or multi-line, use buffering and streaming
         self._load_lines_into_buffer(lines)
         self.job_run()
 
@@ -339,7 +355,7 @@ class Marlin:
             self._current_line_nr = linenr
 
     def request_settings(self):
-        self._iface_write("M503\n")
+        self._iface_write("M503")
 
     def update_preprocessor_position(self):
         self.preprocessor.position_m = list(self.current_position)
@@ -392,6 +408,7 @@ class Marlin:
     def _set_next_line(self, send_comments=False):
         if self._current_line_nr < self.buffer_size:
             line = self.buffer[self._current_line_nr].strip()
+            print(f"[MARLIN DEBUG] Setting next line from buffer: '{line}'")
             self.preprocessor.set_line(line)
             self.preprocessor.substitute_vars()
             self.preprocessor.parse_state()
@@ -401,6 +418,7 @@ class Marlin:
                 self._current_line = self.preprocessor.line + self.preprocessor.comment
             else:
                 self._current_line = self.preprocessor.line
+            print(f"[MARLIN DEBUG] After preprocessing: '{self._current_line}'")
             self._current_line_sent = False
             self._current_line_nr += 1
             self.preprocessor.done()
@@ -413,7 +431,8 @@ class Marlin:
         self._rx_buffer_fill.append(line_length)
         self._rx_buffer_backlog.append(self._current_line)
         self._rx_buffer_backlog_line_number.append(self._current_line_nr)
-        self._iface_write(self._current_line + "\n")
+        print(f"[MARLIN DEBUG] Sending buffer line: '{self._current_line}'")
+        self._iface_write(self._current_line)
         self._current_line_sent = True
         
         # Only set to Jog mode for actual movement commands, not status queries
@@ -438,7 +457,33 @@ class Marlin:
 
     def _iface_write(self, line):
         if self._iface:
-            self._iface.write(line)
+            # Add line numbering and checksum for Marlin protocol
+            formatted_line = self._format_line_with_checksum(line.strip())
+            print(f"[MARLIN DEBUG] Sending: {repr(formatted_line)}")
+            self._iface.write(formatted_line)
+
+    def _format_line_with_checksum(self, line):
+        """Format a line with Marlin line number and checksum"""
+        # Skip line numbering for emergency/immediate commands and line number reset
+        skip_numbering_commands = ['?', 'M112', '!', '~', '\x18', 'M999', 'M110']
+        
+        if any(line.startswith(cmd) for cmd in skip_numbering_commands):
+            return line + '\n'
+        
+        # Format: N<line_number> <command> *<checksum>
+        line_with_number = f"N{self._line_number} {line}"
+        checksum = self._calculate_checksum(line_with_number)
+        formatted = f"{line_with_number}*{checksum}\n"
+        
+        self._line_number += 1
+        return formatted
+
+    def _calculate_checksum(self, line):
+        """Calculate checksum for Marlin protocol"""
+        checksum = 0
+        for char in line:
+            checksum ^= ord(char)
+        return checksum & 0xFF
 
     def _onread(self):
         while self._iface_read_do:
@@ -459,12 +504,40 @@ class Marlin:
                 elif line.startswith("Error:"):
                     self._error = True
                     self.current_mode = "Error"
+                    
+                    # Handle line number errors by resetting line counter
+                    if "Line Number is not Last Line Number+1" in line:
+                        # Extract the expected line number from error message
+                        match = re.search(r'Last Line: (\d+)', line)
+                        if match:
+                            expected_line = int(match.group(1)) + 1
+                            self.logger.warning(f"Resetting line number from {self._line_number} to {expected_line}")
+                            self._line_number = expected_line
+                    elif "checksum mismatch" in line:
+                        # Handle checksum errors by resetting line counter
+                        match = re.search(r'Last Line: (\d+)', line)
+                        if match:
+                            expected_line = int(match.group(1)) + 1
+                            self.logger.warning(f"Checksum error - resetting line number from {self._line_number} to {expected_line}")
+                            self._line_number = expected_line
+                    
                     self.callback("on_stateupdate", self.current_mode, self.current_position,
                                   self.current_work_position)
                     self.callback("on_read", line)
                     self.callback("on_error", line, "", 0)
+                elif line.startswith("Resend:"):
+                    # Handle resend requests by adjusting line number
+                    match = re.search(r'Resend: (\d+)', line)
+                    if match:
+                        resend_line = int(match.group(1))
+                        self.logger.warning(f"Resend requested for line {resend_line}, adjusting from {self._line_number}")
+                        self._line_number = resend_line
+                    self.callback("on_read", line)
                 elif "Marlin" in line:
                     self.callback("on_read", line)
+                    # Initialize Marlin protocol when we detect bootup
+                    if not self.initialized:
+                        self._on_bootup()
                     self.hash_state_requested = True
                     self.request_settings()
                     self.gcode_parser_state_requested = True
@@ -503,6 +576,11 @@ class Marlin:
         self.initialized = True
         self.connected = True
         self.logger.debug("{}: Marlin has booted!".format(self.name))
+        
+        # Send M110 to reset line numbering to ensure sync
+        self._iface_write("M110 N0")
+        self._line_number = 1
+        
         self.callback("on_boot")
         self.poll_start()
 
@@ -601,6 +679,7 @@ class Marlin:
         # Reset position tracking to avoid false movement detection on first position report
         self._last_position = None
         self._last_work_position = None
+        self._line_number = 1  # Reset line numbering on boot
         self.preprocessor.reset()
 
     def _clear_queue(self):
@@ -613,8 +692,8 @@ class Marlin:
     def _poll_state(self):
         while self._poll_keep_alive:
             try:
-                # Send M114 R for real-time position reporting
-                self._iface_write("M114 R\n")
+                # Send M114 R for real-time position reporting  
+                self._iface_write("M114 R")
             except:
                 traceback.print_exc()
                 break
@@ -622,7 +701,7 @@ class Marlin:
         self.logger.debug("{}: Polling has been stopped".format(self.name))
 
     def _get_state(self):
-        self._iface_write("?\n")
+        self._iface_write("?")
 
     def _set_streaming_src_end_reached(self, a):
         self._streaming_src_end_reached = a
@@ -635,9 +714,11 @@ class Marlin:
             self.callback("on_job_completed")
 
     def _load_line_into_buffer(self, line):
+        print(f"[MARLIN DEBUG] Processing line: '{line}'")
         self.preprocessor.set_line(line)
         split_lines = self.preprocessor.split_lines()
         for l1 in split_lines:
+            print(f"[MARLIN DEBUG] Split line: '{l1}'")
             self.preprocessor.set_line(l1)
             self.preprocessor.strip()
             self.preprocessor.tidy()
@@ -645,11 +726,13 @@ class Marlin:
             self.preprocessor.find_vars()
             fractionized_lines = self.preprocessor.fractionize()
             for l2 in fractionized_lines:
+                print(f"[MARLIN DEBUG] Final processed line: '{l2}'")
                 self.buffer.append(l2)
                 self.buffer_size += 1
             self.preprocessor.done()
 
     def _load_lines_into_buffer(self, string):
+        print(f"[MARLIN DEBUG] Loading into buffer: '{string}'")
         lines = string.split("\n")
         for line in lines:
             self._load_line_into_buffer(line)

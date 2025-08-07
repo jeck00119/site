@@ -173,26 +173,42 @@ class Gerbil:
         self.gcode_parser_state_requested = True
         self.poll_stop()
         
-        # Stop the interface
-        try:
-            self._iface.stop()
-        except Exception as e:
-            self.logger.warning(f"{self.name}: Error stopping interface: {e}")
-        
         # Stop reading thread
         self.logger.debug("{}: Stopping reading thread...".format(self.name))
         self._iface_read_do = False
-        self._queue.put("dummy_msg_for_joining_thread")
+        
+        # Stop the interface (this will close the serial port and interrupt blocking reads)
+        try:
+            if self._iface:
+                self._iface.stop()
+        except Exception as e:
+            self.logger.warning(f"{self.name}: Error stopping interface: {e}")
+        
+        # Add dummy message to wake up any blocked queue.get() calls
+        try:
+            self._queue.put("dummy_msg_for_joining_thread")
+        except:
+            pass
         
         # Join with timeout to prevent hanging
-        try:
-            self._thread_read_iface.join(timeout=2.0)  # 2 second timeout
-            if self._thread_read_iface.is_alive():
-                self.logger.warning(f"{self.name}: Reading thread did not stop within timeout")
-            else:
-                self.logger.debug("{}: Reading thread successfully joined.".format(self.name))
-        except Exception as e:
-            self.logger.warning(f"{self.name}: Error joining reading thread: {e}")
+        if self._thread_read_iface:
+            try:
+                self._thread_read_iface.join(timeout=2.0)  # 2 second timeout
+                if self._thread_read_iface.is_alive():
+                    self.logger.warning(f"{self.name}: Reading thread did not stop within timeout")
+                else:
+                    self.logger.debug("{}: Reading thread successfully joined.".format(self.name))
+            except Exception as e:
+                self.logger.warning(f"{self.name}: Error joining reading thread: {e}")
+        
+        # Also need to stop the polling thread with timeout
+        if self._thread_polling and self._thread_polling.is_alive():
+            try:
+                self._thread_polling.join(timeout=1.0)  # 1 second timeout
+                if self._thread_polling.is_alive():
+                    self.logger.warning(f"{self.name}: Polling thread did not stop within timeout")
+            except Exception as e:
+                self.logger.warning(f"{self.name}: Error joining polling thread: {e}")
             
         self.logger.info("{}: Disconnect completed.".format(self.name))
         self.connected = False
