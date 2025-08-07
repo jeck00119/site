@@ -38,7 +38,7 @@ shortuuid
 # Security and Authentication
 python-jose[cryptography]
 passlib[bcrypt]
-bcrypt>=4.0.0
+bcrypt<4.1.0  # Pin to avoid passlib compatibility issues
 PyJWT>=2.8.0
 
 # Computer Vision Libraries
@@ -79,3 +79,6 @@ pypylon  # Basler cameras
 pytest>=7.0.0
 pytest-asyncio
 requests  # For testing HTTP endpoints
+
+# Pin setuptools to avoid pkg_resources deprecation warnings
+setuptools<70.0.0

@@ -41,13 +41,8 @@ echo.
 
 REM Start the backend server
 python main.py
-if errorlevel 1 (
-    echo.
-    echo Backend failed to start!
-    echo Please check the errors above.
-    pause
-    exit /b 1
-)
+REM Don't check errorlevel for python main.py since Ctrl+C is normal termination
+REM The server runs until stopped by user
 echo.
 echo Backend server stopped.
 pause

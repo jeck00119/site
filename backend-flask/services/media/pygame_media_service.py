@@ -5,6 +5,8 @@ import time
 import threading
 from datetime import datetime
 
+# Suppress pygame welcome message
+os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = '1'
 import pygame
 
 from services.media.media import Media
@@ -16,13 +18,15 @@ class PygameMediaService(metaclass=Singleton):
     def __init__(self):
         self.app_logger = None  # Will be set after ServiceManager initializes
         
+        # Simple audio initialization - if it fails, disable audio
         try:
             pygame.mixer.init()
-            print(" Pygame mixer initialized successfully")
+            self.audio_available = True
+            print(" Audio service initialized successfully")
         except pygame.error as e:
-            error_msg = f"Failed to initialize pygame mixer: {e}"
-            print(f" {error_msg}")
-            raise RuntimeError(f"Audio system initialization failed: {e}")
+            self.audio_available = False
+            print(" Audio service disabled (no audio devices available)")
+            # Don't raise an exception, just disable audio functionality
             
         self.repository = None
         self.sound_path = ''
@@ -101,6 +105,10 @@ class PygameMediaService(metaclass=Singleton):
             return False
 
     def add_new_channel(self):
+        if not self.audio_available:
+            self._log_event("WARNING", "Audio Not Available", "Cannot add audio channel - audio system not initialized")
+            return
+            
         channel_id = len(self.channels)
         # Set the number of channels if needed
         if channel_id >= pygame.mixer.get_num_channels():
@@ -120,6 +128,10 @@ class PygameMediaService(metaclass=Singleton):
         del self.channels[channel_index]
 
     def register_media_on_channel(self, media_name: str, channel: int):
+        if not self.audio_available:
+            self._log_event("WARNING", "Audio Not Available", f"Cannot register media - audio system not initialized")
+            return False
+            
         try:
             if channel >= len(self.channels):
                 self._log_event("ERROR", "Invalid Channel", f"Invalid channel index: {channel}")
@@ -129,7 +141,8 @@ class PygameMediaService(metaclass=Singleton):
             
             if not os.path.exists(sound_path):
                 self._log_event("ERROR", "Sound File Not Found", f"Sound file not found: {sound_path}")
-                self.channel_sounds[channel] = None
+                if channel < len(self.channel_sounds):
+                    self.channel_sounds[channel] = None
                 return False
                 
             self.channel_sounds[channel] = pygame.mixer.Sound(sound_path)
@@ -138,11 +151,13 @@ class PygameMediaService(metaclass=Singleton):
             return True
         except pygame.error as e:
             self._log_event("ERROR", "Sound Load Failed", f"Failed to load sound {media_name}: {e}")
-            self.channel_sounds[channel] = None
+            if channel < len(self.channel_sounds):
+                self.channel_sounds[channel] = None
             return False
         except Exception as e:
             self._log_event("ERROR", "Media Registration Error", f"Unexpected error registering media {media_name}: {e}")
-            self.channel_sounds[channel] = None
+            if channel < len(self.channel_sounds):
+                self.channel_sounds[channel] = None
             return False
 
     def put_media_in_queue(self, media_name: str, channel: int, priority: int):
@@ -150,6 +165,10 @@ class PygameMediaService(metaclass=Singleton):
         self.priorityQueue.put((priority, audio))
 
     def play_media(self, channel: int):
+        if not self.audio_available:
+            # Silently return success to avoid breaking the application
+            return True
+            
         try:
             if channel >= len(self.channels):
                 self._log_event("ERROR", "Invalid Channel", f"Invalid channel index: {channel}")
@@ -228,22 +247,25 @@ class PygameMediaService(metaclass=Singleton):
         try:
             self._log_event("INFO", "Audio Service Shutdown", "Shutting down audio service...")
             print(" Shutting down audio service...")
-            channels_number = self.get_number_of_channels()
-
-            for i in range(channels_number):
-                try:
-                    self.stop_media_on_channel(channel=i)
-                except Exception as e:
-                    self._log_event("ERROR", "Channel Stop Error", f"Error stopping channel {i}: {e}")
-
-            self.channels.clear()
-            self.channel_sounds.clear()
-            self.channel_states.clear()
-            self.channel_volumes.clear()
-            self.channel_positions.clear()
-            self.channel_loops.clear()
             
-            pygame.mixer.quit()
+            if self.audio_available:
+                channels_number = self.get_number_of_channels()
+
+                for i in range(channels_number):
+                    try:
+                        self.stop_media_on_channel(channel=i)
+                    except Exception as e:
+                        self._log_event("ERROR", "Channel Stop Error", f"Error stopping channel {i}: {e}")
+
+                self.channels.clear()
+                self.channel_sounds.clear()
+                self.channel_states.clear()
+                self.channel_volumes.clear()
+                self.channel_positions.clear()
+                self.channel_loops.clear()
+                
+                pygame.mixer.quit()
+            
             self._log_event("INFO", "Audio Service Shutdown", "Audio service shut down successfully")
             print(" Audio service shut down successfully")
         except Exception as e:

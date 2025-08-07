@@ -4,6 +4,31 @@ import { handleApiError, getAuthErrorMessage } from "../../utils/errorHandler.js
 import { uuid } from "vue3-uuid";
 
 let timer;
+let expirationCheckInterval;
+
+// Function to start periodic token expiration check
+function startExpirationCheck(context) {
+    // Clear any existing interval
+    if (expirationCheckInterval) {
+        clearInterval(expirationCheckInterval);
+    }
+    
+    // Check token expiration every 5 seconds
+    expirationCheckInterval = setInterval(() => {
+        const tokenExpiration = sessionStorage.getItem('expiration-date');
+        if (tokenExpiration) {
+            const expiresIn = +tokenExpiration - new Date().getTime();
+            if (expiresIn <= 0) {
+                console.warn('Token expired - auto-logout triggered by periodic check');
+                context.dispatch('autoLogout');
+                clearInterval(expirationCheckInterval);
+            }
+        } else {
+            // No expiration date found, stop checking
+            clearInterval(expirationCheckInterval);
+        }
+    }, 5000); // Check every 5 seconds
+}
 
 export default {
     async loadUsers(context) {
@@ -99,6 +124,9 @@ export default {
                         level: userLevel
                     }
                 });
+
+                // Start periodic expiration check
+                startExpirationCheck(context);
             }
         } catch (error) {
             console.error('Failed to add user:', error);
@@ -152,6 +180,9 @@ export default {
                         level: userLevel
                     }
                 });
+
+                // Start periodic expiration check
+                startExpirationCheck(context);
             }
         } catch (error) {
             console.error('Failed to login:', error);
@@ -171,6 +202,7 @@ export default {
         sessionStorage.removeItem('level');
 
         clearTimeout(timer);
+        clearInterval(expirationCheckInterval);
 
         context.commit('logout');
     },
@@ -204,6 +236,9 @@ export default {
                     level: userLevel
                 }
             });
+
+            // Start periodic expiration check for existing sessions
+            startExpirationCheck(context);
         }
     }
 }

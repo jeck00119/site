@@ -3,6 +3,7 @@ import re
 from typing import List, Dict, Optional, Any
 
 from src.metaclasses.singleton import Singleton
+from src.platform_utils import PlatformDetector
 
 
 class UnifiedUSBManager(metaclass=Singleton):
@@ -234,15 +235,15 @@ class UnifiedUSBManager(metaclass=Singleton):
         return port.startswith('/dev/cu.') or port.startswith('/dev/tty.')
 
     def get_current_platform(self) -> str:
-        """Get current platform identifier."""
-        import platform
-        system = platform.system().lower()
-        if system == 'windows':
+        """Get current platform identifier using centralized platform detection."""
+        if PlatformDetector.is_windows():
             return 'windows'
-        elif system == 'darwin':
+        elif PlatformDetector.is_macos():
             return 'macos'
-        else:
+        elif PlatformDetector.is_linux():
             return 'linux'
+        else:
+            return 'unknown'
 
     async def validate_port_compatibility(self, port: str) -> Dict[str, Any]:
         """

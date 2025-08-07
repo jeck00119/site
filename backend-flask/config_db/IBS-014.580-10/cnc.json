@@ -1,10 +1,16 @@
 {
     "cnc": {
-        "3": {
-            "name": "Marlin_Top",
-            "port": "/dev/ttyACM0",
+        "1": {
+            "name": "Marlin_Top_Windows",
+            "port": "COM10 (STMicroelectronics)",
             "type": "Marlin",
-            "uid": "158709d1-8b1c-4bed-beca-ca80e7ec0bfe"
+            "uid": "8a84a38d-1587-4705-b6f5-801abafa330d"
+        },
+        "3": {
+            "name": "sdadsad",
+            "port": "COM11 (USB Serial Device)",
+            "type": "GRBL",
+            "uid": "df4693a8-fe7f-44b1-8f2e-271c39ae9a6c"
         }
     }
 }

@@ -325,7 +325,6 @@ export default {
 
 .save-grid {
   color: white;
-  background-color: #161616;
   justify-content: space-evenly;
   align-items: center;
   display: flex;
@@ -333,14 +332,15 @@ export default {
   width: 100%;
   height: 100%;
   border-radius: 8px;
-  padding: 1rem;
+  padding: 0.5rem;
 }
 
 .action-general {
   display: flex;
   width: 100%;
   justify-content: space-around;
-  margin-bottom: 1rem;
+  margin-bottom: 0.5rem;
+  gap: 0.5rem;
 }
 
 .action-axis {
@@ -348,13 +348,14 @@ export default {
   display: flex;
   flex-wrap: wrap;
   justify-content: space-around;
+  gap: 0.3rem;
 }
 
 .button-save {
   background: rgb(41, 41, 41);
   color: #ffffff;
-  width: 40%;
-  height: 50px;
+  width: 45%;
+  height: 60px;
   margin-bottom: 2%;
   border-radius: 8px;
   box-shadow: rgb(41, 41, 41) 0 3px 5px -3px;
@@ -362,6 +363,10 @@ export default {
   cursor: pointer;
   border: 0;
   transition: all 0.2s ease;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .button-save:hover {
@@ -376,17 +381,26 @@ export default {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 0.25rem;
+  gap: 0.2rem;
   height: 100%;
+  width: 100%;
 }
 
 .button-icon {
-  font-size: 1.2rem;
+  font-size: 1.4rem;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .button-text {
-  font-size: 0.8rem;
+  font-size: 0.7rem;
   font-weight: bold;
+  text-align: center;
+  line-height: 1;
+  display: block;
+  width: 100%;
 }
 
 .dialog-content {

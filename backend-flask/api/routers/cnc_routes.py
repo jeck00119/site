@@ -115,7 +115,7 @@ async def post_cncs(
         cnc_models = []
         for cnc in cnc_data.cnc_list:
             cnc_models.append(CncModel(**cnc))
-        add, update, delete = cnc_service.update_cncs(cnc_models)
+        add, update, delete = cnc_service.save_cnc_configurations(cnc_models)
         for cnc_model in cnc_models:
             if cnc_model.uid in add:
                 cnc_repository.create(cnc_model)
@@ -378,12 +378,18 @@ async def ws_cnc(
         
         # Send initial connection status
         if cnc_info.get('is_mock', False):
+            connection_error = cnc_info.get('connection_error', 'Unknown connection error')
+            is_cross_platform_issue = connection_error.startswith('Cross-platform:')
+            
             await websocket.send_json({
                 'event': 'connection_error',
                 'message': f'CNC {cnc_info.get("name", cnc_uid)} is not connected',
-                'error': cnc_info.get('connection_error', 'Unknown connection error'),
+                'error': connection_error,
                 'port': cnc_info.get('port', 'Unknown'),
-                'type': cnc_info.get('type', 'Unknown')
+                'type': cnc_info.get('type', 'Unknown'),
+                'name': cnc_info.get('name', cnc_uid),
+                'is_cross_platform_issue': is_cross_platform_issue,
+                'cnc_uid': cnc_uid
             })
         else:
             await websocket.send_json({

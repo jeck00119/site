@@ -216,14 +216,13 @@ export default {
 <style scoped>
 .locations-grid {
   color: white;
-  background-color: #161616;
   justify-content: center;
   align-items: center;
   display: flex;
   flex-direction: column;
   justify-content: space-around;
   border-radius: 8px;
-  padding: 1rem;
+  padding: 0.5rem;
 }
 
 .title {
@@ -245,7 +244,8 @@ export default {
 
 .flex-row {
   display: flex;
-  gap: 0.5rem;
+  gap: 0.3rem;
+  justify-content: space-between;
 }
 
 .button-wide {
@@ -277,8 +277,10 @@ export default {
   align-items: center;
   justify-content: center;
   text-align: center;
-  word-wrap: break-word;
+  white-space: nowrap;
   overflow: hidden;
+  text-overflow: ellipsis;
+  padding: 0.25rem;
 }
 
 .form-control-dialog {

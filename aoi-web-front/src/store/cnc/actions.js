@@ -71,15 +71,25 @@ export default {
         const cncs = context.getters.getCNCs;
         const token = context.rootGetters["auth/getToken"];
 
-        const { response } = await api.post('/cnc/save', { cnc_list: cncs }, {
-            "content-type": "application/json",
-            "Authorization": token
-        });
+        try {
+            const { response, data } = await api.post('/cnc/save', { cnc_list: cncs }, {
+                "content-type": "application/json",
+                "Authorization": token
+            });
 
-        if(!response.ok)
-        {
-            const error = new Error(`Failed to save CNCs!`);
-            throw error;
+            if(!response.ok) {
+                const errorMessage = data?.message || 'Failed to save CNCs - some CNCs may have connection issues';
+                console.warn('CNC Save Warning:', errorMessage);
+                // Don't throw error - allow operation to continue
+                // The individual CNC connection errors will be handled via WebSocket callbacks
+                return { success: false, message: errorMessage };
+            }
+            
+            return { success: true };
+        } catch (error) {
+            console.error('CNC Save Error:', error);
+            // Don't throw error - allow operation to continue gracefully
+            return { success: false, message: error.message || 'Failed to save CNCs' };
         }
     },
 

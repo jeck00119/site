@@ -168,6 +168,9 @@ export default {
   font-size: 1.2rem;
   margin: 1%;
   transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .button-down:hover,

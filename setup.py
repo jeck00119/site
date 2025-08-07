@@ -436,7 +436,7 @@ class AutoSetup:
         import sys
         
         print("\n" + "=" * 60)
-        print("🔧 BACKEND SETUP")
+        print("BACKEND SETUP")
         print("=" * 60)
         
         # Check if port 8000 is available before setting up
@@ -510,7 +510,7 @@ class AutoSetup:
         logs_dir = backend_dir / "logs"
         logs_dir.mkdir(exist_ok=True)
         
-        print("✅ Backend setup complete")
+        print("Backend setup complete!")
         return True
 
     def setup_frontend(self):
@@ -518,7 +518,7 @@ class AutoSetup:
         import subprocess
         
         print("\n" + "=" * 60)
-        print("🌐 FRONTEND SETUP")
+        print("FRONTEND SETUP")
         print("=" * 60)
         
         frontend_dir = Path("aoi-web-front")
@@ -575,8 +575,91 @@ class AutoSetup:
             print("WARNING: Could not install npm dependencies automatically")
             print("Please run manually: cd aoi-web-front && npm install")
             print("This is required before running the frontend server")
+            return False
         
-        print("✅ Frontend setup complete")
+        # Update npm packages to their latest compatible versions
+        print("\nUpdating npm packages to latest compatible versions...")
+        update_commands = []
+        if self.is_windows:
+            update_commands = [
+                ["npm.cmd", "update"],
+                ["npm", "update"],
+                ["cmd", "/c", "npm", "update"]
+            ]
+        else:
+            update_commands = [
+                ["npm", "update"]
+            ]
+        
+        for cmd in update_commands:
+            try:
+                success, output = self.run_command_with_progress(
+                    cmd,
+                    "Updating npm packages",
+                    cwd=frontend_dir,
+                    shell=False,
+                    show_output=False
+                )
+                if success:
+                    break
+            except:
+                continue
+        
+        # Fix any security vulnerabilities
+        print("\nChecking and fixing security vulnerabilities...")
+        audit_commands = []
+        if self.is_windows:
+            audit_commands = [
+                ["npm.cmd", "audit", "fix"],
+                ["npm", "audit", "fix"],
+                ["cmd", "/c", "npm", "audit", "fix"]
+            ]
+        else:
+            audit_commands = [
+                ["npm", "audit", "fix"]
+            ]
+        
+        for cmd in audit_commands:
+            try:
+                success, output = self.run_command_with_progress(
+                    cmd,
+                    "Fixing npm security vulnerabilities",
+                    cwd=frontend_dir,
+                    shell=False,
+                    show_output=False
+                )
+                if success:
+                    print("✓ Security vulnerabilities fixed (if any existed)")
+                    break
+            except:
+                continue
+        
+        # Run audit to show final status
+        print("\nChecking final security status...")
+        audit_check_commands = []
+        if self.is_windows:
+            audit_check_commands = [
+                ["npm.cmd", "audit"],
+                ["npm", "audit"],
+                ["cmd", "/c", "npm", "audit"]
+            ]
+        else:
+            audit_check_commands = [
+                ["npm", "audit"]
+            ]
+        
+        for cmd in audit_check_commands:
+            try:
+                success, output = self.run_command(cmd, shell=False, cwd=frontend_dir)
+                if "found 0 vulnerabilities" in output:
+                    print("✓ No security vulnerabilities found")
+                elif "vulnerability" in output.lower():
+                    print(f"ℹ Security status: {output}")
+                break
+            except:
+                continue
+        
+        print("Frontend setup complete!")
         return True
 
     def create_start_scripts(self):

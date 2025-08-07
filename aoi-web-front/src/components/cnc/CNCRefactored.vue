@@ -76,13 +76,47 @@
         />
       </div>
     </div>
+
+    <!-- Cross-platform Port Error Dialog -->
+    <base-dialog 
+      title="CNC Port Configuration Issue" 
+      :show="showPortErrorDialog" 
+      height="35vh" 
+      @close="closePortErrorDialog"
+    >
+      <template #default>
+        <div class="port-error-content">
+          <div class="error-icon">
+            <div class="warning-symbol">⚠️</div>
+          </div>
+          <div class="error-message">
+            <h3>Incompatible Port Detected</h3>
+            <p><strong>CNC:</strong> {{ portErrorData.cncName }} ({{ portErrorData.type }})</p>
+            <p><strong>Port:</strong> {{ portErrorData.port }}</p>
+            <div class="error-details">
+              <p>{{ portErrorData.error }}</p>
+            </div>
+            <p class="suggestion">Would you like to update the CNC configuration with a compatible port?</p>
+          </div>
+        </div>
+      </template>
+      <template #actions>
+        <div class="port-error-actions">
+          <base-button width="8vw" @click="closePortErrorDialog">Cancel</base-button>
+          <base-button width="10vw" mode="flat" @click="handleSystemSettingsRedirect">
+            Update CNC Settings
+          </base-button>
+        </div>
+      </template>
+    </base-dialog>
   </div>
 </template>
 
 <script>
 import { ref, onMounted, onUnmounted, computed } from "vue";
 import { useStore } from "vuex";
-import { ipAddress, port } from "../../url";
+import { useRouter } from "vue-router";
+import api from "../../utils/api.js";
 
 // Import child components
 import PositionDisplay from "./PositionDisplay.vue";
@@ -118,12 +152,17 @@ export default {
   },
   setup(props) {
     const store = useStore();
+    const router = useRouter();
 
     // Reactive state
     const selectedFeedrate = ref(100);
     const selectedSteps = ref(1);
     const ugsTerminalHistory = ref("");
     const webSocketState = ref("Disconnected");
+    
+    // Cross-platform port error dialog state
+    const showPortErrorDialog = ref(false);
+    const portErrorData = ref({});
 
     // WebSocket connection
     let socket = null;
@@ -153,7 +192,7 @@ export default {
         });
 
         // Connect to WebSocket
-        connectToWs();
+        await connectToWs();
 
         // Fetch locations
         await store.dispatch("cnc/fetchLocations", props.axisUid);
@@ -169,9 +208,10 @@ export default {
     }
 
     // WebSocket Management
-    function connectToWs() {
+    async function connectToWs() {
       try {
-        socket = new WebSocket(`ws://${ipAddress}:${port}/cnc/${props.axisUid}/ws`);
+        const wsUrl = await api.getFullUrl(`/cnc/${props.axisUid}/ws`);
+        socket = new WebSocket(wsUrl.replace('http:', 'ws:'));
 
         socket.addEventListener("open", onCncSocketOpen);
         socket.addEventListener("close", onCncSocketClose);
@@ -186,8 +226,8 @@ export default {
 
     function reconnectToWs() {
       disconnectFromWs();
-      setTimeout(() => {
-        connectToWs();
+      setTimeout(async () => {
+        await connectToWs();
       }, 1000);
     }
 
@@ -271,6 +311,10 @@ export default {
           addToConsole(`Error: ${msg.message}`);
           break;
 
+        case "connection_error":
+          handleConnectionError(msg);
+          break;
+
         default:
           console.log("Unhandled WebSocket message:", msg);
       }
@@ -310,6 +354,33 @@ export default {
     function addToConsole(message) {
       const timestamp = new Date().toLocaleTimeString();
       ugsTerminalHistory.value += `[${timestamp}] ${message}\n`;
+    }
+
+    function handleConnectionError(msg) {
+      // Log the connection error to console
+      addToConsole(`Connection Error: ${msg.message} - ${msg.error}`);
+      
+      // Show cross-platform port error dialog if applicable
+      if (msg.is_cross_platform_issue) {
+        portErrorData.value = {
+          cncName: msg.name,
+          port: msg.port,
+          type: msg.type,
+          error: msg.error.replace('Cross-platform: ', ''),
+          cncUid: msg.cnc_uid
+        };
+        showPortErrorDialog.value = true;
+      }
+    }
+
+    function handleSystemSettingsRedirect() {
+      router.push('/system-settings');
+      showPortErrorDialog.value = false;
+    }
+
+    function closePortErrorDialog() {
+      showPortErrorDialog.value = false;
+      portErrorData.value = {};
     }
 
     // Event Handlers for Child Components
@@ -363,12 +434,16 @@ export default {
       selectedSteps,
       ugsTerminalHistory,
       webSocketState,
+      showPortErrorDialog,
+      portErrorData,
       
       // Computed
       pos,
       
       // Methods
       reconnectToWs,
+      handleSystemSettingsRedirect,
+      closePortErrorDialog,
       
       // Event handlers
       onFeedrateChanged,
@@ -388,7 +463,7 @@ export default {
 
 <style scoped>
 .cnc-container {
-  margin: 1rem;
+  margin: 1rem 1rem;
   width: 100%;
   border-radius: 12px;
   box-shadow: 0 2px 8px black;
@@ -403,126 +478,185 @@ export default {
 
 .wrapper {
   display: grid;
-  grid-template-columns: repeat(16, 1fr);
-  grid-template-rows: repeat(8, 1fr);
   align-content: normal;
   gap: 5px;
   width: 100%;
-  min-height: 600px;
+  overflow: hidden;
 }
 
-/* Grid Layout */
+/* Grid Layout - Match original CNC.vue positioning */
 .positions-section {
   grid-column: 1/5;
   grid-row: 2/5;
+  color: white;
+  background-color: #161616;
+  border-radius: 8px;
+  overflow: hidden;
+  padding: 0.5rem;
 }
 
 .save-section {
   grid-column: 1;
   grid-row: 5/8;
+  color: white;
+  background-color: #161616;
+  border-radius: 8px;
+  overflow: hidden;
+  padding: 0.5rem;
 }
 
 .movement-section {
   grid-column: 2/5;
   grid-row: 5/8;
   display: flex;
+  gap: 5px;
 }
 
 .commands-section {
-  grid-column: 5/9;
+  grid-column: 5/10;
   grid-row: 2/5;
+  color: white;
+  background-color: #161616;
+  border-radius: 8px;
+  overflow: hidden;
+  padding: 0.5rem;
 }
 
 .shortcuts-section {
-  grid-column: 9/14;
+  grid-column: 10/15;
   grid-row: 5/8;
+  color: white;
+  background-color: #161616;
+  border-radius: 8px;
+  overflow: hidden;
+  padding: 0.5rem;
 }
 
 .feedrate-section {
-  grid-column: 9/14;
+  grid-column: 10/15;
   grid-row: 2/5;
+  color: white;
+  background-color: #161616;
+  border-radius: 8px;
+  overflow: hidden;
+  padding: 0.5rem;
 }
 
 .steps-section {
-  grid-column: 5/9;
+  grid-column: 5/10;
   grid-row: 5/8;
+  color: white;
+  background-color: #161616;
+  border-radius: 8px;
+  overflow: hidden;
+  padding: 0.5rem;
 }
 
 .terminal-section {
-  grid-column: 14/17;
+  grid-column: 15/18;
   grid-row: 2/8;
+  color: white;
+  background-color: #161616;
+  border-radius: 8px;
+  overflow: hidden;
+  padding: 0.5rem;
 }
 
-/* Responsive Design */
-@media (max-width: 1200px) {
-  .wrapper {
-    grid-template-columns: repeat(12, 1fr);
-    grid-template-rows: repeat(10, 1fr);
-  }
-  
-  .positions-section {
-    grid-column: 1/7;
-    grid-row: 1/3;
-  }
-  
-  .save-section {
-    grid-column: 7/9;
-    grid-row: 1/3;
-  }
-  
-  .movement-section {
-    grid-column: 9/13;
-    grid-row: 1/3;
-  }
-  
-  .commands-section {
-    grid-column: 1/7;
-    grid-row: 3/5;
+/* Responsive Design - Match original CNC.vue breakpoints */
+@media screen and (max-width: 1300px) {
+  .feedrate-section {
+    grid-column: 1/5;
+    grid-row: 8/11;
   }
   
   .shortcuts-section {
-    grid-column: 7/13;
-    grid-row: 3/5;
-  }
-  
-  .feedrate-section {
-    grid-column: 1/5;
-    grid-row: 5/7;
-  }
-  
-  .steps-section {
-    grid-column: 5/9;
-    grid-row: 5/7;
+    grid-column: 5/10;
+    grid-row: 8/11;
   }
   
   .terminal-section {
-    grid-column: 9/13;
-    grid-row: 5/10;
+    grid-column: 10/14;
+    grid-row: 2/11;
   }
 }
 
-@media (max-width: 768px) {
-  .wrapper {
-    grid-template-columns: 1fr;
-    grid-template-rows: auto;
-    gap: 1rem;
+@media screen and (max-width: 950px) {
+  .feedrate-section {
+    grid-column: 1/5;
+    grid-row: 8/11;
   }
   
-  .positions-section,
-  .save-section,
-  .movement-section,
-  .commands-section,
-  .shortcuts-section,
-  .feedrate-section,
-  .steps-section,
+  .shortcuts-section {
+    grid-column: 5/10;
+    grid-row: 8/11;
+  }
+  
   .terminal-section {
-    grid-column: 1;
-    grid-row: auto;
+    grid-column: 1/10;
+    grid-row: 11/12;
   }
-  
-  .cnc-container {
-    margin: 0.5rem;
-  }
+}
+
+/* Port Error Dialog Styles */
+.port-error-content {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  padding: 1rem;
+  color: white;
+}
+
+.error-icon {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.warning-symbol {
+  font-size: 2.5rem;
+  line-height: 1;
+}
+
+.error-message {
+  flex: 1;
+}
+
+.error-message h3 {
+  margin: 0 0 1rem 0;
+  color: #ff6b6b;
+  font-size: 1.2rem;
+}
+
+.error-message p {
+  margin: 0.5rem 0;
+  line-height: 1.4;
+}
+
+.error-details {
+  background-color: rgba(255, 107, 107, 0.1);
+  border-left: 3px solid #ff6b6b;
+  padding: 0.75rem;
+  margin: 1rem 0;
+  border-radius: 4px;
+}
+
+.error-details p {
+  margin: 0;
+  font-style: italic;
+}
+
+.suggestion {
+  font-weight: bold;
+  color: #ffd93d !important;
+}
+
+.port-error-actions {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  width: 100%;
+  padding: 0 1rem;
 }
 </style>
 

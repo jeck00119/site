@@ -83,7 +83,7 @@ def analyze_route_file(file_path: Path) -> dict:
     # Check for missing imports
     missing_imports = []
     if 'HTTPException' in content and 'from fastapi import' in content:
-        fastapi_import = re.search(r'from fastapi import ([^\\n]+)', content)
+        fastapi_import = re.search(r'from fastapi import ([^\n]+)', content)
         if fastapi_import and 'HTTPException' not in fastapi_import.group(1):
             missing_imports.append("HTTPException not in fastapi import")
     
@@ -154,11 +154,11 @@ def generate_migration_plan():
     print(f"Total issues found: {total_issues}")
     
     if needs_migration:
-        print("\\nFiles requiring migration:")
+        print("\nFiles requiring migration:")
         for file_name in needs_migration:
             print(f"  - {file_name}")
     
-    print("\\nRecommended migration steps:")
+    print("\nRecommended migration steps:")
     print("  1. Add centralized error handling imports")
     print("  2. Replace manual authentication checks with require_authentication() dependency")
     print("  3. Replace try-catch blocks with RouteHelper methods")
@@ -213,8 +213,8 @@ if __name__ == "__main__":
     # Show import template
     generate_import_template()
     
-    print("\\nAnalysis complete!")
-    print("\\nNext steps:")
+    print("\nAnalysis complete!")
+    print("\nNext steps:")
     print("   1. Review the issues identified above")
     print("   2. Use the import template to update route files")
     print("   3. Test each migrated route file")

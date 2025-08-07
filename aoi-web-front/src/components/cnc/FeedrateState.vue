@@ -136,20 +136,20 @@ export default {
 <style scoped>
 .feedrate-grid {
   color: white;
-  background-color: #161616;
   justify-content: space-around;
   align-items: center;
   display: flex;
   flex-direction: column;
   width: 100%;
   border-radius: 8px;
-  padding: 1rem;
+  padding: 0.5rem;
 }
 
 .state-wrapper {
   display: flex;
   width: 100%;
   margin-bottom: 1rem;
+  align-items: center;
 }
 
 .state {
@@ -157,18 +157,22 @@ export default {
   width: 70%;
   justify-content: flex-start;
   margin-left: 5%;
-  font-size: 1.5rem;
+  font-size: 1.2rem;
   font-weight: bold;
   align-items: center;
+  overflow: hidden;
+  white-space: nowrap;
 }
 
 .connection-status {
   display: flex;
-  width: 25%;
-  justify-content: space-around;
+  width: 30%;
+  justify-content: flex-end;
   align-items: center;
-  font-size: 0.7rem;
-  gap: 0.5rem;
+  font-size: 0.6rem;
+  gap: 0.2rem;
+  flex-shrink: 0;
+  overflow: hidden;
 }
 
 .button-websocket {
@@ -176,14 +180,21 @@ export default {
   color: white;
   border: none;
   border-radius: 4px;
-  padding: 0.25rem;
+  padding: 0.2rem;
   cursor: pointer;
   transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  font-size: 0.8rem;
 }
 
 .button-websocket:hover:not(:disabled) {
   background-color: rgb(61, 61, 61);
-  transform: scale(1.1);
+  transform: scale(1.05);
 }
 
 .button-websocket:disabled {

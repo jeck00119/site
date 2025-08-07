@@ -2,7 +2,7 @@
 title AOI Platform Launcher
 echo ================================================
 echo            AOI Platform Launcher
-echo         Industrial Vision & Automation
+echo         Industrial Vision ^& Automation
 echo ================================================
 echo.
 

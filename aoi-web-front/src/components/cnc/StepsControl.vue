@@ -140,13 +140,12 @@ export default {
 <style scoped>
 .steps-grid {
   color: white;
-  background-color: #161616;
   justify-content: space-around;
   align-items: center;
   display: flex;
   flex-direction: column;
   border-radius: 8px;
-  padding: 1rem;
+  padding: 0.5rem;
 }
 
 .title {

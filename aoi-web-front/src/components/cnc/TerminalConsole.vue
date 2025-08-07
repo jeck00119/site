@@ -222,11 +222,8 @@ export default {
 <style scoped>
 .terminal-grid {
   color: white;
-  background-color: #161616;
   display: flex;
   flex-direction: column;
-  border-radius: 8px;
-  padding: 1rem;
   height: 100%;
 }
 
@@ -248,7 +245,7 @@ export default {
 
 .terminal-output {
   background-color: black;
-  color: #00ff00;
+  color: white;
   width: 100%;
   height: 100%;
   border: none;

@@ -149,13 +149,14 @@ class ConfigurationService(metaclass=Singleton):
         self.stereo_calibration_repository.set_db(name)
         self.robot_positions_repository.set_db(name)
         
-        # CRITICAL FIX: Include users repository in configuration switching
-        # Users should be configuration-specific based on directory structure
-        from api.dependencies.services import get_service_by_type
-        from services.authentication.auth_service import AuthService
-        auth_service = get_service_by_type(AuthService)()
-        auth_service.users_repository.set_db(name)
-        print(f"[DEBUG] Users repository switched to configuration: {name}")
+        # FIXED: Users should remain global, not configuration-specific
+        # Removing user repository switching to prevent authentication issues
+        # Users database should always point to the main config_db directory
+        # from api.dependencies.services import get_service_by_type
+        # from services.authentication.auth_service import AuthService
+        # auth_service = get_service_by_type(AuthService)()
+        # auth_service.users_repository.set_db(name)  # REMOVED - causes users to disappear
+        print(f"[DEBUG] Configuration switched to: {name} (users remain global)")
 
     def reset_dbs(self):
         self.algorithms_repository.reset_db()

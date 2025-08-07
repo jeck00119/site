@@ -6,6 +6,52 @@ interface RequestResponse<T = any> {
     responseData: T;
 }
 
+// Global 401 handler
+function handle401Unauthorized(url: string) {
+    // Don't handle 401 for login/auth endpoints
+    if (url.includes('/auth/login') || url.includes('/auth/users') || url.includes('/auth/create_user')) {
+        return false; // Let the auth flow handle these
+    }
+    
+    console.warn('401 Unauthorized - Token expired, logging out automatically');
+    
+    // Clear session immediately
+    sessionStorage.removeItem('auth-token');
+    sessionStorage.removeItem('user');
+    sessionStorage.removeItem('expiration-date');
+    sessionStorage.removeItem('level');
+    
+    // Force redirect to login page
+    window.location.href = '/login';
+    
+    // Also dispatch logout action for state cleanup (non-blocking)
+    import('../store/index.js').then(({ default: store }) => {
+        store.dispatch('auth/logout').catch(() => {});
+    }).catch(() => {});
+    
+    return true; // Handled
+}
+
+// Enhanced response handler with 401 check
+async function handleResponse<T>(response: Response, url: string): Promise<RequestResponse<T>> {
+    // Check for 401 Unauthorized
+    if (response.status === 401) {
+        const handled = handle401Unauthorized(url);
+        if (handled) {
+            // Throw error to stop further processing
+            throw new Error('Unauthorized - Redirecting to login');
+        }
+        // For auth endpoints, let them handle the 401 themselves
+    }
+    
+    const responseData = await response.json();
+    
+    return {
+        response,
+        responseData
+    };
+}
+
 async function get<T = any>(url: string, headers?: Headers): Promise<RequestResponse<T>> {
     headers = headers ? headers : {
         'content-type': 'application/json'
@@ -17,12 +63,7 @@ async function get<T = any>(url: string, headers?: Headers): Promise<RequestResp
         signal: AbortSignal.timeout(10000) // 10 second timeout
     });
 
-    const responseData = await response.json();
-
-    return {
-        response,
-        responseData
-    }
+    return handleResponse<T>(response, url);
 }
 
 async function post<T = any>(url: string, payload?: any, headers?: Headers): Promise<RequestResponse<T>> {
@@ -37,12 +78,7 @@ async function post<T = any>(url: string, payload?: any, headers?: Headers): Pro
         signal: AbortSignal.timeout(15000) // 15 second timeout for POST requests
     });
 
-    const responseData = await response.json();
-
-    return {
-        response,
-        responseData
-    };
+    return handleResponse<T>(response, url);
 }
 
 async function postStream<T = any>(url: string, payload?: any, headers?: Headers): Promise<RequestResponse<T>> {
@@ -66,12 +102,7 @@ async function postStream<T = any>(url: string, payload?: any, headers?: Headers
             signal: AbortSignal.timeout(30000) // 30 second timeout for stream requests
         });
 
-        const responseData = await response.json();
-
-        return {
-            response,
-            responseData
-        };
+        return handleResponse<T>(response, url);
     } catch (error) {
         console.error('PostStream request failed:', error);
         throw error;
@@ -90,12 +121,7 @@ async function update<T = any>(url: string, payload?: any, headers?: Headers): P
         signal: AbortSignal.timeout(15000) // 15 second timeout for PUT requests
     });
 
-    const responseData = await response.json();
-
-    return {
-        response,
-        responseData
-    };
+    return handleResponse<T>(response, url);
 }
 
 async function remove<T = any>(url: string, headers?: Headers): Promise<RequestResponse<T>> {
@@ -109,12 +135,7 @@ async function remove<T = any>(url: string, headers?: Headers): Promise<RequestR
         signal: AbortSignal.timeout(10000) // 10 second timeout for DELETE requests
     });
 
-    const responseData = await response.json();
-
-    return {
-        response,
-        responseData
-    };
+    return handleResponse<T>(response, url);
 }
 
 async function patch(url: string, payload?: any, headers?: Headers): Promise<Response> {

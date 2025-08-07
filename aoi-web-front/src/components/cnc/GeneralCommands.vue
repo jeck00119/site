@@ -154,7 +154,6 @@ export default {
 <style scoped>
 .commands-grid {
   color: white;
-  background-color: #161616;
   display: flex;
   flex-direction: column;
   justify-content: space-around;
@@ -163,7 +162,7 @@ export default {
   height: 100%;
   margin: auto;
   border-radius: 8px;
-  padding: 1rem;
+  padding: 0.5rem;
 }
 
 .title {
@@ -185,7 +184,8 @@ export default {
 
 .flex-row {
   display: flex;
-  gap: 0.5rem;
+  gap: 0.3rem;
+  justify-content: space-between;
 }
 
 .button-wide {
@@ -217,7 +217,8 @@ export default {
 .command-button {
   width: 33%;
   height: 5vh;
-  min-height: 50px;
+  min-height: 60px;
+  overflow: hidden;
 }
 
 .button-container {
@@ -225,17 +226,23 @@ export default {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 0.25rem;
+  gap: 0.15rem;
   height: 100%;
+  padding: 0.3rem;
 }
 
 .button-icon {
   font-size: 1.2rem;
+  flex-shrink: 0;
 }
 
 .button-text {
   font-size: 0.7rem;
   font-weight: bold;
+  text-align: center;
+  line-height: 1.1;
+  display: block;
+  width: 100%;
 }
 </style>
 

@@ -72,11 +72,13 @@ class CncService(metaclass=Singleton):
         self.initialize_all_cncs()
 
     def initialize_all_cncs(self):
-        current_cnc_repo = CncRepository()
-        for cnc in current_cnc_repo.read_all():
+        cncs = self._cnc_repo.read_all()
+        self.logger.info(f"initialize_all_cncs: Found {len(cncs)} CNCs to initialize")
+        for cnc in cncs:
             try:
                 if cnc['uid'] not in self._callbacks_buffers:
                     self._callbacks_buffers[cnc['uid']] = deque(maxlen=20)
+                    self.logger.info(f"Initialized callback buffer for CNC {cnc['uid']}")
                 self._init_cnc(cnc['uid'])
             except Exception as e:
                 cnc_name = cnc.get("name", cnc.get("uid"))
@@ -102,7 +104,7 @@ class CncService(metaclass=Singleton):
         # Collect messages from the callback buffer
         messages_collected = []
         while self._callbacks_buffers.get(uid) and self._callbacks_buffers[uid]:
-            buffed = self._callbacks_buffers[uid].popleft()[0]
+            buffed = self._callbacks_buffers[uid].popleft()
             event = buffed[0]
             
             message = self._format_message(event, buffed, cnc_type)
@@ -164,6 +166,19 @@ class CncService(metaclass=Singleton):
             error_message = error_list.get(buffed[1], buffed[1])
             return {'event': event, "message": error_message}
 
+        elif event == "connection_error":
+            connection_error = buffed[1]
+            is_cross_platform_issue = buffed[2]
+            cnc_uid = buffed[3]
+            self.logger.info(f"Formatting connection_error message for CNC {cnc_uid}")
+            return {
+                'event': 'connection_error',
+                'message': f'CNC connection failed',
+                'error': connection_error,
+                'is_cross_platform_issue': is_cross_platform_issue,
+                'cnc_uid': cnc_uid
+            }
+
         elif event in ["on_job_completed", "on_movement", "on_standstill", "on_boot", "on_write", "on_feed_change"]:
             return {'event': event}
 
@@ -173,7 +188,7 @@ class CncService(metaclass=Singleton):
     
     def _has_priority_message(self, messages):
         """Check if batch contains priority messages that should be sent immediately"""
-        priority_events = ["on_error", "on_alarm", "on_job_completed", "on_boot"]
+        priority_events = ["on_error", "on_alarm", "on_job_completed", "on_boot", "connection_error"]
         return any(msg.get('event') in priority_events for msg in messages)
 
     def _get_cnc_type(self, uid):
@@ -183,7 +198,8 @@ class CncService(metaclass=Singleton):
         except Exception:
             return 'GRBL'
 
-    def update_cncs(self, cnc_models: list):
+    def update_cncs(self, cnc_models: list, initialize_connections=True):
+        """Update CNCs with option to skip connection initialization"""
         saved_cncs = self._cnc_repo.read_all()
         found_axis = {}
         for cnc in saved_cncs:
@@ -192,21 +208,38 @@ class CncService(metaclass=Singleton):
         update = []
         delete = []
         add = []
+        
         for cnc_model in cnc_models:
             if cnc_model.uid in saved_uids:
                 found_axis[cnc_model.uid] = True
-                if cnc_model.port != self._cnc_objects.get(cnc_model.uid, Mock()).get_port():
+                # Only check port changes and reinitialize if we're doing connection initialization
+                if initialize_connections and cnc_model.port != self._cnc_objects.get(cnc_model.uid, Mock()).get_port():
                     self._deinit_cnc(cnc_model.uid)
                     self._init_cnc_from_model(cnc_model)
                     update.append(cnc_model.uid)
+                elif initialize_connections:
+                    # CNC exists but we're initializing - make sure it's connected
+                    if cnc_model.uid not in self._cnc_objects:
+                        self._init_cnc_from_model(cnc_model)
+                        update.append(cnc_model.uid)
             else:
-                self._init_cnc_from_model(cnc_model)
+                # New CNC - only initialize connection if requested
+                if initialize_connections:
+                    self._init_cnc_from_model(cnc_model)
                 add.append(cnc_model.uid)
+                
         for axis_uid, found in found_axis.items():
             if not found:
-                self._deinit_cnc(axis_uid)
+                if initialize_connections:
+                    self._deinit_cnc(axis_uid)
                 delete.append(axis_uid)
+                
         return add, update, delete
+    
+    def save_cnc_configurations(self, cnc_models: list):
+        """Save CNC configurations without attempting connections"""
+        self.logger.info("Saving CNC configurations without initializing connections")
+        return self.update_cncs(cnc_models, initialize_connections=False)
 
     def _init_cnc_from_model(self, cnc_model):
         self._callbacks_buffers[cnc_model.uid] = deque(maxlen=100)
@@ -224,25 +257,118 @@ class CncService(metaclass=Singleton):
                 cnc_name=cnc_model.name,
                 callback=lambda *vars: self._callback(cnc_model.uid, vars)
             )
-        self._cnc_objects[cnc_model.uid].init()
+        
+        try:
+            self._cnc_objects[cnc_model.uid].init()
+        except SerialException as e:
+            # Check if this is a cross-platform port issue
+            try:
+                from services.port_manager.port_manager import UnifiedUSBManager
+                port_manager = UnifiedUSBManager()
+                
+                current_platform = port_manager.get_current_platform()
+                port = cnc_model.port
+                is_cross_platform_issue = False
+                
+                if current_platform == 'windows':
+                    if port.startswith('/dev/tty'):
+                        is_cross_platform_issue = True
+                elif current_platform in ['linux', 'macos']:
+                    if port.startswith('COM'):
+                        is_cross_platform_issue = True
+                
+                if is_cross_platform_issue:
+                    error_msg = f"Cross-platform: Port '{port}' is configured for {'Linux/macOS' if current_platform == 'windows' else 'Windows'} but you're running on {current_platform.title()}. Available ports can be found in the CNC settings."
+                    self.logger.warning(f"CNC {cnc_model.uid}: Cross-platform port issue - {error_msg}")
+                    # Send cross-platform error to UI
+                    self._callback(cnc_model.uid, ('connection_error', error_msg, True, cnc_model.uid))
+                else:
+                    self.logger.error(f"Could not connect to {port} - {str(e)}")
+                    # Send generic connection error to UI
+                    self._callback(cnc_model.uid, ('connection_error', f"Could not connect to {port}: {str(e)}", False, cnc_model.uid))
+                    
+            except Exception as validation_error:
+                self.logger.error(f"Error during port validation: {validation_error}")
+                self.logger.error(f"Could not connect to {cnc_model.port} - {str(e)}")
+                self._callback(cnc_model.uid, ('connection_error', f"Could not connect to {cnc_model.port}: {str(e)}", False, cnc_model.uid))
+            
+            # Remove failed CNC from objects but keep in callbacks for error reporting
+            if cnc_model.uid in self._cnc_objects:
+                del self._cnc_objects[cnc_model.uid]
+            
+            # Don't re-raise the exception - allow the save operation to continue for other CNCs
+            return
 
     def _init_cnc(self, uid):
         if uid not in self._cnc_objects.keys():
-            current_cnc_repo = CncRepository()
-            doc = current_cnc_repo.read_id(uid)
+            doc = self._cnc_repo.read_id(uid)
             cnc_model: CncModel = CncModel(**doc)
             try:
                 self._init_cnc_from_model(cnc_model)
             except SerialException as e:
-                error_msg = f"Serial connection failed: {e}"
-                self.logger.error(f"CNC {uid}: {error_msg}")
-                self._connection_errors[uid] = error_msg
+                # Check if this is a cross-platform port issue using existing validation
+                try:
+                    from services.port_manager.port_manager import UnifiedUSBManager
+                    port_manager = UnifiedUSBManager()
+                    
+                    # Use synchronous platform detection instead of async validation
+                    current_platform = port_manager.get_current_platform()
+                    port = cnc_model.port
+                    is_cross_platform_issue = False
+                    platform_msg = ""
+                    
+                    # Check for cross-platform port patterns
+                    if current_platform == 'windows' and (port.startswith('/dev/tty') or port.startswith('/dev/cu.')):
+                        is_cross_platform_issue = True
+                        platform_msg = f"Port '{port}' is configured for Linux/macOS but you're running on Windows"
+                    elif current_platform == 'linux' and port.upper().startswith('COM'):
+                        is_cross_platform_issue = True
+                        platform_msg = f"Port '{port}' is configured for Windows but you're running on Linux"
+                    elif current_platform == 'macos' and (port.upper().startswith('COM') or port.startswith('/dev/ttyACM')):
+                        is_cross_platform_issue = True
+                        platform_msg = f"Port '{port}' is configured for Windows/Linux but you're running on macOS"
+                    
+                    if is_cross_platform_issue:
+                        error_msg = f"{platform_msg}. Available ports can be found in the CNC settings."
+                        self.logger.error(f"CNC {uid}: Cross-platform port issue - {error_msg}")
+                        self._connection_errors[uid] = f"Cross-platform: {error_msg}"
+                    else:
+                        error_msg = f"Serial connection failed: {e}"
+                        self.logger.error(f"CNC {uid}: {error_msg}")
+                        self._connection_errors[uid] = error_msg
+                except Exception as validation_error:
+                    # Fallback to original error handling if validation fails
+                    self.logger.debug(f"Port validation failed: {validation_error}")
+                    error_msg = f"Serial connection failed: {e}"
+                    self.logger.error(f"CNC {uid}: {error_msg}")
+                    self._connection_errors[uid] = error_msg
+                
                 self._cnc_objects[uid] = Mock()
+                
+                # Send connection error through callback buffer so WebSocket can pick it up
+                if uid in self._callbacks_buffers:
+                    connection_error = self._connection_errors.get(uid, 'Unknown connection error')
+                    is_cross_platform_issue = connection_error.startswith('Cross-platform:')
+                    
+                    self.logger.info(f"Adding connection_error to callback buffer for CNC {uid}: {connection_error}")
+                    # Format as expected by callback buffer - match the normal callback pattern
+                    callback_data = ('connection_error', connection_error, is_cross_platform_issue, uid)
+                    self._callbacks_buffers[uid].append(callback_data)
             except Exception as e:
                 error_msg = f"Initialization failed: {e}"
                 self.logger.error(f"CNC {uid}: {error_msg}")
                 self._connection_errors[uid] = error_msg
                 self._cnc_objects[uid] = Mock()
+                
+                # Send connection error through callback buffer so WebSocket can pick it up
+                if uid in self._callbacks_buffers:
+                    connection_error = self._connection_errors.get(uid, 'Unknown connection error')
+                    is_cross_platform_issue = connection_error.startswith('Cross-platform:')
+                    
+                    self.logger.info(f"Adding connection_error to callback buffer for CNC {uid}: {connection_error}")
+                    # Format as expected by callback buffer - match the normal callback pattern
+                    callback_data = ('connection_error', connection_error, is_cross_platform_issue, uid)
+                    self._callbacks_buffers[uid].append(callback_data)
 
     def _deinit_cnc(self, uid):
         if uid not in self._cnc_objects.keys():

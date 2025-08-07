@@ -20,7 +20,7 @@
 import { computed, onMounted, onUnmounted } from 'vue';
 import { useStore } from 'vuex';
 
-import cnc from "../../cnc/CNC.vue";
+import cnc from "../../cnc/CNCRefactored.vue";
 
 export default {
   components: {

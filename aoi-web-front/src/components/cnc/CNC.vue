@@ -550,12 +550,14 @@
 <script>
 import { ref, onMounted, onUnmounted, computed } from "vue";
 import { useStore } from "vuex";
+import { useRouter } from "vue-router";
 import api from "../../utils/api.js";
 
 export default {
   props: ["axisName", "axisUid"],
   setup(props, context) {
     const store = useStore();
+    const router = useRouter();
 
     const selectedFeedrate = ref(100);
     const selectedSteps = ref(1);
@@ -569,6 +571,10 @@ export default {
     const showButtonLocationDialog = ref(false);
     const showSaveLocationDialog = ref(false);
     const showLocationDeleteDialog = ref(false);
+    
+    // Cross-platform port error dialog state
+    const showPortErrorDialog = ref(false);
+    const portErrorData = ref({});
 
     const selectedLocationForDelete = ref("");
     const selectedLocation = ref(null);
@@ -805,6 +811,10 @@ export default {
 
         case "on_error":
           ugsTerminalHistory.value += `Error:${msg.message}`;
+          break;
+
+        case "connection_error":
+          handleConnectionError(msg);
           break;
         }
     }

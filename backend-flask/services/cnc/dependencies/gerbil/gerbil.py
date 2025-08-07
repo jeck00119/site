@@ -467,10 +467,10 @@ class Gerbil:
                     self.callback("on_read", line)
                 elif line == "ok":
                     self._handle_ok()
-                elif re.match("^\[G[0123] .*", line):
+                elif re.match(r"^\[G[0123] .*", line):
                     self._update_gcode_parser_state(line)
                     self.callback("on_read", line)
-                elif re.match("^\[...:.*", line):
+                elif re.match(r"^\[...:.*", line):
                     self._update_hash_state(line)
                     self.callback("on_read", line)
                     if "PRB" in line:
@@ -504,7 +504,7 @@ class Gerbil:
                     self.request_settings()
                     self.gcode_parser_state_requested = True
                 else:
-                    m = re.match("\$(.*)=(.*)", line)
+                    m = re.match(r"\$(.*)=(.*)", line)
                     if m:
                         key = int(m.group(1))
                         val = m.group(2)
@@ -552,7 +552,7 @@ class Gerbil:
             self.settings_hash[key] = tuple(tpl)
 
     def _update_gcode_parser_state(self, line):
-        m = re.match("\[G(\d) G(\d\d) G(\d\d) G(\d\d) G(\d\d) G(\d\d) M(\d) M(\d) M(\d) T(\d) F([\d.-]*?) S([\d.-]*?)\]", line)
+        m = re.match(r"\[G(\d) G(\d\d) G(\d\d) G(\d\d) G(\d\d) G(\d\d) M(\d) M(\d) M(\d) T(\d) F([\d.-]*?) S([\d.-]*?)\]", line)
         if m:
             self.gps[0] = m.group(1)
             self.gps[1] = m.group(2)
@@ -580,7 +580,7 @@ class Gerbil:
                 line = line[:-1] + "|FS:0,0>"
         try:
             m = re.match(
-                "<([0-9A-z:]*)[|,]MPos:(-?\d+\.\d{3}),(-?\d+\.\d{3}),(-?\d+\.\d{3})[|,](?:Bf:-?\d+,-?\d+[|,])?FS:-?\d+,-?\d+[|,]?(?:Pn:[XYZPDHRS]+[|,]?)?(?:WCO:(-?\d+\.\d{3}),(-?\d+\.\d{3}),(-?\d+\.\d{3})[|,]?)?(?:Ov:(-?\d+),(-?\d+),(-?\d+)[|,]?)?(?:A:[SCFM]+)?>",
+                r"<([0-9A-z:]*)[|,]MPos:(-?\d+\.\d{3}),(-?\d+\.\d{3}),(-?\d+\.\d{3})[|,](?:Bf:-?\d+,-?\d+[|,])?FS:-?\d+,-?\d+[|,]?(?:Pn:[XYZPDHRS]+[|,]?)?(?:WCO:(-?\d+\.\d{3}),(-?\d+\.\d{3}),(-?\d+\.\d{3})[|,]?)?(?:Ov:(-?\d+),(-?\d+),(-?\d+)[|,]?)?(?:A:[SCFM]+)?>",
                 line)
             state = m.group(1)
             m_pos_x = m.group(2)

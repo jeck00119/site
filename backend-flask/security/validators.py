@@ -32,7 +32,7 @@ class SecurityValidator:
             "sql_injection": re.compile(r'(\b(SELECT|INSERT|UPDATE|DELETE|DROP|CREATE|ALTER|EXEC|UNION|SCRIPT)\b)', re.IGNORECASE),
             "xss": re.compile(r'<script[^>]*>.*?</script>', re.IGNORECASE | re.DOTALL),
             "path_traversal": re.compile(r'\.\.[\\/]'),
-            "command_injection": re.compile(r'[;&|`$(){}[\]<>]'),
+            "command_injection": re.compile(r'[;&|`$(){}\[\]<>]'),
         }
     
     def validate_input(self, value: Any, validation_type: str, **kwargs) -> bool:
