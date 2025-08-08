@@ -49,20 +49,27 @@ start_aoi_system.bat
 ## Project Structure
 
 ```
-AOI-Site/
-├── backend-flask/          # Python FastAPI backend
-│   ├── src/                # Core backend modules
-│   ├── services/           # Hardware integration services
-│   ├── requirements.txt    # Python dependencies
-│   └── main.py            # API entry point
-├── aoi-web-front/          # Vue.js + TypeScript frontend
-│   ├── src/               # Vue components and logic
-│   ├── package.json       # Node.js dependencies
-│   └── tsconfig.json      # TypeScript configuration
+site/
+├── backend-flask/          # FastAPI backend (despite the name)
+│   ├── api/               # API routes and endpoints
+│   ├── services/          # Business logic and hardware integration
+│   ├── config/            # Configuration management
+│   ├── security/          # Authentication and security
+│   ├── repo/              # Data access layer
+│   ├── requirements.txt   # Python dependencies
+│   └── main.py           # API entry point
+├── aoi-web-front/         # Vue.js 3 + TypeScript frontend
+│   ├── src/              # Vue components and store
+│   ├── package.json      # Node.js dependencies
+│   └── vite.config.ts    # Vite build configuration
+├── config_db/             # Product-specific configurations
 ├── venv/                  # Python virtual environment (auto-created)
-├── setup.py               # Cross-platform setup script
-└── start_*.bat/sh         # Launch scripts
+├── setup.py              # Cross-platform setup script
+├── PROJECT_STRUCTURE.md  # Detailed architecture documentation
+└── start_*.bat/sh        # Launch scripts
 ```
+
+For detailed architecture and module information, see [PROJECT_STRUCTURE.md](PROJECT_STRUCTURE.md).
 
 ## Configuration
 
