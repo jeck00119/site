@@ -119,6 +119,20 @@ import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import api from "../../utils/api.js";
 
+// Throttle utility for high-frequency updates
+function throttle(func, limit) {
+  let inThrottle;
+  return function() {
+    const args = arguments;
+    const context = this;
+    if (!inThrottle) {
+      func.apply(context, args);
+      inThrottle = true;
+      setTimeout(() => inThrottle = false, limit);
+    }
+  }
+}
+
 // Import child components
 import PositionDisplay from "./PositionDisplay.vue";
 import LocationManagement from "./LocationManagement.vue";
@@ -158,7 +172,8 @@ export default {
     // Reactive state
     const selectedFeedrate = ref(1500);
     const selectedSteps = ref(100);
-    const ugsTerminalHistory = ref("");
+    const terminalMessages = ref([]);
+    const ugsTerminalHistory = computed(() => terminalMessages.value.join('\n'));
     const webSocketState = ref("Disconnected");
     
     // Cross-platform port error dialog state
@@ -323,27 +338,17 @@ export default {
       }
     }
 
+    // Throttled position update to prevent excessive UI updates
+    const throttledPositionUpdate = throttle((data) => {
+      store.dispatch("cnc/updatePositionData", data);
+    }, 50); // Max 20 updates per second
+
     function handleStateUpdate(msg) {
-      store.dispatch("cnc/setMPos", {
+      // Use throttled updates for position data to improve performance
+      throttledPositionUpdate({
         uid: props.axisUid,
-        x: msg.mPos[0],
-        y: msg.mPos[1],
-        z: msg.mPos[2]
-      });
-
-      store.dispatch("cnc/setWPos", {
-        uid: props.axisUid,
-        x: msg.wPos[0],
-        y: msg.wPos[1],
-        z: msg.wPos[2]
-      });
-
-      store.dispatch("cnc/setPos", {
-        uid: props.axisUid
-      });
-
-      store.dispatch("cnc/setCNCState", {
-        uid: props.axisUid,
+        mPos: msg.mPos,
+        wPos: msg.wPos,
         state: msg.state
       });
     }
@@ -356,7 +361,12 @@ export default {
 
     function addToConsole(message) {
       const timestamp = new Date().toLocaleTimeString();
-      ugsTerminalHistory.value += `[${timestamp}] ${message}\n`;
+      terminalMessages.value.push(`[${timestamp}] ${message}`);
+      
+      // Prevent memory leak by limiting terminal history
+      if (terminalMessages.value.length > 1000) {
+        terminalMessages.value = terminalMessages.value.slice(-500);
+      }
     }
 
     function handleConnectionError(msg) {
@@ -428,7 +438,7 @@ export default {
     }
 
     function onTerminalCleared() {
-      ugsTerminalHistory.value = "";
+      terminalMessages.value = [];
     }
 
     // Connection handling methods

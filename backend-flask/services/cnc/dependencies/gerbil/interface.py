@@ -113,7 +113,7 @@ class Interface:
                     # Serial port is closed, break the loop
                     print(">>>> [INTERFACE] Serial port is closed, stopping read thread")
                     break
-                time.sleep(0.04)
+                time.sleep(0.01)  # Reduced from 40ms to 10ms for faster serial reading
             except (serial.SerialException, OSError) as e:
                 if not self._do_read:
                     # Expected exception when stopping

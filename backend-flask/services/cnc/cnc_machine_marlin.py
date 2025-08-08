@@ -154,6 +154,12 @@ class CncMachineMarlin(BaseCncMachine):
                 print(f"[MOVE_BY DEBUG] Using proper Marlin protocol")
                 print(f"[MOVE_BY DEBUG] Params: X={x} Y={y} Z={z} F={feed_rate}")
                 
+                # Immediately set state to Jog when starting movement
+                if self._marlin.current_mode != "Jog":
+                    self._marlin.current_mode = "Jog"
+                    self.callback("on_stateupdate", "Jog", self._marlin.current_position, 
+                                  self._marlin.current_work_position)
+                
                 # Use stream method to ensure proper line numbering and checksums
                 # Send G91 first as separate command
                 self._marlin.stream("G91")

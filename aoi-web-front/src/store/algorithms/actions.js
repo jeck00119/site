@@ -589,6 +589,10 @@ export default {
             const algorithmAttributes = context.getters.getCurrentAlgorithmAttributes;
             const currentAlgorithm = context.getters.getCurrentAlgorithm;
 
+            // Batch all API calls for much better performance
+            const apiCalls = [];
+
+            // Add algorithm attribute calls to batch
             for(const key in algorithmAttributes)
             {
                 const data = {
@@ -596,26 +600,27 @@ export default {
                     "value": currentAlgorithm.parameters[algorithmAttributes[key].name]
                 };
 
-                const { response } = await api.post('/algorithm/__API__/edit_live_algorithm', data);
-
-                if(!response.ok)
-                {
-                    const error = new Error("Failed to edit live algorithm!");
-                    throw error;
-                }
+                apiCalls.push(api.post('/algorithm/__API__/edit_live_algorithm', data));
             }
 
-            const data = {
+            // Add graphics call to batch
+            const graphicsData = {
                 "key": "graphics",
                 "value": payload
             }
+            apiCalls.push(api.post('/algorithm/__API__/edit_live_algorithm', graphicsData));
 
-            const { response } = await api.post('/algorithm/__API__/edit_live_algorithm', data);
+            // Execute all API calls in parallel instead of sequentially
+            const responses = await Promise.all(apiCalls);
 
-            if(!response.ok)
-            {
-                const error = new Error("Failed to edit live algorithm graphics!");
-                throw error;
+            // Check all responses for errors
+            for (let i = 0; i < responses.length; i++) {
+                if (!responses[i].response.ok) {
+                    const errorMsg = i === responses.length - 1 
+                        ? "Failed to edit live algorithm graphics!" 
+                        : "Failed to edit live algorithm!";
+                    throw new Error(errorMsg);
+                }
             }
         } catch (error) {
             console.error('Failed to set live algorithm attributes:', error);
@@ -632,6 +637,10 @@ export default {
             const algorithmAttributes = context.getters.getCurrentReferenceAlgorithmAttributes;
             const currentAlgorithm = context.getters.getCurrentReferenceAlgorithm;
 
+            // Batch all API calls for much better performance
+            const apiCalls = [];
+
+            // Add algorithm attribute calls to batch
             for(const key in algorithmAttributes)
             {
                 const data = {
@@ -639,26 +648,27 @@ export default {
                     "value": currentAlgorithm.parameters[algorithmAttributes[key].name]
                 };
 
-                const { response } = await api.post('/algorithm/__API__/edit_live_algorithm', data);
-
-                if(!response.ok)
-                {
-                    const error = new Error("Failed to edit live algorithm!");
-                    throw error;
-                }
+                apiCalls.push(api.post('/algorithm/__API__/edit_live_algorithm', data));
             }
 
-            const data = {
+            // Add graphics call to batch
+            const graphicsData = {
                 "key": "graphics",
                 "value": payload
             }
+            apiCalls.push(api.post('/algorithm/__API__/edit_live_algorithm', graphicsData));
 
-            const { response } = await api.post('/algorithm/__API__/edit_live_algorithm', data);
+            // Execute all API calls in parallel instead of sequentially
+            const responses = await Promise.all(apiCalls);
 
-            if(!response.ok)
-            {
-                const error = new Error("Failed to edit live algorithm graphics!");
-                throw error;
+            // Check all responses for errors
+            for (let i = 0; i < responses.length; i++) {
+                if (!responses[i].response.ok) {
+                    const errorMsg = i === responses.length - 1 
+                        ? "Failed to edit live algorithm graphics!" 
+                        : "Failed to edit live algorithm!";
+                    throw new Error(errorMsg);
+                }
             }
         } catch (error) {
             console.error('Failed to set live reference algorithm attributes:', error);

@@ -49,8 +49,8 @@
                         </tr>
                     </thead>
                     <tbody>
-                        <tr v-for="(inspection, idx) in inspections" @click="selectRow(idx)" :class="{'selected-row': selectedRow === idx && !editable}">
-                            <td v-for="column, colIdx in columnNames">
+                        <tr v-for="(inspection, idx) in inspections" :key="inspection.uid || idx" v-memo="[inspection, selectedRow === idx, editable]" @click="selectRow(idx)" :class="{'selected-row': selectedRow === idx && !editable}">
+                            <td v-for="column, colIdx in columnNames" :key="column">
                                 <div v-if="columnTypes[colIdx] === 'Boolean'">
                                     <base-dropdown
                                         :current="inspection[column]"

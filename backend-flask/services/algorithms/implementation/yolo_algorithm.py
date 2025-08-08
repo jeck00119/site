@@ -73,15 +73,21 @@ class YoloAlgorithm(AbstractAlgorithm):
 
         if self.reference_algorithm is not None:
             algorithm_result = self.reference_algorithm.execute(frame_copy)
-            if algorithm_result.data.x is not None:
+            if hasattr(algorithm_result.data, 'x') and algorithm_result.data.x is not None:
                 displacement = [algorithm_result.data.x, algorithm_result.data.y]
                 for roi in graphics_copy:
                     roi["bound"][0] += algorithm_result.data.x
                     roi["bound"][1] += algorithm_result.data.y
 
-        roi, coordinates = crop_roi(frame_copy, roi_offset=graphics_copy[0]["offset"],
-                                    roi_bound=graphics_copy[0]["bound"], roi_rect=graphics_copy[0]["rect"],
-                                    rotation=graphics_copy[0]["rotation"])
+        # Check if graphics_copy has at least one element before accessing
+        if len(graphics_copy) == 0:
+            # Use full frame if no graphics defined
+            roi = frame_copy
+            coordinates = (0, 0, frame_copy.shape[1], frame_copy.shape[0])
+        else:
+            roi, coordinates = crop_roi(frame_copy, roi_offset=graphics_copy[0]["offset"],
+                                        roi_bound=graphics_copy[0]["bound"], roi_rect=graphics_copy[0]["rect"],
+                                        rotation=graphics_copy[0]["rotation"])
 
         # timestamp = str(time.time()).split('.')[0]
         # filename = timestamp + '.png'
@@ -92,12 +98,14 @@ class YoloAlgorithm(AbstractAlgorithm):
         start_x, start_y, end_x, end_y = coordinates
         cropped_image = detection_frame[start_y:end_y, start_x:end_x]
 
-        for i, mask in enumerate(graphics_copy[0]["masks"]):
-            masked = self.mask_region(cropped_image, mask,
-                                      color=(
-                                          graphics_copy[0]["masksColors"][i][2], graphics_copy[0]["masksColors"][i][1],
-                                          graphics_copy[0]["masksColors"][i][0]))
-            cropped_image = masked
+        # Apply masks only if graphics are defined
+        if len(graphics_copy) > 0:
+            for i, mask in enumerate(graphics_copy[0]["masks"]):
+                masked = self.mask_region(cropped_image, mask,
+                                          color=(
+                                              graphics_copy[0]["masksColors"][i][2], graphics_copy[0]["masksColors"][i][1],
+                                              graphics_copy[0]["masksColors"][i][0]))
+                cropped_image = masked
 
         # Get the dimensions of the cropped image
         cropped_height, cropped_width, _ = cropped_image.shape
@@ -149,9 +157,7 @@ class YoloAlgorithm(AbstractAlgorithm):
                                        )
 
             box_annotator = sv.BoxAnnotator(
-                thickness=1,
-                text_thickness=2,
-                text_scale=1
+                thickness=1
             )
 
             labels = [
@@ -197,9 +203,7 @@ class YoloAlgorithm(AbstractAlgorithm):
                 boxes = detections.xyxy
 
                 box_annotator = sv.BoxAnnotator(
-                    thickness=1,
-                    text_thickness=2,
-                    text_scale=1
+                    thickness=1
                 )
 
                 labels += [

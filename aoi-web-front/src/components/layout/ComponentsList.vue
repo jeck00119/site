@@ -12,7 +12,7 @@
         </div>
         
         <!-- <div class="list-item-container">
-            <div class="list-item" v-for="component in components" :key="component.uid" @mouseover="setCurrentId(component.uid)" @mouseleave="setCurrentId(null)">
+            <div class="list-item" v-for="component in components" :key="component.uid" v-memo="[component.name, component.uid]" @mouseover="setCurrentId(component.uid)" @mouseleave="setCurrentId(null)">
                 <div class="component-name">
                     <p>{{ component.name }}</p>
                 </div>

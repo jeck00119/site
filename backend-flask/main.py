@@ -129,10 +129,12 @@ app.add_middleware(SecurityMiddleware)
 # Global exception handlers
 @app.exception_handler(StarletteHTTPException)
 async def http_exception_handler(request: Request, exc: StarletteHTTPException):
+    # Handle WebSocket requests that don't have method attribute
+    method = getattr(request, 'method', 'WebSocket')
     log_app_event(
         "ERROR", 
         f"HTTP {exc.status_code} Error",
-        f"{request.method} {request.url}: {exc.detail}"
+        f"{method} {request.url}: {exc.detail}"
     )
     
     response = JSONResponse(

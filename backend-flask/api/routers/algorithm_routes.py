@@ -69,8 +69,11 @@ class Field(BaseModel):
     @field_validator('key')
     @classmethod
     def snake_case(cls, v):
-        v = re.sub('(.)([A-Z][a-z]+)', r'\1_\2', v)
-        return re.sub('([a-z0-9])([A-Z])', r'\1_\2', v).lower()
+        print(f"DEBUG: Field validator converting '{v}' to snake_case")
+        v_snake = re.sub('(.)([A-Z][a-z]+)', r'\1_\2', v)
+        result = re.sub('([a-z0-9])([A-Z])', r'\1_\2', v_snake).lower()
+        print(f"DEBUG: Field validator result: '{result}'")
+        return result
 
 
 @router.get("")
@@ -525,15 +528,18 @@ async def edit_reference_algorithm(
         algorithm_service: AlgorithmsService = Depends(get_service_by_type(AlgorithmsService))
 ) -> Dict[str, str]:
     try:
+        print(f"DEBUG: Editing reference algorithm with key='{field.key}', value type='{type(field.value)}'")
         algorithm_service.edit_reference_algorithm(field.key, field.value)
         return RouteHelper.create_success_response("Reference algorithm edited successfully")
     except NoLiveAlgSet as e:
+        print(f"DEBUG: NoLiveAlgSet error: {e}")
         raise create_error_response(
             operation="edit reference algorithm",
             entity_type="Algorithm",
             exception=e
         )
     except Exception as e:
+        print(f"DEBUG: Exception in edit_reference_algorithm: {type(e).__name__}: {e}")
         raise create_error_response(
             operation="edit reference algorithm",
             entity_type="Algorithm",
@@ -703,7 +709,7 @@ async def process_reference_algorithm_img_src(
         
         proc_frames = []
         for image in alg_result.debugImages:
-            proc_frames.append(frame_to_base64(image))
+            proc_frames.append(frame_to_base64(image).decode('utf-8'))
         
         result = {
             'frame': proc_frames,
@@ -965,10 +971,7 @@ async def websocket_reference_img_src(
 
             ret = {
                 'frame': proc_frames,
-                'data': {
-                    'x': alg_result.data.x,
-                    'y': alg_result.data.y
-                },
+                'data': alg_result.data,
                 'reference': alg_result.referencePoints
             }
 
@@ -1021,10 +1024,7 @@ async def websocket_reference_static(
 
             ret = {
                 'frame': proc_frames,
-                'data': {
-                    'x': alg_result.data.x,
-                    'y': alg_result.data.y
-                },
+                'data': alg_result.data,
                 'reference': alg_result.referencePoints
             }
 

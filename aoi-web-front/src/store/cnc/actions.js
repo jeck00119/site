@@ -305,12 +305,8 @@ export default {
     },
 
     updatePositionData(context, payload) {
-        context.commit('setMPos', { uid: payload.uid, x: payload.mPos[0], y: payload.mPos[1], z: payload.mPos[2] });
-        context.commit('setWPos', { uid: payload.uid, x: payload.wPos[0], y: payload.wPos[1], z: payload.wPos[2] });
-        context.commit('setPos', { uid: payload.uid });
-        if (payload.state) {
-            context.commit('setCNCState', { uid: payload.uid, state: payload.state });
-        }
+        // Use optimized single mutation instead of 3-4 separate commits
+        context.commit('updateAllPositions', payload);
     },
 
     setPos(context, payload) {

@@ -8,7 +8,7 @@
                         <th>Value</th>
                     </tr>
                 </thead>
-                <tr v-for="value, key in data" :key="key">
+                <tr v-for="value, key in data" :key="key" v-memo="[value]">
                     <td>{{ key }}</td>
                     <td>{{ value }}</td>
                 </tr>

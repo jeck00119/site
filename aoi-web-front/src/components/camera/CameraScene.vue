@@ -176,14 +176,18 @@ export default {
         watch(show, (newValue) => {
             if(!newValue)
             {
-                socket.removeEventListener('message', imageReceived);
+                if(socket) {
+                    socket.removeEventListener('message', imageReceived);
+                }
                 removeImages();
             }
 
             if(newValue && props.cameraFeed)
             {
                 removeImages();
-                socket.addEventListener('message', imageReceived);
+                if(socket) {
+                    socket.addEventListener('message', imageReceived);
+                }
             }
         });
 

@@ -171,7 +171,9 @@ class Marlin:
             "99",
             "0",
         ]
-        self.poll_interval = 0.2
+        # Reduced polling interval for faster position updates during movement
+        # Was 0.2 (200ms), now 0.05 (50ms) for real-time tracking
+        self.poll_interval = 0.05
         self.settings = {}
         self.settings_hash = {
             "G54": (0, 0, 0),
@@ -228,7 +230,7 @@ class Marlin:
         self._line_number = 1  # Marlin line numbering starts at 1
         self._last_resend = None  # Track last resend request to prevent loops
         self._resend_count = 0    # Count consecutive resends
-        self._command_delay = 0.075  # 75ms delay between commands - configurable
+        self._command_delay = 0.02  # 20ms delay between commands for responsive control
         self._active_command_count = 0  # Track active numbered commands
         self._poll_keep_alive = False
         self._iface_read_do = False
@@ -896,11 +898,11 @@ class Marlin:
 
     def _should_poll_position(self):
         """Determine if it's safe to send M114 R polling commands"""
-        # Don't poll if we have active numbered commands in the buffer
-        return (self.streaming_complete and 
-                not self._streaming_enabled and 
-                self._active_command_count == 0 and
-                len(self._rx_buffer_fill) == 0)
+        # Allow polling during movement for real-time position updates
+        # Only check that we're not overflowing the buffer
+        # M114 R is a realtime command that doesn't interfere with movement
+        buffer_has_space = sum(self._rx_buffer_fill) < (self._rx_buffer_size - 20)
+        return buffer_has_space
     
     def _get_state(self):
         self._iface_write("?")

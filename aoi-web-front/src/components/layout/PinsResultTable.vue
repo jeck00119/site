@@ -8,9 +8,9 @@
                     <!-- <th>Value</th> -->
                 </tr>
             </thead>
-            <tr v-for="i in 2">
+            <tr v-for="i in 2" :key="i" v-memo="[xValues.length, i]">
                 <td style="background-color: black;">{{ i % 2 === 0 ? 'Y': 'X'}}</td>
-                <td v-for="p in xValues.length" class="table-data-pass" :class='{"failed-inspection": failed(i, p)}'>{{ outputValue(i, p) }}</td>
+                <td v-for="p in xValues.length" :key="p" class="table-data-pass" :class='{"failed-inspection": failed(i, p)}'>{{ outputValue(i, p) }}</td>
                 <!-- <td>{{ value.value }}</td> -->
             </tr>
         </table>

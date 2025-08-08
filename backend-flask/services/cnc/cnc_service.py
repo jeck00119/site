@@ -29,7 +29,8 @@ class CncService(metaclass=Singleton):
         # Message batching configuration
         self._batch_buffers: dict[str, list] = {}
         self._last_batch_time: dict[str, float] = {}
-        self._batch_interval = 0.05  # 50ms batching interval
+        # Reduced batching interval for real-time position updates
+        self._batch_interval = 0.02  # 20ms batching interval (was 50ms)
         self._max_batch_size = 10    # Maximum messages per batch
 
     @staticmethod
