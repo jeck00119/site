@@ -382,4 +382,265 @@ class SecurityValidator:
         except Exception:
             # If we can't analyze the content, be conservative
             return True
+    
+    def validate_algorithm_property(self, key: str, value: Any) -> Dict[str, Any]:
+        """
+        Validate algorithm property values with centralized logic.
+        
+        Args:
+            key: Property name (e.g., 'golden_position', 'graphics')
+            value: Property value to validate
+            
+        Returns:
+            Dict with 'valid', 'error_message', and 'sanitized_value' keys
+        """
+        try:
+            # Specific validation rules for algorithm properties
+            validation_rules = {
+                'golden_position': self._validate_golden_position,
+                'graphics': self._validate_graphics,
+                'model_path': self._validate_model_path,
+                'confidence_threshold': self._validate_confidence_threshold,
+                'iou_threshold': self._validate_iou_threshold,
+                'reference_point_idx': self._validate_reference_point_idx,
+            }
+            
+            # Get validator function or use generic validation
+            validator = validation_rules.get(key, self._validate_generic_algorithm_property)
+            
+            return validator(value)
+            
+        except Exception as e:
+            self.logger.error(f"Algorithm property validation error for {key}: {e}")
+            return {
+                'valid': False,
+                'error_message': f"Validation failed for property '{key}': {str(e)}",
+                'sanitized_value': None
+            }
+    
+    def _validate_golden_position(self, value: Any) -> Dict[str, Any]:
+        """Validate golden_position property."""
+        try:
+            # Must be a list of exactly 2 numeric values
+            if not isinstance(value, (list, tuple)):
+                return {
+                    'valid': False,
+                    'error_message': f"golden_position must be a list or tuple, got {type(value).__name__}",
+                    'sanitized_value': None
+                }
+            
+            if len(value) != 2:
+                return {
+                    'valid': False,
+                    'error_message': f"golden_position must have exactly 2 values, got {len(value)}",
+                    'sanitized_value': None
+                }
+            
+            # Convert to list and validate numeric values
+            try:
+                sanitized = [float(x) for x in value]
+            except (ValueError, TypeError):
+                return {
+                    'valid': False,
+                    'error_message': "golden_position values must be numeric",
+                    'sanitized_value': None
+                }
+            
+            return {
+                'valid': True,
+                'error_message': None,
+                'sanitized_value': sanitized
+            }
+            
+        except Exception as e:
+            return {
+                'valid': False,
+                'error_message': f"golden_position validation error: {str(e)}",
+                'sanitized_value': None
+            }
+    
+    def _validate_graphics(self, value: Any) -> Dict[str, Any]:
+        """Validate graphics property."""
+        try:
+            if not isinstance(value, list):
+                return {
+                    'valid': False,
+                    'error_message': f"graphics must be a list, got {type(value).__name__}",
+                    'sanitized_value': None
+                }
+            
+            # Basic validation - each graphic should be a dict
+            for i, graphic in enumerate(value):
+                if not isinstance(graphic, dict):
+                    return {
+                        'valid': False,
+                        'error_message': f"graphics[{i}] must be a dictionary, got {type(graphic).__name__}",
+                        'sanitized_value': None
+                    }
+            
+            return {
+                'valid': True,
+                'error_message': None,
+                'sanitized_value': value
+            }
+            
+        except Exception as e:
+            return {
+                'valid': False,
+                'error_message': f"graphics validation error: {str(e)}",
+                'sanitized_value': None
+            }
+    
+    def _validate_model_path(self, value: Any) -> Dict[str, Any]:
+        """Validate model_path property."""
+        try:
+            if not isinstance(value, str):
+                return {
+                    'valid': False,
+                    'error_message': f"model_path must be a string, got {type(value).__name__}",
+                    'sanitized_value': None
+                }
+            
+            # Sanitize the path for security
+            sanitized = self._sanitize_filename(value)
+            
+            return {
+                'valid': True,
+                'error_message': None,
+                'sanitized_value': sanitized
+            }
+            
+        except Exception as e:
+            return {
+                'valid': False,
+                'error_message': f"model_path validation error: {str(e)}",
+                'sanitized_value': None
+            }
+    
+    def _validate_confidence_threshold(self, value: Any) -> Dict[str, Any]:
+        """Validate confidence_threshold property."""
+        try:
+            try:
+                float_value = float(value)
+            except (ValueError, TypeError):
+                return {
+                    'valid': False,
+                    'error_message': "confidence_threshold must be numeric",
+                    'sanitized_value': None
+                }
+            
+            if not 0.0 <= float_value <= 1.0:
+                return {
+                    'valid': False,
+                    'error_message': "confidence_threshold must be between 0.0 and 1.0",
+                    'sanitized_value': None
+                }
+            
+            return {
+                'valid': True,
+                'error_message': None,
+                'sanitized_value': float_value
+            }
+            
+        except Exception as e:
+            return {
+                'valid': False,
+                'error_message': f"confidence_threshold validation error: {str(e)}",
+                'sanitized_value': None
+            }
+    
+    def _validate_iou_threshold(self, value: Any) -> Dict[str, Any]:
+        """Validate iou_threshold property."""
+        try:
+            try:
+                float_value = float(value)
+            except (ValueError, TypeError):
+                return {
+                    'valid': False,
+                    'error_message': "iou_threshold must be numeric",
+                    'sanitized_value': None
+                }
+            
+            if not 0.0 <= float_value <= 1.0:
+                return {
+                    'valid': False,
+                    'error_message': "iou_threshold must be between 0.0 and 1.0",
+                    'sanitized_value': None
+                }
+            
+            return {
+                'valid': True,
+                'error_message': None,
+                'sanitized_value': float_value
+            }
+            
+        except Exception as e:
+            return {
+                'valid': False,
+                'error_message': f"iou_threshold validation error: {str(e)}",
+                'sanitized_value': None
+            }
+    
+    def _validate_reference_point_idx(self, value: Any) -> Dict[str, Any]:
+        """Validate reference_point_idx property."""
+        try:
+            try:
+                int_value = int(value)
+            except (ValueError, TypeError):
+                return {
+                    'valid': False,
+                    'error_message': "reference_point_idx must be an integer",
+                    'sanitized_value': None
+                }
+            
+            if int_value < 0:
+                return {
+                    'valid': False,
+                    'error_message': "reference_point_idx must be non-negative",
+                    'sanitized_value': None
+                }
+            
+            return {
+                'valid': True,
+                'error_message': None,
+                'sanitized_value': int_value
+            }
+            
+        except Exception as e:
+            return {
+                'valid': False,
+                'error_message': f"reference_point_idx validation error: {str(e)}",
+                'sanitized_value': None
+            }
+    
+    def _validate_generic_algorithm_property(self, value: Any) -> Dict[str, Any]:
+        """Generic validation for unknown algorithm properties."""
+        try:
+            # Basic security check - no malicious content
+            if isinstance(value, str):
+                threats = self.detect_threats(value)
+                if threats:
+                    return {
+                        'valid': False,
+                        'error_message': f"Property contains potential security threats: {', '.join(threats)}",
+                        'sanitized_value': None
+                    }
+                
+                # Sanitize string values
+                sanitized_value = self.sanitize_input(value, "html")
+            else:
+                sanitized_value = value
+            
+            return {
+                'valid': True,
+                'error_message': None,
+                'sanitized_value': sanitized_value
+            }
+            
+        except Exception as e:
+            return {
+                'valid': False,
+                'error_message': f"Generic validation error: {str(e)}",
+                'sanitized_value': None
+            }
 

@@ -41,7 +41,7 @@ class BlobDetectionAlgorithmModel(AlgorithmParametersModel):
             ]
         }
     ]
-    golden_position: tuple = [0, 0]
+    golden_position: list = [0, 0]
 
     @field_validator('result_names')
     @classmethod

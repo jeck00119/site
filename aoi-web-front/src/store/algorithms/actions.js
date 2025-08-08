@@ -2,6 +2,7 @@ import { uuid } from "vue3-uuid";
 import api from "../../utils/api.js";
 import { GraphicsRect } from "../../utils/fabric_objects.js";
 import { get, post, update, postStream } from '../../utils/requests.js';
+import { preValidateAlgorithmProperty } from "../../utils/algorithmValidation.js";
 import { ipAddress, port } from '../../url.js';
 
 export default {
@@ -435,14 +436,43 @@ export default {
 
     async updateCurrentAlgorithmProperty(context, payload) {
         try {
-            const { response } = await api.post('/algorithm/__API__/edit_live_algorithm', {
+            // Frontend validation before sending to backend
+            const validation = preValidateAlgorithmProperty(payload.name, payload.value);
+            
+            // Use sanitized value if validation passed and sanitization occurred
+            const valueToSend = validation.valid && validation.sanitizedValue !== null 
+                ? validation.sanitizedValue 
+                : payload.value;
+            
+            const { response, data } = await api.post('/algorithm/__API__/edit_live_algorithm', {
                 key: payload.name,
-                value: payload.value
+                value: valueToSend
             });
 
             if(!response.ok)
             {
-                const error = new Error("Failed to edit live algorithm graphics!");
+                // Enhanced error handling with specific messages
+                let errorMessage = "Failed to edit live algorithm property";
+                
+                if (response.status === 422 && data?.detail) {
+                    // Handle validation errors with specific details
+                    if (typeof data.detail === 'object' && data.detail.message) {
+                        errorMessage = data.detail.message;
+                    } else if (typeof data.detail === 'string') {
+                        errorMessage = data.detail;
+                    }
+                } else if (response.status === 400) {
+                    errorMessage = "Bad request: Invalid algorithm property";
+                } else if (response.status === 404) {
+                    errorMessage = "Algorithm not found or not loaded";
+                } else if (response.status >= 500) {
+                    errorMessage = "Server error while updating algorithm property";
+                }
+                
+                const error = new Error(errorMessage);
+                error.status = response.status;
+                error.property = payload.name;
+                error.valueType = typeof payload.value;
                 throw error;
             }
             else
@@ -450,21 +480,58 @@ export default {
                 context.commit('updateCurrentAlgorithmProperty', payload);
             }
         } catch (error) {
-            console.error('Failed to update current algorithm property:', error);
+            // Enhanced error logging
+            const logMessage = `Failed to update live algorithm property '${payload.name}': ${error.message}`;
+            console.error(logMessage, {
+                property: payload.name,
+                value: payload.value,
+                valueType: typeof payload.value,
+                status: error.status,
+                error: error
+            });
             throw error;
         }
     },
 
     async updateCurrentReferenceAlgorithmProperty(context, payload) {
         try {
-            const { response } = await api.post('/algorithm/__API__/edit_reference_algorithm', {
+            // Frontend validation before sending to backend
+            const validation = preValidateAlgorithmProperty(payload.name, payload.value);
+            
+            // Use sanitized value if validation passed and sanitization occurred
+            const valueToSend = validation.valid && validation.sanitizedValue !== null 
+                ? validation.sanitizedValue 
+                : payload.value;
+            
+            const { response, data } = await api.post('/algorithm/__API__/edit_reference_algorithm', {
                 key: payload.name,
-                value: payload.value
+                value: valueToSend
             });
 
             if(!response.ok)
             {
-                const error = new Error("Failed to edit live algorithm graphics!");
+                // Enhanced error handling with specific messages
+                let errorMessage = "Failed to edit reference algorithm property";
+                
+                if (response.status === 422 && data?.detail) {
+                    // Handle validation errors with specific details
+                    if (typeof data.detail === 'object' && data.detail.message) {
+                        errorMessage = data.detail.message;
+                    } else if (typeof data.detail === 'string') {
+                        errorMessage = data.detail;
+                    }
+                } else if (response.status === 400) {
+                    errorMessage = "Bad request: Invalid algorithm property";
+                } else if (response.status === 404) {
+                    errorMessage = "Algorithm not found or not loaded";
+                } else if (response.status >= 500) {
+                    errorMessage = "Server error while updating algorithm property";
+                }
+                
+                const error = new Error(errorMessage);
+                error.status = response.status;
+                error.property = payload.name;
+                error.valueType = typeof payload.value;
                 throw error;
             }
             else
@@ -472,7 +539,15 @@ export default {
                 context.commit('updateCurrentReferenceAlgorithmProperty', payload);
             }
         } catch (error) {
-            console.error('Failed to update current reference algorithm property:', error);
+            // Enhanced error logging
+            const logMessage = `Failed to update reference algorithm property '${payload.name}': ${error.message}`;
+            console.error(logMessage, {
+                property: payload.name,
+                value: payload.value,
+                valueType: typeof payload.value,
+                status: error.status,
+                error: error
+            });
             throw error;
         }
     },

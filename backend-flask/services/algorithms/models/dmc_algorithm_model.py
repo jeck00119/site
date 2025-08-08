@@ -38,7 +38,7 @@ class DmcAlgorithmModel(AlgorithmParametersModel):
             "masksColors": []
         }
     ]
-    golden_position: tuple = [0, 0]
+    golden_position: list = [0, 0]
 
     def get_ui_from_type(self):
         return self.load_ui_dictionary("services/algorithms/implementation/ui_objects/dmc.json")

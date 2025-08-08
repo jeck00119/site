@@ -27,6 +27,7 @@ from services.custom_components.custom_components_model import CustomComponentMo
 from services.image_source.image_source_service import ImageSourceService
 from services.image_source.load_image_service import LoadImageService
 from services.services_exceptions import NoLiveAlgSet, NoLiveFrameSet
+from security.validators import SecurityValidator
 from src.utils import frame_to_base64
 
 router = APIRouter(
@@ -506,8 +507,34 @@ async def edit_live_algorithm(
         algorithm_service: AlgorithmsService = Depends(get_service_by_type(AlgorithmsService))
 ) -> Dict[str, str]:
     try:
-        algorithm_service.edit_live_algorithm(algorithm.key, algorithm.value)
+        print(f"DEBUG: Editing live algorithm with key='{algorithm.key}', value type='{type(algorithm.value)}'")
+        
+        # Centralized validation
+        validator = SecurityValidator()
+        validation_result = validator.validate_algorithm_property(algorithm.key, algorithm.value)
+        
+        if not validation_result['valid']:
+            print(f"DEBUG: Validation failed: {validation_result['error_message']}")
+            raise HTTPException(
+                status_code=422,
+                detail={
+                    "error": True,
+                    "message": f"Invalid value for property '{algorithm.key}': {validation_result['error_message']}",
+                    "property": algorithm.key,
+                    "value_type": type(algorithm.value).__name__,
+                    "status_code": 422
+                }
+            )
+        
+        # Use sanitized value if available
+        final_value = validation_result['sanitized_value'] if validation_result['sanitized_value'] is not None else algorithm.value
+        
+        algorithm_service.edit_live_algorithm(algorithm.key, final_value)
         return RouteHelper.create_success_response("Live algorithm edited successfully")
+        
+    except HTTPException:
+        # Re-raise HTTP exceptions (validation errors)
+        raise
     except NoLiveAlgSet as e:
         raise create_error_response(
             operation="edit live algorithm",
@@ -529,8 +556,33 @@ async def edit_reference_algorithm(
 ) -> Dict[str, str]:
     try:
         print(f"DEBUG: Editing reference algorithm with key='{field.key}', value type='{type(field.value)}'")
-        algorithm_service.edit_reference_algorithm(field.key, field.value)
+        
+        # Centralized validation
+        validator = SecurityValidator()
+        validation_result = validator.validate_algorithm_property(field.key, field.value)
+        
+        if not validation_result['valid']:
+            print(f"DEBUG: Validation failed: {validation_result['error_message']}")
+            raise HTTPException(
+                status_code=422,
+                detail={
+                    "error": True,
+                    "message": f"Invalid value for property '{field.key}': {validation_result['error_message']}",
+                    "property": field.key,
+                    "value_type": type(field.value).__name__,
+                    "status_code": 422
+                }
+            )
+        
+        # Use sanitized value if available
+        final_value = validation_result['sanitized_value'] if validation_result['sanitized_value'] is not None else field.value
+        
+        algorithm_service.edit_reference_algorithm(field.key, final_value)
         return RouteHelper.create_success_response("Reference algorithm edited successfully")
+        
+    except HTTPException:
+        # Re-raise HTTP exceptions (validation errors)
+        raise
     except NoLiveAlgSet as e:
         print(f"DEBUG: NoLiveAlgSet error: {e}")
         raise create_error_response(
