@@ -15,7 +15,7 @@
     "@fortawesome/fontawesome-svg-core": "^7.0.0",
     "@fortawesome/free-solid-svg-icons": "^7.0.0",
     "@fortawesome/vue-fontawesome": "^3.1.1",
-    "@imengyu/vue3-context-menu": "^1.5.1",
+    "@imengyu/vue3-context-menu": "^1.5.2",
     "exceljs": "^4.4.0",
     "fabric": "^6.7.1",
     "oh-vue-icons": "^1.0.0-rc3",
@@ -23,18 +23,18 @@
     "vue-json-pretty": "^2.5.0",
     "vue-json-viewer": "^3.0.4",
     "vue-multiselect": "^3.3.1",
-    "vue-pdf-embed": "^1.1.6",
+    "vue-pdf-embed": "^1.2.1",
     "vue-router": "^4.5.1",
     "vue3-carousel": "^0.16.0",
     "vue3-uuid": "^1.0.0",
     "vuex": "^4.1.0"
   },
   "devDependencies": {
-    "@types/node": "^24.2.0",
+    "@types/node": "^24.2.1",
     "@vitejs/plugin-vue": "^6.0.1",
     "@vue/tsconfig": "^0.7.0",
     "typescript": "^5.9.2",
-    "vite": "^7.0.6",
+    "vite": "^7.1.1",
     "vue-tsc": "^3.0.5"
   }
 }

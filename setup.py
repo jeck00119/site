@@ -105,7 +105,6 @@ class AutoSetup:
                 
             # Ensure clean output after stopping progress
             if success:
-                # Use simpler characters that work reliably on Windows
                 print(f"OK: {message} - completed successfully")
             else:
                 print(f"ERROR: {message} - failed")
@@ -526,6 +525,7 @@ class AutoSetup:
     def setup_frontend(self):
         """Setup frontend environment and dependencies"""
         import subprocess
+        import json
         
         print("\n" + "=" * 60)
         print("FRONTEND SETUP")
@@ -536,26 +536,79 @@ class AutoSetup:
             print("ERROR: Frontend directory not found")
             return False
         
-        # Install npm dependencies
-        # Try different npm command approaches
+        # Check if this is a fresh install or update
+        node_modules = frontend_dir / "node_modules"
+        package_lock = frontend_dir / "package-lock.json"
+        is_fresh_install = not node_modules.exists()
+        
+        # Enhanced dependency management for dealing with deprecated packages
+        if not is_fresh_install:
+            print("Existing installation detected. Checking for deprecated dependencies...")
+            
+            # Check for outdated packages (optional, informational)
+            print("Checking for outdated packages...")
+            outdated_cmd = ["npm", "outdated"] if not self.is_windows else ["npm.cmd", "outdated"]
+            try:
+                result = subprocess.run(outdated_cmd, cwd=frontend_dir, capture_output=True, text=True, timeout=30)
+                if result.stdout:
+                    print("Some packages could be updated (this is normal):")
+                    # Just show first few lines to avoid clutter
+                    lines = result.stdout.strip().split('\n')[:5]
+                    for line in lines:
+                        print(f"  {line}")
+                    if len(result.stdout.strip().split('\n')) > 5:
+                        print("  ... and more")
+            except Exception:
+                pass  # Not critical if this fails
+            
+            # Option to clean install if many deprecated warnings exist
+            print("\nPerforming optimized installation to minimize deprecated dependencies...")
+            
+            # Clean npm cache first (helps with deprecated package issues)
+            cache_cmd = ["npm", "cache", "clean", "--force"] if not self.is_windows else ["npm.cmd", "cache", "clean", "--force"]
+            try:
+                self.run_command_with_progress(
+                    cache_cmd,
+                    "Cleaning npm cache",
+                    cwd=frontend_dir,
+                    shell=False,
+                    show_output=False
+                )
+            except Exception:
+                pass  # Cache cleaning is optional
+        
+        # Install npm dependencies with legacy peer deps support
+        # This helps avoid conflicts with deprecated packages
         npm_commands = []
         if self.is_windows:
             npm_commands = [
+                ["npm.cmd", "install", "--legacy-peer-deps"],
+                ["npm", "install", "--legacy-peer-deps"],
+                ["cmd", "/c", "npm", "install", "--legacy-peer-deps"],
+                # Fallback without legacy-peer-deps
                 ["npm.cmd", "install"],
                 ["npm", "install"],
                 ["cmd", "/c", "npm", "install"]
             ]
         else:
             npm_commands = [
+                ["npm", "install", "--legacy-peer-deps"],
+                # Fallback without legacy-peer-deps
                 ["npm", "install"]
             ]
         
         success = False
         for cmd in npm_commands:
             try:
+                # Check if this is a legacy-peer-deps command
+                is_legacy = "--legacy-peer-deps" in cmd
+                message = "Installing Node.js dependencies (this may take a few minutes)"
+                if is_legacy:
+                    message = "Installing with legacy peer dependency resolution"
+                    
                 success, output = self.run_command_with_progress(
                     cmd,
-                    "Installing Node.js dependencies (this may take a few minutes)",
+                    message,
                     cwd=frontend_dir,
                     shell=False,
                     show_output=True  # Show real-time npm output
@@ -572,14 +625,24 @@ class AutoSetup:
             # Fallback: try with shell=True
             try:
                 success, output = self.run_command_with_progress(
-                    "npm install",
+                    "npm install --legacy-peer-deps",
                     "Installing Node.js dependencies (fallback method)",
                     cwd=frontend_dir,
                     shell=True,
                     show_output=True
                 )
             except Exception:
-                pass
+                # Final fallback without legacy-peer-deps
+                try:
+                    success, output = self.run_command_with_progress(
+                        "npm install",
+                        "Installing Node.js dependencies (final fallback)",
+                        cwd=frontend_dir,
+                        shell=True,
+                        show_output=True
+                    )
+                except Exception:
+                    pass
         
         if not success:
             print("WARNING: Could not install npm dependencies automatically")
@@ -592,13 +655,13 @@ class AutoSetup:
         update_commands = []
         if self.is_windows:
             update_commands = [
-                ["npm.cmd", "update"],
-                ["npm", "update"],
-                ["cmd", "/c", "npm", "update"]
+                ["npm.cmd", "update", "--save"],
+                ["npm", "update", "--save"],
+                ["cmd", "/c", "npm", "update", "--save"]
             ]
         else:
             update_commands = [
-                ["npm", "update"]
+                ["npm", "update", "--save"]
             ]
         
         for cmd in update_commands:
@@ -615,25 +678,64 @@ class AutoSetup:
             except:
                 continue
         
+        # Additional step: Try to deduplicate dependencies to reduce deprecated packages
+        print("\nOptimizing dependency tree...")
+        dedupe_commands = []
+        if self.is_windows:
+            dedupe_commands = [
+                ["npm.cmd", "dedupe"],
+                ["npm", "dedupe"],
+                ["cmd", "/c", "npm", "dedupe"]
+            ]
+        else:
+            dedupe_commands = [
+                ["npm", "dedupe"]
+            ]
+        
+        for cmd in dedupe_commands:
+            try:
+                success, output = self.run_command_with_progress(
+                    cmd,
+                    "Deduplicating dependencies",
+                    cwd=frontend_dir,
+                    shell=False,
+                    show_output=False
+                )
+                if success:
+                    break
+            except:
+                continue
+        
         # Fix any security vulnerabilities
         print("\nChecking and fixing security vulnerabilities...")
         audit_commands = []
         if self.is_windows:
             audit_commands = [
+                ["npm.cmd", "audit", "fix", "--legacy-peer-deps"],
+                ["npm", "audit", "fix", "--legacy-peer-deps"],
+                ["cmd", "/c", "npm", "audit", "fix", "--legacy-peer-deps"],
+                # Fallback without legacy-peer-deps
                 ["npm.cmd", "audit", "fix"],
                 ["npm", "audit", "fix"],
                 ["cmd", "/c", "npm", "audit", "fix"]
             ]
         else:
             audit_commands = [
+                ["npm", "audit", "fix", "--legacy-peer-deps"],
+                # Fallback without legacy-peer-deps
                 ["npm", "audit", "fix"]
             ]
         
         for cmd in audit_commands:
             try:
+                is_legacy = "--legacy-peer-deps" in cmd
+                message = "Fixing npm security vulnerabilities"
+                if is_legacy:
+                    message = "Fixing vulnerabilities with legacy peer deps"
+                    
                 success, output = self.run_command_with_progress(
                     cmd,
-                    "Fixing npm security vulnerabilities",
+                    message,
                     cwd=frontend_dir,
                     shell=False,
                     show_output=False
@@ -664,12 +766,30 @@ class AutoSetup:
                 if "found 0 vulnerabilities" in output:
                     print("OK: No security vulnerabilities found")
                 elif "vulnerability" in output.lower():
-                    print(f"INFO: Security status: {output}")
+                    # Parse vulnerability count if possible
+                    import re
+                    vuln_match = re.search(r'(\d+)\s+vulnerabilit', output)
+                    if vuln_match:
+                        vuln_count = vuln_match.group(1)
+                        print(f"INFO: {vuln_count} vulnerabilities found (run 'npm audit' for details)")
+                    else:
+                        print(f"INFO: Some vulnerabilities found (run 'npm audit' for details)")
                 break
             except:
                 continue
         
-        print("Frontend setup complete!")
+        # Show deprecation warning summary
+        print("\n" + "=" * 60)
+        print("DEPRECATION WARNINGS NOTE:")
+        print("=" * 60)
+        print("If you see warnings about deprecated packages like:")
+        print("  - inflight, npmlog, rimraf, glob, etc.")
+        print("These are transitive dependencies (used by other packages).")
+        print("They don't affect your app's functionality and will be")
+        print("updated automatically as parent packages release new versions.")
+        print("=" * 60)
+        
+        print("\nFrontend setup complete!")
         print()  # Add spacing after frontend setup
         return True
 
