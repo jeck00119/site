@@ -59,8 +59,9 @@ class AutoSetup:
                 print(f"\r{message} {chars[idx % len(chars)]}", end="", flush=True)
                 idx += 1
                 time.sleep(delay)
-            # Clear the progress line when stopping
-            print(f"\r{' ' * (len(message) + 2)}\r", end="", flush=True)
+            # Clear the progress line when stopping - ensure complete clearing
+            clear_line = " " * (len(message) + 10)  # Extra spaces to ensure full clearing
+            print(f"\r{clear_line}\r", end="", flush=True)
         
         self._stop_progress = False
         thread = threading.Thread(target=animate)
@@ -71,7 +72,9 @@ class AutoSetup:
     def stop_progress(self):
         """Stop the progress indicator and ensure clean output"""
         self._stop_progress = True
-        time.sleep(0.15)  # Give more time for the thread to finish and clear
+        time.sleep(0.2)  # Increased timeout for better synchronization
+        # Additional flush to ensure clearing is complete
+        print("", flush=True)
 
     def run_command_with_progress(self, command, message, shell=None, cwd=None, show_output=False, timeout=600):
         """Run a command with progress indicator and optional real-time output"""
@@ -219,7 +222,7 @@ class AutoSetup:
         processes = self.check_port_availability(port)
         
         if not processes:
-            print(f"Port {port} is available")
+            print(f"OK: Port {port} is available and ready for use")
             return True
         
         print(f"WARNING: Port {port} is already in use!")
@@ -602,7 +605,7 @@ class AutoSetup:
             try:
                 success, output = self.run_command_with_progress(
                     cmd,
-                    "Updating npm packages",
+                    "Updating npm packages to latest versions",
                     cwd=frontend_dir,
                     shell=False,
                     show_output=False
