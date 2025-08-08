@@ -1,5 +1,7 @@
+import asyncio
 import wsproto.utilities
-from starlette.websockets import WebSocket
+from starlette.websockets import WebSocket, WebSocketDisconnect
+from starlette.websockets import WebSocketState
 
 from src.metaclasses.singleton import Singleton
 
@@ -36,12 +38,50 @@ class ConnectionManager(metaclass=Singleton):
     def __init__(self):
         self.active_connections: dict[str, Socket] = {}
 
+    @staticmethod
+    async def safe_sleep_with_cancellation(duration: float):
+        """
+        Centralized sleep method that handles cancellation gracefully.
+        Use this instead of asyncio.sleep() in WebSocket loops.
+        """
+        try:
+            await asyncio.sleep(duration)
+            return True  # Normal completion
+        except asyncio.CancelledError:
+            return False  # Cancelled, should break loop
+
+    @staticmethod
+    def handle_websocket_exceptions(func):
+        """
+        Decorator for centralized WebSocket exception handling.
+        Handles common WebSocket exceptions with consistent behavior.
+        """
+        def wrapper(*args, **kwargs):
+            async def async_wrapper():
+                uid = args[0] if args else kwargs.get('uid', 'unknown')
+                manager = ConnectionManager()
+                try:
+                    return await func(*args, **kwargs)
+                except WebSocketDisconnect:
+                    await manager.disconnect(uid)
+                except asyncio.CancelledError:
+                    # Handle cancellation during shutdown
+                    manager.remove_websocket(uid)
+                    raise  # Re-raise to stop execution
+                except Exception as e:
+                    print(f"WebSocket error for {uid}: {e}")
+                    manager.remove_websocket(uid)
+            return async_wrapper()
+        return wrapper
+
     async def connect(self, uid, websocket: WebSocket):
         await websocket.accept()
         self.active_connections[uid] = Socket(websocket, True)
 
     async def _disconnect_all(self):
-        for uid in self.active_connections.keys():
+        # Create a copy of keys to avoid iteration error during shutdown
+        connection_ids = list(self.active_connections.keys())
+        for uid in connection_ids:
             await self.disconnect(uid)
 
     async def connection_closed(self, uid):

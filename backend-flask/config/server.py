@@ -141,6 +141,9 @@ class ServerConfig(BaseModel):
             "access_log": self.access_log,
             "reload": self.reload,
             "workers": self.workers if not self.reload else 1,  # Workers > 1 not compatible with reload
+            # Add graceful shutdown timeouts to prevent hanging
+            "timeout_graceful_shutdown": 10,  # Force shutdown after 10 seconds
+            "timeout_keep_alive": self.keep_alive_timeout,
         }
         
         if self.ssl_enabled and self.ssl_cert_file and self.ssl_key_file:

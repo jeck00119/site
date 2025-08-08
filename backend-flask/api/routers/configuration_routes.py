@@ -222,16 +222,20 @@ async def send_communication_changes(
             if configuration_service.get_configuration_flag_socket():
                 configuration = configuration_repository.read_id(configuration_service.get_current_configuration_uid())
                 ret = {'configuration': configuration}
-
                 configuration_service.reset_configuration_flag_socket()
-
                 await websocket.send_json(ret)
-            await sleep(0.3)
+            
+            # Use centralized sleep with cancellation handling
+            if not await manager.safe_sleep_with_cancellation(0.3):
+                break  # Cancelled, exit loop
 
         await manager.disconnect(ws_uid)
     except WebSocketDisconnect:
         await manager.disconnect(ws_uid)
     except LocalProtocolError:
+        manager.remove_websocket(ws_uid)
+    except asyncio.CancelledError:
+        # Handle cancellation during shutdown
         manager.remove_websocket(ws_uid)
 
 

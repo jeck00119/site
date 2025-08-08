@@ -442,12 +442,17 @@ async def ws_cnc(
                 await websocket.send_json(msg)
                 msg = cnc_service.read_callback_buffer(cnc_uid)
 
-            await sleep(0.05)
+            # Use centralized sleep with cancellation handling
+            if not await manager.safe_sleep_with_cancellation(0.05):
+                break  # Cancelled, exit loop
         await manager.disconnect(cnc_uid)
     except WebSocketDisconnect:
         await manager.disconnect(cnc_uid)
     except LocalProtocolError as e:
         print(f"WebSocket protocol error for CNC {cnc_uid}: {e}")
+        manager.remove_websocket(cnc_uid)
+    except asyncio.CancelledError:
+        # Handle cancellation during shutdown
         manager.remove_websocket(cnc_uid)
     except RuntimeError as e:
         print(f"WebSocket runtime error for CNC {cnc_uid}: {e}")

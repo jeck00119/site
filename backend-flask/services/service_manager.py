@@ -82,17 +82,17 @@ class ServiceManager:
                 except Exception as e:
                     logger.warning(f"Error shutting down CNC service: {e}")
             
-            # Close all WebSocket connections
+            # Close all WebSocket connections - simplified approach
             connection_manager = ConnectionManager()
-            if hasattr(connection_manager, '_disconnect_all'):
-                # Try to run the async disconnect in a new event loop
+            if hasattr(connection_manager, 'active_connections'):
                 try:
-                    loop = asyncio.new_event_loop()
-                    asyncio.set_event_loop(loop)
-                    loop.run_until_complete(connection_manager._disconnect_all())
-                    loop.close()
+                    # Directly clear connections without async operations during shutdown
+                    connection_count = len(connection_manager.active_connections)
+                    connection_manager.active_connections.clear()
+                    if connection_count > 0:
+                        logger.info(f"Cleared {connection_count} WebSocket connections during shutdown")
                 except Exception as e:
-                    logger.warning(f"Error disconnecting WebSockets during shutdown: {e}")
+                    logger.warning(f"Error clearing WebSocket connections during shutdown: {e}")
                     
         except Exception as e:
             logger.warning(f"Error during service cleanup: {e}")

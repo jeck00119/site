@@ -11,6 +11,146 @@ from services.cnc.dependencies.gerbil.gcode_machine import GcodeMachine
 from services.cnc.dependencies.gerbil.interface import Interface
 
 
+class MarlinBufferManager:
+    """Centralized buffer management for Marlin protocol"""
+    
+    @staticmethod
+    def clear_all_buffers(marlin_instance):
+        """Clear all Marlin buffers to reset communication state"""
+        marlin_instance.buffer.clear()
+        marlin_instance.buffer_size = 0
+        marlin_instance._rx_buffer_fill.clear()
+        marlin_instance._rx_buffer_backlog.clear()
+        marlin_instance._rx_buffer_backlog_line_number.clear()
+        # Reset active command counter when clearing buffers
+        marlin_instance._active_command_count = 0
+
+    @staticmethod  
+    def reset_line_sync(marlin_instance, expected_line: int):
+        """Reset line synchronization and clear buffers"""
+        marlin_instance.logger.warning(f"SYNC FIX: Setting line number to {expected_line}, was {marlin_instance._line_number}")
+        marlin_instance._line_number = expected_line
+        MarlinBufferManager.clear_all_buffers(marlin_instance)
+        # Reset resend tracking
+        marlin_instance._last_resend = None
+        marlin_instance._resend_count = 0
+        # Stop any current streaming to prevent further line number conflicts
+        marlin_instance._streaming_enabled = False
+        marlin_instance._set_streaming_complete(True)
+
+
+class MarlinCommandVerifier:
+    """Centralized command verification and retry logic"""
+    
+    @staticmethod
+    def detect_command_corruption(line: str) -> tuple[bool, str]:
+        """Detect if a command was corrupted and identify the original command"""
+        if "Unknown command:" not in line:
+            return False, ""
+            
+        # Extract the corrupted command
+        import re
+        match = re.search(r'Unknown command: "([^"]+)"', line)
+        if not match:
+            return False, ""
+            
+        corrupted_cmd = match.group(1)
+        
+        # Common corruption patterns
+        corruption_fixes = {
+            'MM110': 'M110',
+            'MM114': 'M114', 
+            'MM17': 'M17',
+            'MM18': 'M18',
+            'MM999': 'M999',
+            'GG28': 'G28',
+            'GG90': 'G90',
+            'GG91': 'G91',
+        }
+        
+        for corrupted, original in corruption_fixes.items():
+            if corrupted in corrupted_cmd:
+                return True, corrupted_cmd.replace(corrupted, original)
+                
+        return True, ""  # Detected corruption but couldn't fix
+    
+    @staticmethod
+    def should_retry_command(marlin_instance, original_cmd: str) -> bool:
+        """Determine if a corrupted command should be automatically retried"""
+        # Don't retry if we're in an error state or have too many active commands
+        if marlin_instance.current_mode == "Error":
+            return False
+        if marlin_instance._active_command_count > 5:  # Prevent buffer overflow
+            return False
+        
+        # Only retry simple commands automatically
+        safe_retry_commands = ['M110', 'M114', 'M17', 'M18', 'M999']
+        return any(original_cmd.startswith(cmd) for cmd in safe_retry_commands)
+
+
+class MarlinErrorHandler:
+    """Centralized error handling for Marlin protocol"""
+    
+    @staticmethod
+    def handle_line_number_error(marlin_instance, line: str, logger) -> bool:
+        """Handle line number mismatch errors. Returns True if handled."""
+        if "Line Number is not Last Line Number+1" not in line:
+            return False
+            
+        # Extract the expected line number from error message  
+        import re
+        match = re.search(r'Last Line: (\d+)', line)
+        if match:
+            expected_line = int(match.group(1)) + 1
+            logger.warning(f"FORCE SYNC: Resetting line number from {marlin_instance._line_number} to {expected_line}")
+            MarlinBufferManager.reset_line_sync(marlin_instance, expected_line)
+        return True
+    
+    @staticmethod
+    def handle_checksum_error(marlin_instance, line: str, logger) -> bool:
+        """Handle checksum mismatch errors. Returns True if handled."""
+        if "checksum mismatch" not in line:
+            return False
+            
+        import re
+        match = re.search(r'Last Line: (\d+)', line)
+        if match:
+            expected_line = int(match.group(1)) + 1
+            logger.warning(f"Checksum error - resetting line number from {marlin_instance._line_number} to {expected_line}")
+            MarlinBufferManager.reset_line_sync(marlin_instance, expected_line)
+        return True
+    
+    @staticmethod
+    def handle_resend_request(marlin_instance, line: str, logger) -> bool:
+        """Handle resend requests. Returns True if handled."""
+        if not line.startswith("Resend:"):
+            return False
+            
+        import re
+        match = re.search(r'Resend: (\d+)', line)
+        if match:
+            resend_line = int(match.group(1))
+            
+            # Check for infinite resend loop
+            if marlin_instance._last_resend == resend_line:
+                marlin_instance._resend_count += 1
+                if marlin_instance._resend_count > 5:
+                    logger.error(f"RESEND LOOP DETECTED: Ignoring repeated resend request for line {resend_line}")
+                    # Force a hard reset to break the loop
+                    marlin_instance._line_number = resend_line
+                    marlin_instance._resend_count = 0
+                    marlin_instance._last_resend = None
+                    marlin_instance._streaming_enabled = False
+                    return True
+            else:
+                marlin_instance._resend_count = 1
+                marlin_instance._last_resend = resend_line
+            
+            logger.warning(f"RESEND: Syncing line number from {marlin_instance._line_number} to {resend_line} (attempt {marlin_instance._resend_count})")
+            MarlinBufferManager.reset_line_sync(marlin_instance, resend_line)
+        return True
+
+
 class Marlin:
     def __init__(self, callback):
         self.name = "marlin"
@@ -86,6 +226,10 @@ class Marlin:
         self.buffer_size_stash = 0
         self._current_line_nr_stash = 0
         self._line_number = 1  # Marlin line numbering starts at 1
+        self._last_resend = None  # Track last resend request to prevent loops
+        self._resend_count = 0    # Count consecutive resends
+        self._command_delay = 0.075  # 75ms delay between commands - configurable
+        self._active_command_count = 0  # Track active numbered commands
         self._poll_keep_alive = False
         self._iface_read_do = False
         self._thread_polling = None
@@ -461,11 +605,14 @@ class Marlin:
             formatted_line = self._format_line_with_checksum(line.strip())
             print(f"[MARLIN DEBUG] Sending: {repr(formatted_line)}")
             self._iface.write(formatted_line)
+            # Add configurable delay to prevent buffer overflow and command fragmentation
+            import time
+            time.sleep(self._command_delay)
 
     def _format_line_with_checksum(self, line):
         """Format a line with Marlin line number and checksum"""
-        # Skip line numbering for emergency/immediate commands and line number reset
-        skip_numbering_commands = ['?', 'M112', '!', '~', '\x18', 'M999', 'M110']
+        # Skip line numbering for emergency/immediate commands and real-time polling
+        skip_numbering_commands = ['?', 'M112', '!', '~', '\x18', 'M999', 'M110', 'M114 R']
         
         if any(line.startswith(cmd) for cmd in skip_numbering_commands):
             return line + '\n'
@@ -475,6 +622,8 @@ class Marlin:
         checksum = self._calculate_checksum(line_with_number)
         formatted = f"{line_with_number}*{checksum}\n"
         
+        # Track active numbered commands
+        self._active_command_count += 1
         self._line_number += 1
         return formatted
 
@@ -505,33 +654,36 @@ class Marlin:
                     self._error = True
                     self.current_mode = "Error"
                     
-                    # Handle line number errors by resetting line counter
-                    if "Line Number is not Last Line Number+1" in line:
-                        # Extract the expected line number from error message
-                        match = re.search(r'Last Line: (\d+)', line)
-                        if match:
-                            expected_line = int(match.group(1)) + 1
-                            self.logger.warning(f"Resetting line number from {self._line_number} to {expected_line}")
-                            self._line_number = expected_line
-                    elif "checksum mismatch" in line:
-                        # Handle checksum errors by resetting line counter
-                        match = re.search(r'Last Line: (\d+)', line)
-                        if match:
-                            expected_line = int(match.group(1)) + 1
-                            self.logger.warning(f"Checksum error - resetting line number from {self._line_number} to {expected_line}")
-                            self._line_number = expected_line
+                    # Use centralized error handlers
+                    handled = (
+                        MarlinErrorHandler.handle_line_number_error(self, line, self.logger) or
+                        MarlinErrorHandler.handle_checksum_error(self, line, self.logger)
+                    )
                     
                     self.callback("on_stateupdate", self.current_mode, self.current_position,
                                   self.current_work_position)
                     self.callback("on_read", line)
                     self.callback("on_error", line, "", 0)
                 elif line.startswith("Resend:"):
-                    # Handle resend requests by adjusting line number
-                    match = re.search(r'Resend: (\d+)', line)
-                    if match:
-                        resend_line = int(match.group(1))
-                        self.logger.warning(f"Resend requested for line {resend_line}, adjusting from {self._line_number}")
-                        self._line_number = resend_line
+                    # Use centralized resend handler
+                    MarlinErrorHandler.handle_resend_request(self, line, self.logger)
+                    self.callback("on_read", line)
+                elif "Unknown command:" in line:
+                    # Use centralized command verification
+                    is_corrupted, fixed_command = MarlinCommandVerifier.detect_command_corruption(line)
+                    if is_corrupted and fixed_command:
+                        self.logger.warning(f"COMMAND CORRUPTION DETECTED: {line}")
+                        self.logger.info(f"Attempting to fix: {fixed_command}")
+                        
+                        # Retry if it's a safe command
+                        if MarlinCommandVerifier.should_retry_command(self, fixed_command):
+                            self.logger.info(f"Auto-retrying fixed command: {fixed_command}")
+                            self._iface_write(fixed_command)
+                        else:
+                            self.logger.warning(f"Command corruption detected but not retrying: {fixed_command}")
+                    else:
+                        self.logger.warning(f"COMMAND CORRUPTION DETECTED but couldn't fix: {line}")
+                    
                     self.callback("on_read", line)
                 elif "Marlin" in line:
                     self.callback("on_read", line)
@@ -559,6 +711,10 @@ class Marlin:
         return any(line_upper.startswith(cmd) for cmd in status_commands)
 
     def _handle_ok(self):
+        # Decrement active command counter for numbered commands
+        if self._active_command_count > 0:
+            self._active_command_count -= 1
+            
         if not self.streaming_complete:
             self._rx_buffer_fill_pop()
             if not (self._wait_empty_buffer and len(self._rx_buffer_fill) > 0):
@@ -680,6 +836,8 @@ class Marlin:
         self._last_position = None
         self._last_work_position = None
         self._line_number = 1  # Reset line numbering on boot
+        self._last_resend = None  # Clear any resend tracking
+        self._resend_count = 0    # Reset resend counter
         self.preprocessor.reset()
 
     def _clear_queue(self):
@@ -692,14 +850,24 @@ class Marlin:
     def _poll_state(self):
         while self._poll_keep_alive:
             try:
-                # Send M114 R for real-time position reporting  
-                self._iface_write("M114 R")
+                # Use centralized polling safety check
+                if self._should_poll_position():
+                    # Send M114 R for real-time position reporting  
+                    self._iface_write("M114 R")
             except:
                 traceback.print_exc()
                 break
             time.sleep(self.poll_interval)
         self.logger.debug("{}: Polling has been stopped".format(self.name))
 
+    def _should_poll_position(self):
+        """Determine if it's safe to send M114 R polling commands"""
+        # Don't poll if we have active numbered commands in the buffer
+        return (self.streaming_complete and 
+                not self._streaming_enabled and 
+                self._active_command_count == 0 and
+                len(self._rx_buffer_fill) == 0)
+    
     def _get_state(self):
         self._iface_write("?")
 

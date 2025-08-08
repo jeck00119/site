@@ -33,6 +33,56 @@ from .gcode_machine import GcodeMachine
 from .interface import Interface
 
 
+class GrblBufferManager:
+    """Centralized buffer management for GRBL/FluidNC protocol"""
+    
+    @staticmethod
+    def clear_all_buffers(grbl_instance):
+        """Clear all GRBL buffers to reset communication state"""
+        grbl_instance.buffer.clear() if hasattr(grbl_instance, 'buffer') else None
+        grbl_instance.buffer_size = 0 if hasattr(grbl_instance, 'buffer_size') else None
+        grbl_instance._rx_buffer_fill.clear()
+        grbl_instance._rx_buffer_backlog.clear()
+        grbl_instance._rx_buffer_backlog_line_number.clear()
+
+    @staticmethod  
+    def reset_communication_state(grbl_instance):
+        """Reset communication state and clear buffers"""
+        GrblBufferManager.clear_all_buffers(grbl_instance)
+        # Reset any additional GRBL-specific state if needed
+
+
+class GrblErrorHandler:
+    """Centralized error handling for GRBL/FluidNC protocol"""
+    
+    @staticmethod
+    def handle_grbl_error(grbl_instance, line: str, logger) -> bool:
+        """Handle GRBL error messages. Returns True if handled."""
+        if not line.startswith("error:"):
+            return False
+            
+        # Extract error number and handle accordingly
+        import re
+        error_match = re.search(r'error:(\d+)', line)
+        if error_match:
+            error_num = error_match.group(1)
+            logger.warning(f"GRBL Error {error_num}: {line}")
+            # Clear buffers on error to prevent confusion
+            GrblBufferManager.clear_all_buffers(grbl_instance)
+        return True
+    
+    @staticmethod
+    def handle_grbl_alarm(grbl_instance, line: str, logger) -> bool:
+        """Handle GRBL alarm states. Returns True if handled."""
+        if not line.startswith("ALARM:"):
+            return False
+            
+        logger.warning(f"GRBL Alarm: {line}")
+        # Clear buffers on alarm
+        GrblBufferManager.clear_all_buffers(grbl_instance)
+        return True
+
+
 class Gerbil:
     def __init__(self, callback, name="mygrbl"):
         self.name = name
@@ -472,6 +522,9 @@ class Gerbil:
         self.callback("on_write", line)
         if self._iface:
             num_written = self._iface.write(line)
+            # Add configurable delay to prevent buffer overflow and command fragmentation
+            import time
+            time.sleep(0.05)  # 50ms delay between commands (consistent with Marlin)
 
     def _onread(self):
         while self._iface_read_do:
@@ -499,11 +552,19 @@ class Gerbil:
                             self.callback("on_probe", self.settings_hash["PRB"])
                 elif "ALARM" in line:
                     self.cmode = "Alarm"
+                    
+                    # Use centralized alarm handler
+                    GrblErrorHandler.handle_grbl_alarm(self, line, self.logger)
+                    
                     self.callback("on_stateupdate", self.cmode, self.cmpos, self.cwpos)
                     self.callback("on_read", line)
                     self.callback("on_alarm", line)
                 elif "error" in line:
                     self._error = True
+                    
+                    # Use centralized error handler
+                    GrblErrorHandler.handle_grbl_error(self, line, self.logger)
+                    
                     if len(self._rx_buffer_backlog) > 0:
                         problem_command = self._rx_buffer_backlog[0]
                         problem_line = self._rx_buffer_backlog_line_number[0]
