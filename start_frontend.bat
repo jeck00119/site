@@ -5,7 +5,7 @@ echo ========================================
 echo.
 
 REM Change to frontend directory
-cd /d "%~dp0\aoi-web-front"
+cd /d "%~dp0aoi-web-front"
 
 REM Check if node_modules exists
 if not exist "node_modules" (
@@ -30,8 +30,13 @@ echo Press Ctrl+C to stop the server
 echo.
 
 call npm run dev
-REM Don't check errorlevel for npm run dev since Ctrl+C is normal termination
-REM The dev server runs until stopped by user
+if errorlevel 1 (
+    echo.
+    echo Frontend failed to start!
+    echo Please check the errors above.
+    pause
+    exit /b 1
+)
 echo.
 echo Frontend server stopped.
 pause
