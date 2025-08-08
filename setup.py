@@ -59,7 +59,8 @@ class AutoSetup:
                 print(f"\r{message} {chars[idx % len(chars)]}", end="", flush=True)
                 idx += 1
                 time.sleep(delay)
-            print()  # New line when done
+            # Clear the progress line when stopping
+            print(f"\r{' ' * (len(message) + 2)}\r", end="", flush=True)
         
         self._stop_progress = False
         thread = threading.Thread(target=animate)
@@ -68,9 +69,9 @@ class AutoSetup:
         return thread
 
     def stop_progress(self):
-        """Stop the progress indicator"""
+        """Stop the progress indicator and ensure clean output"""
         self._stop_progress = True
-        time.sleep(0.1)  # Give time for the thread to finish
+        time.sleep(0.15)  # Give more time for the thread to finish and clear
 
     def run_command_with_progress(self, command, message, shell=None, cwd=None, show_output=False, timeout=600):
         """Run a command with progress indicator and optional real-time output"""
@@ -99,10 +100,12 @@ class AutoSetup:
             if progress_thread:
                 self.stop_progress()
                 
+            # Ensure clean output after stopping progress
             if success:
-                print(f"✓ {message} - completed successfully")
+                # Use simpler characters that work reliably on Windows
+                print(f"OK: {message} - completed successfully")
             else:
-                print(f"✗ {message} - failed")
+                print(f"ERROR: {message} - failed")
                 if output and not show_output:
                     print(f"Error: {output}")
                     
@@ -111,7 +114,7 @@ class AutoSetup:
         except subprocess.TimeoutExpired:
             if progress_thread:
                 self.stop_progress()
-            print(f"✗ {message} - timed out after {timeout} seconds")
+            print(f"ERROR: {message} - timed out after {timeout} seconds")
             print("This operation is taking longer than expected. You can:")
             print("1. Try running the setup again")
             print("2. Check your internet connection")
@@ -120,7 +123,7 @@ class AutoSetup:
         except Exception as e:
             if progress_thread:
                 self.stop_progress()
-            print(f"✗ {message} - error: {e}")
+            print(f"ERROR: {message} - error: {e}")
             return False, str(e)
 
     def check_port_availability(self, port=8000):
@@ -629,7 +632,7 @@ class AutoSetup:
                     show_output=False
                 )
                 if success:
-                    print("✓ Security vulnerabilities fixed (if any existed)")
+                    print("OK: Security vulnerabilities fixed (if any existed)")
                     break
             except:
                 continue
@@ -652,9 +655,9 @@ class AutoSetup:
             try:
                 success, output = self.run_command(cmd, shell=False, cwd=frontend_dir)
                 if "found 0 vulnerabilities" in output:
-                    print("✓ No security vulnerabilities found")
+                    print("OK: No security vulnerabilities found")
                 elif "vulnerability" in output.lower():
-                    print(f"ℹ Security status: {output}")
+                    print(f"INFO: Security status: {output}")
                 break
             except:
                 continue
