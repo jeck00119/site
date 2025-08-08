@@ -62,9 +62,11 @@ export default {
     },
 
     setPos(state, payload){
-        state.positionData[payload.uid].pos.x = state.positionData[payload.uid].mPos.x - state.positionData[payload.uid].wPos.x;
-        state.positionData[payload.uid].pos.y = state.positionData[payload.uid].mPos.y - state.positionData[payload.uid].wPos.y
-        state.positionData[payload.uid].pos.z = state.positionData[payload.uid].mPos.z - state.positionData[payload.uid].wPos.z
+        // Display the work position (wPos) as the primary position
+        // This is standard for CNC controllers like UGS
+        state.positionData[payload.uid].pos.x = state.positionData[payload.uid].wPos.x;
+        state.positionData[payload.uid].pos.y = state.positionData[payload.uid].wPos.y;
+        state.positionData[payload.uid].pos.z = state.positionData[payload.uid].wPos.z;
     },
 
     setCNCState(state, payload){

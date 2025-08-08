@@ -4,6 +4,7 @@ from enum import Enum
 
 from services.cnc.cnc_models import LocationModel
 from services.cnc.dependencies.gerbil.gerbil import Gerbil
+from services.cnc.base_cnc_machine import BaseCncMachine
 
 
 class GrblStates(Enum):
@@ -105,7 +106,7 @@ INSTRUCTIONS = {
     }
 
 
-class CncMachineGerbil():
+class CncMachineGerbil(BaseCncMachine):
     def __init__(self, port: str, cnc_name,  callback=()):
         super().__init__()
         self._port = port
@@ -124,29 +125,11 @@ class CncMachineGerbil():
         except Exception as e:
             raise e
 
-    def get_port(self):
-        return self._port
-
-    @staticmethod
-    def _is_at(x, current_x):
-        if x is None:
-            return True
-        else:
-            return abs(x) == abs(current_x)
-
-    def is_at(self, x, y, z):
-        pos = self.current_pos()
-        if not pos:
-            return False
-        return self._is_at(x, pos.x) \
-               and self._is_at(y, pos.y) \
-               and self._is_at(z, pos.z)
-
-    def is_at_location(self, location: LocationModel):
-        x = location.x
-        y = location.y
-        z = location.z
-        return self.is_at(x, y, z)
+    # Inherited from BaseCncMachine:
+    # - get_port()
+    # - _is_at()
+    # - is_at() 
+    # - is_at_location()
 
     def send(self, command: str):
         if self._gerbil:
@@ -185,17 +168,7 @@ class CncMachineGerbil():
         except Exception as e:
             return '','',''
 
-    def parse_coordinates(self, x, y, z, feed_rate):
-        line = ""
-        if x is not None:
-            line += f"X{x}"
-        if y is not None:
-            line += f"Y{y}"
-        if z is not None:
-            line += f"Z{z}"
-        if feed_rate is not None:
-            line += f"F{int(feed_rate)}"
-        return line
+    # parse_coordinates() inherited from BaseCncMachine
 
     def state(self):
         if self._gerbil:

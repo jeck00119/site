@@ -216,7 +216,7 @@ class Marlin:
         self.streaming_complete = True
         self.job_finished = True
         self._streaming_src_end_reached = True
-        self._streaming_enabled = True
+        self._streaming_enabled = False  # Start with polling enabled for idle machine
         self._error = False
         self._incremental_streaming = False
         self.buffer = []
@@ -291,9 +291,12 @@ class Marlin:
             self.logger.info(
                 "{}: Cannot start another interface. There is already an interface {}.".format(self.name, self._iface))
         self._iface_read_do = True
+        self.logger.info(f"[MARLIN INIT] Creating _onread thread, _iface_read_do={self._iface_read_do}")
         self._thread_read_iface = threading.Thread(target=self._onread)
         self._thread_read_iface.name = "Marlin interface thread"
+        self.logger.info(f"[MARLIN INIT] Starting _onread thread...")
         self._thread_read_iface.start()
+        self.logger.info(f"[MARLIN INIT] _onread thread started successfully")
         # Wait for bootup message or timeout
         time.sleep(1)
         # Force bootup initialization if not already done
@@ -484,6 +487,9 @@ class Marlin:
         self._set_job_finished(True)
         self._set_streaming_src_end_reached(True)
         self._error = False
+        # Reset state from Error back to Idle when error is cleared
+        if self.current_mode == "Error":
+            self.current_mode = "Idle"
         self._current_line = ""
         self._current_line_sent = True
         self.travel_dist_buffer = {}
@@ -635,66 +641,78 @@ class Marlin:
         return checksum & 0xFF
 
     def _onread(self):
-        while self._iface_read_do:
-            line = self._queue.get()
-            if len(line) > 0:
-                if "echo:busy: processing" in line:
-                    self.current_mode = "Jog"
-                    self.callback("on_stateupdate", self.current_mode, self.current_position,
-                                  self.current_work_position)
-                elif re.search(r'X:(-?[\d.]+) Y:(-?[\d.]+) Z:(-?[\d.]+)', line):
-                    self._update_state_from_m114(line)
-                elif line.startswith("echo:"):
-                    self._parse_settings(line)
-                    self.callback("on_read", line)
-                elif line == "ok":
-                    self._handle_ok()
-                    self.callback("on_read", line)
-                elif line.startswith("Error:"):
-                    self._error = True
-                    self.current_mode = "Error"
-                    
-                    # Use centralized error handlers
-                    handled = (
-                        MarlinErrorHandler.handle_line_number_error(self, line, self.logger) or
-                        MarlinErrorHandler.handle_checksum_error(self, line, self.logger)
-                    )
-                    
-                    self.callback("on_stateupdate", self.current_mode, self.current_position,
-                                  self.current_work_position)
-                    self.callback("on_read", line)
-                    self.callback("on_error", line, "", 0)
-                elif line.startswith("Resend:"):
-                    # Use centralized resend handler
-                    MarlinErrorHandler.handle_resend_request(self, line, self.logger)
-                    self.callback("on_read", line)
-                elif "Unknown command:" in line:
-                    # Use centralized command verification
-                    is_corrupted, fixed_command = MarlinCommandVerifier.detect_command_corruption(line)
-                    if is_corrupted and fixed_command:
-                        self.logger.warning(f"COMMAND CORRUPTION DETECTED: {line}")
-                        self.logger.info(f"Attempting to fix: {fixed_command}")
+        self.logger.info(f"[MARLIN THREAD] _onread thread started, _iface_read_do={self._iface_read_do}")
+        self.logger.debug(f"[MARLIN THREAD] _onread thread started, _iface_read_do={self._iface_read_do}")
+        try:
+            while self._iface_read_do:
+                line = self._queue.get()
+                self.logger.debug(f"[MARLIN QUEUE] Processing line from queue: '{line}'")
+                if len(line) > 0:
+                    if "echo:busy: processing" in line:
+                        self.current_mode = "Jog"
+                        self.callback("on_stateupdate", self.current_mode, self.current_position,
+                                      self.current_work_position)
+                    elif re.search(r'X:(-?[\d.]+) Y:(-?[\d.]+) Z:(-?[\d.]+)', line):
+                        print(f"[MARLIN PARSE] Position line regex matched: {line}")
+                        self.logger.debug(f"[MARLIN QUEUE] M114 regex matched, calling _update_state_from_m114")
+                        self._update_state_from_m114(line)
+                    elif line.startswith("echo:"):
+                        self._parse_settings(line)
+                        self.callback("on_read", line)
+                    elif line == "ok":
+                        self._handle_ok()
+                        self.callback("on_read", line)
+                    elif line.startswith("Error:"):
+                        self._error = True
+                        self.current_mode = "Error"
                         
-                        # Retry if it's a safe command
-                        if MarlinCommandVerifier.should_retry_command(self, fixed_command):
-                            self.logger.info(f"Auto-retrying fixed command: {fixed_command}")
-                            self._iface_write(fixed_command)
+                        # Use centralized error handlers
+                        handled = (
+                            MarlinErrorHandler.handle_line_number_error(self, line, self.logger) or
+                            MarlinErrorHandler.handle_checksum_error(self, line, self.logger)
+                        )
+                        
+                        self.callback("on_stateupdate", self.current_mode, self.current_position,
+                                      self.current_work_position)
+                        self.callback("on_read", line)
+                        self.callback("on_error", line, "", 0)
+                    elif line.startswith("Resend:"):
+                        # Use centralized resend handler
+                        MarlinErrorHandler.handle_resend_request(self, line, self.logger)
+                        self.callback("on_read", line)
+                    elif "Unknown command:" in line:
+                        # Use centralized command verification
+                        is_corrupted, fixed_command = MarlinCommandVerifier.detect_command_corruption(line)
+                        if is_corrupted and fixed_command:
+                            self.logger.warning(f"COMMAND CORRUPTION DETECTED: {line}")
+                            self.logger.info(f"Attempting to fix: {fixed_command}")
+                            
+                            # Retry if it's a safe command
+                            if MarlinCommandVerifier.should_retry_command(self, fixed_command):
+                                self.logger.info(f"Auto-retrying fixed command: {fixed_command}")
+                                self._iface_write(fixed_command)
+                            else:
+                                self.logger.warning(f"Command corruption detected but not retrying: {fixed_command}")
                         else:
-                            self.logger.warning(f"Command corruption detected but not retrying: {fixed_command}")
+                            self.logger.warning(f"COMMAND CORRUPTION DETECTED but couldn't fix: {line}")
+                        
+                        self.callback("on_read", line)
+                    elif "Marlin" in line:
+                        self.callback("on_read", line)
+                        # Initialize Marlin protocol when we detect bootup
+                        if not self.initialized:
+                            self._on_bootup()
+                        self.hash_state_requested = True
+                        self.request_settings()
+                        self.gcode_parser_state_requested = True
                     else:
-                        self.logger.warning(f"COMMAND CORRUPTION DETECTED but couldn't fix: {line}")
-                    
-                    self.callback("on_read", line)
-                elif "Marlin" in line:
-                    self.callback("on_read", line)
-                    # Initialize Marlin protocol when we detect bootup
-                    if not self.initialized:
-                        self._on_bootup()
-                    self.hash_state_requested = True
-                    self.request_settings()
-                    self.gcode_parser_state_requested = True
-                else:
-                    self.callback("on_read", line)
+                        self.callback("on_read", line)
+        except Exception as e:
+            self.logger.error(f"Error in _onread thread: {e}")
+            import traceback
+            self.logger.error(f"Traceback: {traceback.format_exc()}")
+        finally:
+            self.logger.info(f"[MARLIN THREAD] _onread thread is ending")
 
     def _is_status_command(self, line):
         """Check if a command is just for status/info and doesn't cause movement"""
@@ -720,6 +738,10 @@ class Marlin:
             if not (self._wait_empty_buffer and len(self._rx_buffer_fill) > 0):
                 self._wait_empty_buffer = False
                 self._stream()
+        else:
+            # When streaming is complete and no active commands, allow polling
+            if self._active_command_count == 0 and len(self._rx_buffer_fill) == 0:
+                self._streaming_enabled = False  # Enable polling when idle
 
         if self.is_homing:
             self.is_homing = False
@@ -742,6 +764,7 @@ class Marlin:
 
     def _update_state_from_m114(self, line):
         try:
+            self.logger.debug(f"[MARLIN PARSE] Processing M114 line: {line}")
             x_match = re.search(r'X:(-?[\d.]+)', line)
             y_match = re.search(r'Y:(-?[\d.]+)', line)
             z_match = re.search(r'Z:(-?[\d.]+)', line)
@@ -753,30 +776,35 @@ class Marlin:
 
                 self.current_work_position = (w_pos_x, w_pos_y, w_pos_z)
                 self.current_position = self.current_work_position
+                print(f"[MARLIN PARSE] Updated position to: {self.current_position}")
 
                 # Handle position change detection
                 if self._last_position is None:
                     # First position report after connection - assume standstill
                     self.is_standstill = True
                 elif self.current_position != self._last_position:
+                    # Position changed - we're moving
                     if self.is_standstill:
                         self.is_standstill = False
+                        # Set state to Jog when movement is detected (unless in Error state)
+                        if self.current_mode == "Idle":
+                            self.current_mode = "Jog"
                         self.callback("on_movement")
                 else:
+                    # Position unchanged - we've stopped
                     if not self.is_standstill:
                         self.is_standstill = True
+                        # Set state back to Idle when movement stops (unless in Error state)
+                        if self.current_mode == "Jog":
+                            self.current_mode = "Idle"
+                            self.callback("on_idle", "idle")
                         self.callback("on_standstill")
-                
-                # If we're standing still and in Jog mode, switch to Idle
-                # This handles the case where homing completed but we're stuck in Jog
-                if self.is_standstill and self.current_mode == "Jog":
-                    self.current_mode = "Idle"
-                    self.callback("on_idle", "idle")
-                    self.logger.debug(f"{self.name}: Switched from Jog to Idle (standstill detected)")
 
                 if (self.current_mode != self._last_mode or
                         self.current_position != self._last_position or
                         self.current_work_position != self._last_work_position):
+                    self.logger.debug(f"[MARLIN POSITION] Sending on_stateupdate: mode={self.current_mode}, pos={self.current_position}, wpos={self.current_work_position}")
+                    print(f"[MARLIN CALLBACK] Sending on_stateupdate: mode={self.current_mode}, pos={self.current_position}, wpos={self.current_work_position}")
                     self.callback("on_stateupdate", self.current_mode, self.current_position,
                                   self.current_work_position)
 
@@ -828,6 +856,9 @@ class Marlin:
         self._set_job_finished(True)
         self._set_streaming_src_end_reached(True)
         self._error = False
+        # Reset state from Error back to Idle when error is cleared during boot
+        if self.current_mode == "Error":
+            self.current_mode = "Idle"
         self._current_line = ""
         self._current_line_sent = True
         self._clear_queue()
@@ -838,6 +869,9 @@ class Marlin:
         self._line_number = 1  # Reset line numbering on boot
         self._last_resend = None  # Clear any resend tracking
         self._resend_count = 0    # Reset resend counter
+        # Enable polling for idle machine - no job running
+        self._streaming_enabled = False  # Allow position polling when idle
+        self._active_command_count = 0   # Reset command count
         self.preprocessor.reset()
 
     def _clear_queue(self):

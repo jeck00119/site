@@ -9,6 +9,7 @@ from repo.repositories import CncRepository, LocationRepository
 from services.cnc.cnc_machine_gerbil import CncMachineGerbil, ERROR_LIST_CNC as GRBL_ERROR_LIST
 from services.cnc.cnc_machine_marlin import CncMachineMarlin, ERROR_LIST_CNC as MARLIN_ERROR_LIST
 from services.cnc.cnc_models import CncModel, LocationModel
+from services.cnc.cnc_error_handler import CncErrorHandler
 from src.metaclasses.singleton import Singleton
 import logging
 
@@ -21,11 +22,8 @@ class CncService(metaclass=Singleton):
         self._callbacks_buffers: dict[str, deque] = {}
         self._exceptions: list = []
         self._connection_errors: dict[str, str] = {}  # Track connection errors per CNC
-        self._error_lists = {
-            "GRBL": GRBL_ERROR_LIST,
-            "FluidNC": GRBL_ERROR_LIST,
-            "Marlin": MARLIN_ERROR_LIST
-        }
+        # Use centralized error handler
+        self._error_handler = CncErrorHandler()
         self.logger = logging.getLogger(__name__)
         
         # Message batching configuration
@@ -89,6 +87,7 @@ class CncService(metaclass=Singleton):
 
     def _callback(self, uid, *data):
         if uid in self._callbacks_buffers:
+            self.logger.debug(f"[CNC SERVICE] Callback received for {uid}: {data}")
             self._callbacks_buffers[uid].append(data)
 
     def read_callback_buffer(self, uid):
@@ -105,6 +104,9 @@ class CncService(metaclass=Singleton):
         messages_collected = []
         while self._callbacks_buffers.get(uid) and self._callbacks_buffers[uid]:
             buffed = self._callbacks_buffers[uid].popleft()
+            # Unwrap nested tuple if needed - callback data comes as (('event', data...),)
+            if len(buffed) == 1 and isinstance(buffed[0], tuple):
+                buffed = buffed[0]
             event = buffed[0]
             
             message = self._format_message(event, buffed, cnc_type)
@@ -162,8 +164,7 @@ class CncService(metaclass=Singleton):
             return {'event': event, "message": buffed[1]}
 
         elif event == "on_error":
-            error_list = self._error_lists.get(cnc_type, GRBL_ERROR_LIST)
-            error_message = error_list.get(buffed[1], buffed[1])
+            error_message = self._error_handler.get_error_message(cnc_type, buffed[1])
             return {'event': event, "message": error_message}
 
         elif event == "connection_error":
@@ -389,15 +390,29 @@ class CncService(metaclass=Singleton):
     def delete_cnc(self, cnc_uid):
         self._deinit_cnc(cnc_uid)
 
+    def _execute_cnc_command(self, uid, operation, *args, **kwargs):
+        """Centralized validation and execution for all CNC operations"""
+        if uid not in self._cnc_objects:
+            raise Exception(f"CNC {uid} not found")
+        
+        cnc_obj = self._cnc_objects[uid]
+        if isinstance(cnc_obj, Mock):
+            connection_error = self._connection_errors.get(uid, 'Unknown connection error')
+            raise Exception(f"CNC {uid} is not connected (Mock object). Connection error: {connection_error}")
+        
+        # Execute the operation
+        method = getattr(cnc_obj, operation)
+        if kwargs:
+            return method(*args, **kwargs)
+        else:
+            return method(*args)
+
     def abort(self, uid):
         try:
-            if uid in self._cnc_objects:
-                cnc_obj = self._cnc_objects[uid]
-                if isinstance(cnc_obj, Mock):
-                    raise Exception(f"CNC {uid} is not connected (Mock object). Connection error: {self._connection_errors.get(uid, 'Unknown connection error')}")
-                if hasattr(cnc_obj, '_abort_requested'):
-                    cnc_obj._abort_requested = True
-                cnc_obj.abort()
+            cnc_obj = self._cnc_objects.get(uid)
+            if cnc_obj and hasattr(cnc_obj, '_abort_requested'):
+                cnc_obj._abort_requested = True
+            self._execute_cnc_command(uid, 'abort')
         except Exception as e:
             error_msg = f"Error during abort on CNC {uid}: {str(e)}"
             self.logger.error(error_msg)
@@ -405,78 +420,46 @@ class CncService(metaclass=Singleton):
             raise e
 
     async def home(self, uid):
-        if uid in self._cnc_objects:
-            cnc_obj = self._cnc_objects[uid]
-            if isinstance(cnc_obj, Mock):
-                raise Exception(f"CNC {uid} is not connected (Mock object). Connection error: {self._connection_errors.get(uid, 'Unknown connection error')}")
-            await cnc_obj.home()
+        await self._execute_cnc_command(uid, 'home')
 
     def soft_reset(self, uid):
-        if uid in self._cnc_objects:
-            cnc_obj = self._cnc_objects[uid]
-            if isinstance(cnc_obj, Mock):
-                raise Exception(f"CNC {uid} is not connected (Mock object). Connection error: {self._connection_errors.get(uid, 'Unknown connection error')}")
-            cnc_obj.soft_reset()
+        self._execute_cnc_command(uid, 'soft_reset')
 
     def zero_reset(self, uid):
-        if uid in self._cnc_objects:
-            cnc_obj = self._cnc_objects[uid]
-            if isinstance(cnc_obj, Mock):
-                raise Exception(f"CNC {uid} is not connected (Mock object). Connection error: {self._connection_errors.get(uid, 'Unknown connection error')}")
-            cnc_obj.zero_reset()
+        self._execute_cnc_command(uid, 'zero_reset')
 
     def return_to_zero(self, uid):
-        if uid in self._cnc_objects:
-            cnc_obj = self._cnc_objects[uid]
-            if isinstance(cnc_obj, Mock):
-                raise Exception(f"CNC {uid} is not connected (Mock object). Connection error: {self._connection_errors.get(uid, 'Unknown connection error')}")
-            cnc_obj.return_to_zero()
+        self._execute_cnc_command(uid, 'return_to_zero')
 
     def unlock(self, uid):
-        if uid in self._cnc_objects:
-            cnc_obj = self._cnc_objects[uid]
-            if isinstance(cnc_obj, Mock):
-                raise Exception(f"CNC {uid} is not connected (Mock object). Connection error: {self._connection_errors.get(uid, 'Unknown connection error')}")
-            cnc_obj.unlock()
+        self._execute_cnc_command(uid, 'unlock')
 
     def send(self, uid, command):
-        if uid in self._cnc_objects:
-            cnc_obj = self._cnc_objects[uid]
-            if isinstance(cnc_obj, Mock):
-                raise Exception(f"CNC {uid} is not connected (Mock object). Connection error: {self._connection_errors.get(uid, 'Unknown connection error')}")
-            self.logger.debug(f"Received command service: {command}")
-            cnc_obj.send(command)
+        self.logger.debug(f"Received command service: {command}")
+        self._execute_cnc_command(uid, 'send', command)
 
     def axis_minus(self, uid, axis, step, feed_rate):
-        if uid in self._cnc_objects:
-            cnc_obj = self._cnc_objects[uid]
-            if isinstance(cnc_obj, Mock):
-                raise Exception(f"CNC {uid} is not connected (Mock object). Connection error: {self._connection_errors.get(uid, 'Unknown connection error')}")
-            if axis in ['x', 'X']:
-                cnc_obj.move_by(x=-int(step), feed_rate=int(feed_rate))
-            if axis in ['y', 'Y']:
-                cnc_obj.move_by(y=-int(step), feed_rate=int(feed_rate))
-            if axis in ['z', 'Z']:
-                cnc_obj.move_by(z=-int(step), feed_rate=int(feed_rate))
+        kwargs = {'feed_rate': int(feed_rate)}
+        if axis in ['x', 'X']:
+            kwargs['x'] = -int(step)
+        elif axis in ['y', 'Y']:
+            kwargs['y'] = -int(step)
+        elif axis in ['z', 'Z']:
+            kwargs['z'] = -int(step)
+        self._execute_cnc_command(uid, 'move_by', **kwargs)
 
     def axis_plus(self, uid, axis, step, feed_rate):
-        if uid in self._cnc_objects:
-            cnc_obj = self._cnc_objects[uid]
-            if isinstance(cnc_obj, Mock):
-                raise Exception(f"CNC {uid} is not connected (Mock object). Connection error: {self._connection_errors.get(uid, 'Unknown connection error')}")
-            if axis in ['x', 'X']:
-                cnc_obj.move_by(x=int(step), feed_rate=int(feed_rate))
-            if axis in ['y', 'Y']:
-                cnc_obj.move_by(y=int(step), feed_rate=int(feed_rate))
-            if axis in ['z', 'Z']:
-                cnc_obj.move_by(z=int(step), feed_rate=int(feed_rate))
+        kwargs = {'feed_rate': int(feed_rate)}
+        if axis in ['x', 'X']:
+            kwargs['x'] = int(step)
+        elif axis in ['y', 'Y']:
+            kwargs['y'] = int(step)
+        elif axis in ['z', 'Z']:
+            kwargs['z'] = int(step)
+        self._execute_cnc_command(uid, 'move_by', **kwargs)
 
     async def move_to_location(self, uid, location: LocationModel, block, timeout):
-        if uid in self._cnc_objects:
-            cnc_obj = self._cnc_objects[uid]
-            if isinstance(cnc_obj, Mock):
-                raise Exception(f"CNC {uid} is not connected (Mock object). Connection error: {self._connection_errors.get(uid, 'Unknown connection error')}")
-            await cnc_obj.move_to_location_j(location=location, block=block, timeout=timeout)
+        await self._execute_cnc_command(uid, 'move_to_location_j', location=location, block=block, timeout=timeout)
 
     def get_cnc_info(self, uid):
         """Get information about a CNC including connection status"""
