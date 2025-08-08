@@ -447,6 +447,7 @@ class AutoSetup:
         if not self.handle_port_conflict(8000):
             print("WARNING: Port 8000 conflict not resolved")
             print("Backend setup will continue, but the server may fail to start")
+        print()  # Add spacing after port check
         
         backend_dir = Path("backend-flask")
         if not backend_dir.exists():
@@ -481,6 +482,7 @@ class AutoSetup:
         )
         if not success:
             print("WARNING: Could not upgrade pip - continuing with current version")
+        print()  # Add spacing after pip upgrade
         
         # Install requirements
         # Try backend-specific requirements first, then fall back to root requirements
@@ -501,6 +503,7 @@ class AutoSetup:
         if not success:
             print(f"ERROR: Failed to install requirements")
             return False
+        print()  # Add spacing after requirements installation
         
         # Copy environment file
         env_example = Path(".env.example")
@@ -514,6 +517,7 @@ class AutoSetup:
         logs_dir.mkdir(exist_ok=True)
         
         print("Backend setup complete!")
+        print()  # Add spacing after backend setup
         return True
 
     def setup_frontend(self):
@@ -663,6 +667,7 @@ class AutoSetup:
                 continue
         
         print("Frontend setup complete!")
+        print()  # Add spacing after frontend setup
         return True
 
     def create_start_scripts(self):
@@ -674,6 +679,7 @@ class AutoSetup:
         self.create_linux_scripts()
         
         print("Cross-platform start scripts created successfully")
+        print()  # Add spacing after script creation
         return True
     
     def create_windows_scripts(self):
