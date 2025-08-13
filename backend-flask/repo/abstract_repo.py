@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 from typing import Union
 
 from pydantic import BaseModel
@@ -25,18 +26,25 @@ class BaseRepo(metaclass=Singleton):
         self._configuration_path = value
 
     def set_db(self, configuration_name):
+        # Always use the centralized config_db location in backend-flask
+        backend_flask_dir = Path(__file__).parent.parent.resolve()
+        config_db_base = backend_flask_dir / "config_db"
+        
         if configuration_name:
-            path = f"{os.getcwd()}/config_db/{configuration_name}"
+            path = config_db_base / configuration_name
         else:
-            path = f"{os.getcwd()}/config_db"
+            path = config_db_base
 
+        # Convert to string for compatibility with existing code
+        path_str = str(path)
+        
         try:
-            os.listdir(path)
+            os.listdir(path_str)
         except FileNotFoundError:
-            os.mkdir(path)
+            os.makedirs(path_str, exist_ok=True)
 
-        self.configuration_path = path
-        self.db = TinyDB(path + f"/{self.databaseName}.json", sort_keys=True, indent=4, ).table(f"{self.databaseName}")
+        self.configuration_path = path_str
+        self.db = TinyDB(str(path / f"{self.databaseName}.json"), sort_keys=True, indent=4).table(f"{self.databaseName}")
 
     def reset_db(self):
         self.db = None

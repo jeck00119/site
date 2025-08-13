@@ -35,10 +35,37 @@ class SlowUSBCamera(CameraInterface):
         self.release_grab_thread()
 
     def load_config(self, data: dict):
+        import time
+        config_start = time.time()
+        print(f"[CAMERA-CONFIG] Loading {len(data)} camera settings...")
+        
         self._lock.acquire()
-        for key, val in data.items():
-            self.set(key, val)
-        self._lock.release()
+        try:
+            # Skip slow/problematic settings that can be applied later or aren't critical
+            fast_settings = {}
+            slow_settings = {}
+            
+            for key, val in data.items():
+                # Focus settings can be extremely slow (1+ seconds each)
+                if key in ['auto_focus', 'focus']:
+                    slow_settings[key] = val
+                else:
+                    fast_settings[key] = val
+            
+            # Apply fast settings first
+            for key, val in fast_settings.items():
+                self.set(key, val)
+            
+            # Apply slow settings only if necessary
+            # You could make this optional based on a flag
+            for key, val in slow_settings.items():
+                print(f"[CAMERA-CONFIG] Applying slow setting: {key}")
+                self.set(key, val)
+                
+        finally:
+            self._lock.release()
+        
+        print(f"[CAMERA-CONFIG] Settings applied in {time.time() - config_start:.3f}s")
 
 
 class CameraThread(Thread):

@@ -24,8 +24,9 @@
 </template>
 
 <script>
-import { computed } from "vue";
-import { useStore } from "vuex";
+import { computed, onMounted } from "vue";
+import { useCncStore } from '@/composables/useStore';
+import { createLogger } from '@/utils/logger';
 
 export default {
   name: "PositionDisplay",
@@ -40,10 +41,17 @@ export default {
     }
   },
   setup(props) {
-    const store = useStore();
+    const logger = createLogger('PositionDisplay');
+    
+    // Use centralized CNC store composable
+    const { pos } = useCncStore(props.axisUid);
+    
+    onMounted(() => {
+      logger.lifecycle('mounted', 'PositionDisplay component mounted', { axisUid: props.axisUid });
+    });
 
     return {
-      pos: computed(() => store.getters["cnc/pos"](props.axisUid))
+      pos
     };
   }
 };
@@ -51,13 +59,17 @@ export default {
 
 <style scoped>
 .positions-grid {
-  color: white;
+  color: var(--color-text-secondary);
   display: flex;
   flex-direction: column;
   width: 100%;
   height: 100%;
   justify-content: space-around;
   margin: auto;
+  background-color: var(--cnc-position-bg);
+  border: var(--border-width-1) solid var(--cnc-position-border);
+  border-radius: var(--border-radius-card);
+  padding: var(--space-4);
 }
 
 .position-layout {
@@ -65,54 +77,59 @@ export default {
   flex-direction: column;
   width: 95%;
   margin: 0 auto;
-  gap: 3px;
+  gap: var(--space-1);
 }
 
 .data-row {
   display: flex;
   align-items: center;
-  gap: 3px;
+  gap: var(--space-1);
 }
 
 .axis-label {
   width: 30%;
-  font-weight: bold;
-  font-size: 1.6rem;
-  color: white;
+  font-weight: var(--font-weight-bold);
+  font-size: var(--font-size-2xl);
+  color: var(--color-text-secondary);
   display: flex;
   align-items: center;
   justify-content: center;
-  height: 60px;
+  min-height: var(--touch-target-min);
 }
 
 .boxed {
   width: 70%;
-  background-color: rgb(41, 41, 41);
-  border-radius: 8px;
-  padding: 1rem;
+  background-color: var(--color-bg-tertiary);
+  border-radius: var(--border-radius-lg);
+  padding: var(--space-4);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1.6rem;
-  font-weight: bold;
-  font-family: monospace;
-  height: 60px;
+  font-size: var(--font-size-2xl);
+  font-weight: var(--font-weight-bold);
+  font-family: var(--font-family-mono);
+  min-height: var(--touch-target-min);
   box-sizing: border-box;
-  color: rgb(224, 181, 102);
+  color: var(--color-primary-light);
+  border: var(--border-width-1) solid var(--color-border-secondary);
+  transition: var(--transition-hover);
 }
 
-
+.boxed:hover {
+  border-color: var(--color-primary);
+  box-shadow: var(--shadow-base);
+}
 
 .axis-info {
   text-align: center;
-  margin-bottom: 1rem;
+  margin-bottom: var(--space-4);
 }
 
 .axis-info h3 {
-  margin: 0;
-  color: #ffffff;
-  font-size: 1.4rem;
-  font-weight: bold;
+  margin: var(--space-0);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-bold);
 }
 </style>
 

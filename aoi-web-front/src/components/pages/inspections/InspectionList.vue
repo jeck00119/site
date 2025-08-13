@@ -154,7 +154,7 @@
                 </div>
                 <transition name="error">
                     <div class="error" v-if="invalidName">
-                        <p>Component name should not be an empty string.</p>
+                        <p>Column name is required and cannot be empty.</p>
                     </div>
                 </transition>
                 <div class="form-control">
@@ -203,12 +203,15 @@
 
 <script>
 import { ref, computed, onMounted } from 'vue';
-import { useStore } from 'vuex';
+import { useInspectionListStore, useAuthStore, useConfigurationsStore, useLogStore } from '@/composables/useStore';
+import { createLogger } from '@/utils/logger';
+import { addErrorToStore, handleApiError } from '@/utils/errorHandler';
+import { validateRequired } from '@/utils/validation';
 
 import ExcelJS from 'exceljs';
 
 import UploadInspectionList from '../../inspection_list/UploadInspectionList.vue';
-import useNotification from '../../../hooks/notifications.js';
+import useNotification from '../../../hooks/notifications.ts';
 
 export default{
     components: {
@@ -216,29 +219,25 @@ export default{
     },
 
     setup() {
-        const store = useStore();
+        const logger = createLogger('InspectionList');
+        
+        // Use centralized store composables
+        const { inspectionList, currentInspection, loadInspectionList, updateInspectionList } = useInspectionListStore();
+        const { currentUser } = useAuthStore();
+        const { currentConfiguration } = useConfigurationsStore();
+        const { addLog } = useLogStore();
+        
+        // For remaining store access until fully migrated
+        const { store } = useInspectionListStore();
 
         const showUpload = ref(false);
 
-        const currentConfiguration = computed(function() {
-            return store.getters["configurations/getCurrentConfiguration"];
-        });
+        // Configuration and user are now from centralized composables
 
-        const currentUser = computed(function() {
-            return store.getters["auth/getCurrentUser"];
-        });
-
-        const inspections = computed(function() {
-            return store.getters["inspections/getInspections"];
-        });
-
-        const columnNames = computed(function() {
-            return store.getters["inspections/getColumnNames"];
-        });
-
-        const columnTypes = computed(function() {
-            return store.getters["inspections/getColumnTypes"];
-        });
+        // Inspections data from centralized store
+        const inspections = computed(() => store.getters["inspections/getInspections"]);
+        const columnNames = computed(() => store.getters["inspections/getColumnNames"]);
+        const columnTypes = computed(() => store.getters["inspections/getColumnTypes"]);
 
         const editable = ref(false);
 
@@ -308,16 +307,19 @@ export default{
                         store.dispatch("inspections/setColumnNames", Object.keys(inspections.value[0]));
                         store.dispatch("inspections/setColumnTypes", Array(columnNames.value.length).fill('String'));
 
-                        store.dispatch("log/addEvent", {
+                        addLog({
                             type: 'INSPECTION LIST',
                             user: currentUser.value ? currentUser.value.username : 'Unknown',
                             title: 'Inspection List Uploaded',
                             description: `Inspection list: ${file.name} was uploaded.`
                         });
+                        
+                        logger.info('Inspection list uploaded successfully', { fileName: file.name });
                     }
                 }
             } catch (error) {
-                console.error('Error reading Excel file:', error);
+                logger.error('Failed to read Excel file', error);
+                handleApiError(null, null, 'Excel file reading');
                 setNotification(3000, 'Error reading Excel file: ' + error.message, 'bi-exclamation-circle-fill');
             }
 
@@ -397,7 +399,7 @@ export default{
                 link.click();
                 window.URL.revokeObjectURL(url);
             } catch (error) {
-                console.error('Error exporting Excel file:', error);
+                logger.error('Failed to export Excel file', error);
                 setNotification(3000, 'Error exporting Excel file: ' + error.message, 'bi-exclamation-circle-fill');
             }
         }
@@ -471,12 +473,14 @@ export default{
 
             inspections.value.push(row);
 
-            store.dispatch("log/addEvent", {
+            addLog({
                 type: 'INSPECTION LIST',
                 user: currentUser.value ? currentUser.value.username : 'Unknown',
                 title: 'New Row Added',
-                description: 'A new row was added to the current inpection list.'
+                description: 'A new row was added to the current inspection list.'
             });
+            
+            logger.debug('New row added to inspection list');
         }
 
         function deleteRow(){
@@ -486,12 +490,14 @@ export default{
                 selectedRow.value = null;
             }
 
-            store.dispatch("log/addEvent", {
+            addLog({
                 type: 'INSPECTION LIST',
                 user: currentUser.value ? currentUser.value.username : 'Unknown',
                 title: 'Row Deleted',
                 description: `Row with index ${selectedRow.value} was deleted from the current inspection list.`
             });
+            
+            logger.debug('Row deleted from inspection list', { rowIndex: selectedRow.value });
         }
 
         function selectColumn(idx) {
@@ -506,12 +512,15 @@ export default{
         }
 
         function addColumn() {
-            if(columnName.value === '')
-            {
+            // Validate column name using centralized validation
+            const validation = validateRequired(columnName.value, 'Column name');
+            if (!validation.isValid) {
                 invalidName.value = true;
+                logger.warn('Column validation failed', { errors: validation.errors });
                 return;
             }
-            else
+            
+            invalidName.value = false;
             {
                 if(columnEditMode.value)
                 {
@@ -529,12 +538,14 @@ export default{
 
                     columnEditMode.value = false;
 
-                    store.dispatch("log/addEvent", {
+                    addLog({
                         type: 'INSPECTION LIST',
                         user: currentUser.value ? currentUser.value.username : 'Unknown',
                         title: 'Column Name Modified',
                         description: `Column name was modified from ${oldName}: ${oldType} to ${columnName.value}: ${columnType.value}`
                     });
+                    
+                    logger.info('Column modified', { from: `${oldName}:${oldType}`, to: `${columnName.value}:${columnType.value}` });
                 }
                 else
                 {
@@ -546,12 +557,14 @@ export default{
                         inspection[columnName.value] = '';
                     }
 
-                    store.dispatch("log/addEvent", {
+                    addLog({
                         type: 'INSPECTION LIST',
                         user: currentUser.value ? currentUser.value.username : 'Unknown',
                         title: 'New Column Added',
                         description: `A new column with name ${columnName.value} and type ${columnType.value} was added.`
                     });
+                    
+                    logger.info('New column added', { name: columnName.value, type: columnType.value });
                 }
 
                 closeAddDialog();
@@ -572,12 +585,14 @@ export default{
 
                 selectedColumn.value = null;
 
-                store.dispatch("log/addEvent", {
+                addLog({
                     type: 'INSPECTION LIST',
                     user: currentUser.value ? currentUser.value.username : 'Unknown',
                     title: 'Column Deleted',
                     description: `Column ${columnName} was deleted.`
                 });
+                
+                logger.debug('Column deleted', { columnName });
             }
         }
 
@@ -586,7 +601,7 @@ export default{
             selectedRow.value = null;
         }
 
-        function saveInspectionList() {
+        async function saveInspectionList() {
             let data = convertTableToJSON();
 
             let inspections = {}
@@ -610,27 +625,39 @@ export default{
             }
 
             try {
-                store.dispatch("inspections/updateInspectionList", {
+                logger.debug('Saving inspection list');
+                
+                await updateInspectionList({
                     columns: columnNames.value,
                     columnTypes: columnTypes.value,
                     inspections: inspections
                 });
 
-                store.dispatch("log/addEvent", {
+                addLog({
                     type: 'INSPECTION LIST',
                     user: currentUser.value ? currentUser.value.username : 'Unknown',
-                    title: 'Inslection List Saved',
+                    title: 'Inspection List Saved',
                     description: `Inspection list was saved.`
                 });
-            }catch(err) {
-                setNotification(3000, err, 'bi-exclamation-circle-fill');
+                
+                logger.info('Inspection list saved successfully');
+            } catch(err) {
+                logger.error('Failed to save inspection list', err);
+                setNotification(3000, err.message || err, 'bi-exclamation-circle-fill');
             }
         }
 
-        onMounted(() => {
-            if(currentConfiguration.value)
-            {
-                store.dispatch("inspections/loadInspectionList");
+        onMounted(async () => {
+            logger.lifecycle('mounted', 'InspectionList component mounted');
+            
+            if(currentConfiguration.value) {
+                try {
+                    logger.debug('Loading inspection list');
+                    await loadInspectionList();
+                    logger.info('Inspection list loaded successfully');
+                } catch(error) {
+                    logger.error('Failed to load inspection list', error);
+                }
             }
         });
 

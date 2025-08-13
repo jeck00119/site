@@ -12,7 +12,7 @@ from api.dependencies.services import get_service_by_type
 from api.error_handlers import create_error_response, validate_authentication
 from api.route_utils import RouteHelper, require_authentication
 from repo.repositories import UsersRepository
-from security.validators import SecurityValidator
+from security.validators import SecurityValidator, validate_input, detect_security_threats
 from services.authentication.auth_service import AuthService
 from services.authentication.user_model import User
 from services.authorization.authorization import get_current_user
@@ -29,23 +29,30 @@ class UserRoleData(BaseModel):
 
 
 @router.post("/login")
+@detect_security_threats()
 async def login(
         user_data: OAuth2PasswordRequestForm = Depends(OAuth2PasswordRequestForm),
         auth_service: AuthService = Depends(get_service_by_type(AuthService))
 ) -> JSONResponse:
     try:
-        # Validate @forvia email domain
-        if not user_data.username or '@forvia' not in user_data.username.lower():
+        # Use SecurityValidator for comprehensive email validation
+        validator = SecurityValidator()
+        if not validator.validate_input(user_data.username, "email"):
             raise create_error_response(
                 operation="authenticate",
                 entity_type="User",
                 entity_id=user_data.username,
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                custom_message="Only @forvia email addresses are allowed"
+                custom_message="Invalid email format or non-Forvia domain"
             )
+        
+        # Sanitize input
+        sanitized_username = validator.sanitize_input(user_data.username, "html")
+        user_data.username = sanitized_username
         
         user_status, user, auth_result = auth_service.is_authenticated(user_data.username, user_data.password)
         if user_status:
+            print(f"User authenticated successfully: {user['username']} with level: {user['level']}")
             token_data = {"username": user["username"], "level": user["level"]}
             expires = datetime.utcnow() + timedelta(seconds=28800)
             token_data.update({"exp": expires})
@@ -59,6 +66,7 @@ async def login(
             response.headers["User-Data"] = user["username"]
             response.headers["Level"] = user["level"]
             response.headers["Token-Expiration"] = "28800"
+            print(f"Sending response with headers - User: {user['username']}, Level: {user['level']}")
             return response
         else:
             # Provide specific error messages based on authentication failure reason
@@ -91,21 +99,27 @@ async def login(
 
 
 @router.post("/create_user")
+@validate_input(username="email", password="password")
+@detect_security_threats()
 async def create_user(
         user: User,
         auth_service: AuthService = Depends(get_service_by_type(AuthService)),
         users_repository: UsersRepository = Depends(get_service_by_type(UsersRepository))
 ) -> JSONResponse:
     try:
-        # Validate @forvia email domain
-        if not user.username or '@forvia' not in user.username.lower():
+        # Additional validation using SecurityValidator
+        validator = SecurityValidator()
+        if not validator.validate_input(user.username, "email"):
             raise create_error_response(
                 operation="create_user",
                 entity_type="User",
                 entity_id=user.username,
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                custom_message="Only @forvia email addresses are allowed"
+                custom_message="Invalid email format or non-Forvia domain"
             )
+        
+        # Sanitize username
+        user.username = validator.sanitize_input(user.username, "html")
         
         print(f"Creating user: {user.username} with uid: {user.uid}")
         
@@ -151,6 +165,8 @@ async def create_user(
 
 
 @router.post("/update_role")
+@validate_input(uid="safe_string", role="safe_string")
+@detect_security_threats()
 async def update_users_role(
         user_data: UserRoleData,
         user: Dict[str, Any] = Depends(require_authentication("update user role")),

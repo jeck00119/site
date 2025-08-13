@@ -68,14 +68,27 @@ class FileHandler(Handler):
 
     def read(self):
         entries = []
-        with self.lock:
-            with open(self.path, 'r') as log_file:
-                logs = log_file.readlines()
-                logs = [log.strip() for log in logs]
-                for log in logs:
-                    entry = self.formatter.unzip(log)
-                    entries.append(entry)
-
+        try:
+            with self.lock:
+                # Check if file exists and is not empty
+                if not os.path.exists(self.path) or os.path.getsize(self.path) == 0:
+                    return entries
+                    
+                with open(self.path, 'r') as log_file:
+                    logs = log_file.readlines()
+                    logs = [log.strip() for log in logs if log.strip()]  # Skip empty lines
+                    for log in logs:
+                        try:
+                            entry = self.formatter.unzip(log)
+                            if entry:  # Only add valid entries
+                                entries.append(entry)
+                        except Exception as e:
+                            # Skip malformed entries silently
+                            continue
+        except Exception as e:
+            # Return empty list on any file reading error
+            pass
+            
         return entries
 
     def remove(self, idx: int):

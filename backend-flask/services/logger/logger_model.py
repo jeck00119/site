@@ -1,3 +1,4 @@
+from typing import Optional
 from src.utils import CamelModel
 
 
@@ -11,4 +12,4 @@ class AppEntry(Entry):
     type: str
     title: str
     description: str
-    details: str
+    details: Optional[str] = None

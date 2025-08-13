@@ -14,6 +14,7 @@
           class="button-wide custom-loc-button"
           type="button"
           :data-shortcut-index="`${(row-1)*3 + col-1}`"
+          :disabled="!isConnected"
         >
           {{ shortcuts[(row-1)*3 + col-1]?.name || '' }}
         </button>
@@ -60,7 +61,7 @@
 
 <script>
 import { ref, computed, onMounted } from "vue";
-import { useStore } from "vuex";
+import { useCncStore } from '@/composables/useStore';
 
 export default {
   name: "LocationShortcuts",
@@ -68,11 +69,15 @@ export default {
     axisUid: {
       type: String,
       required: true
+    },
+    isConnected: {
+      type: Boolean,
+      default: false
     }
   },
   emits: ['shortcut-executed', 'shortcut-configured'],
   setup(props, { emit }) {
-    const store = useStore();
+    const cncStore = useCncStore();
     
     const showShortcutDialog = ref(false);
     const selectedLocation = ref(null);
@@ -81,7 +86,10 @@ export default {
     const currentShortcutIndex = ref(null);
     const currentShortcutButton = ref(null);
 
-    const locations = computed(() => store.getters["cnc/locations"]);
+    // These are already computed refs from the composables
+
+
+    const locations = cncStore.locations;
 
     onMounted(() => {
       loadShortcuts();
@@ -105,6 +113,11 @@ export default {
     }
 
     function openShortcutDialog(event) {
+      // Only allow configuration when connected
+      if (!props.isConnected) {
+        return;
+      }
+      
       currentShortcutButton.value = event.target;
       currentShortcutIndex.value = parseInt(event.target.dataset.shortcutIndex);
       renamedLocation.value = '';
@@ -123,8 +136,9 @@ export default {
       const shortcutIndex = parseInt(event.target.dataset.shortcutIndex);
       const shortcut = shortcuts.value[shortcutIndex];
       
-      if (shortcut && shortcut.locationUid) {
-        store.dispatch("cnc/api_moveToLocation", {
+      // Only execute if connected and shortcut exists
+      if (props.isConnected && shortcut && shortcut.locationUid) {
+        cncStore.moveToLocation({
           cncUid: props.axisUid,
           location: shortcut.locationUid,
           timeout: 5,
@@ -160,14 +174,14 @@ export default {
     async function renameLocation() {
       if (renamedLocation.value.trim() !== "" && selectedLocation.value) {
         try {
-          await store.dispatch("cnc/patchLocation", {
+          await cncStore.patchLocation({
             locationUid: selectedLocation.value.uid, 
             newName: renamedLocation.value
           });
           
           // Refresh locations after rename
           setTimeout(() => {
-            store.dispatch("cnc/fetchLocations", props.axisUid);
+            cncStore.fetchLocations(props.axisUid);
           }, 300);
           
           emit('shortcut-configured', {
@@ -262,10 +276,16 @@ export default {
   transition: all 0.2s ease;
 }
 
-.button-wide:hover {
+.button-wide:hover:not(:disabled) {
   box-shadow: rgba(255, 255, 255, 0.2) 0 3px 15px inset,
     rgba(0, 0, 0, 0.1) 0 3px 5px, rgba(0, 0, 0, 0.1) 0 10px 13px;
   transform: scale(1.05);
+}
+
+.button-wide:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
 }
 
 .custom-loc-button {

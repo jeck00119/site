@@ -127,9 +127,11 @@
                             <div class="algorithm-list">
                                 <vue-multiselect
                                     v-model="currentAlgorithmName"
-                                    :options="algorithms.map(alg => alg.type)"
+                                    :options="Array.isArray(algorithms) ? algorithms.map(alg => alg && alg.type ? alg.type : String(alg)).filter(Boolean) : []"
                                     placeholder="Select Algorithm"
                                     :searchable="true"
+                                    :close-on-select="true"
+                                    :clear-on-select="false"
                                 ></vue-multiselect>
                             </div>
                             <div class="algorithm-parameters" v-if="currentAlgorithmName">
@@ -200,7 +202,52 @@ export default {
 
     emits: ['reference-changed', 'algorithm-changed', 'import-path-changed', 'download-algorithm', 'single-run', 'live-process', 'single-run-reference', 'live-process-reference', 'tab-changed'],
 
-    props: ['algorithms', 'referenceAlgorithms', 'currentAlgorithm', 'algorithmAttributes', 'parameters', 'currentReferenceAlgorithm', 'referenceAlgorithmAttributes', 'referenceParameters', 'width', 'height', 'disableActions'],
+    props: {
+        algorithms: { 
+            type: Array, 
+            default: () => [] 
+        },
+        referenceAlgorithms: { 
+            type: Array, 
+            default: () => [] 
+        },
+        currentAlgorithm: { 
+            type: Object, 
+            default: () => null 
+        },
+        algorithmAttributes: { 
+            type: Array, 
+            default: () => [] 
+        },
+        parameters: { 
+            type: Array, 
+            default: () => [] 
+        },
+        currentReferenceAlgorithm: { 
+            type: Object, 
+            default: () => null 
+        },
+        referenceAlgorithmAttributes: { 
+            type: Array, 
+            default: () => [] 
+        },
+        referenceParameters: { 
+            type: Array, 
+            default: () => [] 
+        },
+        width: { 
+            type: String, 
+            default: '100%' 
+        },
+        height: { 
+            type: String, 
+            default: '100%' 
+        },
+        disableActions: { 
+            type: Boolean, 
+            default: false 
+        }
+    },
 
     setup(_, context){
         const tabs = ref(['References', 'Detections']);
@@ -219,6 +266,7 @@ export default {
         });
 
         watch(currentAlgorithmName, (newValue) => {
+            console.log('AlgorithmDebugControl: currentAlgorithmName changed to:', newValue);
             context.emit('algorithm-changed', newValue);
         });
 

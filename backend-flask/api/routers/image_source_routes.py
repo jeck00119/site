@@ -10,6 +10,7 @@ from wsproto.utilities import LocalProtocolError
 from api.dependencies.services import get_service_by_type
 from api.error_handlers import create_error_response
 from api.route_utils import RouteHelper, require_authentication
+from security.validators import validate_input, detect_security_threats, validate_file_upload
 from api.ws_connection_manager import ConnectionManager
 from repo.repositories import ImageSourceRepository
 from repo.repository_exceptions import UidNotFound, UidNotUnique
@@ -45,6 +46,7 @@ async def list_image_sources(
 
 
 @router.get("/{image_source_uid}")
+@validate_input(image_source_uid="safe_string")
 async def get_image_source(
         image_source_uid: str,
         image_source_repository: ImageSourceRepository = Depends(get_service_by_type(ImageSourceRepository)),
@@ -58,12 +60,13 @@ async def get_image_source(
         )
         image_source_service.load_settings_to_image_source(uid=image_source_uid)
         result = ImageSourceModel(**entity)
-        return RouteHelper.create_success_response(result)
+        return RouteHelper.create_success_response(result.model_dump())
     except Exception as e:
         raise create_error_response("get", "ImageSource", entity_id=image_source_uid, exception=e)
 
 
 @router.post("")
+@detect_security_threats()
 async def post_image_source(
         image_source: ImageSourceModel,
         user: dict = Depends(require_authentication),
@@ -81,6 +84,8 @@ async def post_image_source(
 
 
 @router.put("/{image_source_uid}")
+@validate_input(image_source_uid="safe_string")
+@detect_security_threats()
 async def put_image_source(
         image_source: ImageSourceModel,
         user: dict = Depends(require_authentication),
@@ -130,30 +135,56 @@ async def websocket_endpoint(
         image_source_service: ImageSourceService = Depends(get_service_by_type(ImageSourceService)),
         camera_calibration_service: CameraCalibrationService = Depends(get_service_by_type(CameraCalibrationService))
 ):
-    await manager.connect(ws_uid, websocket)
-    image_source = image_source_repository.read_id(image_source_uid)
-
-    if image_source_service.check_image_source_type(image_source_uid) == ImgSrcEnum.DYNAMIC:
-        image_source_type = "dynamic"
-    elif image_source_service.check_image_source_type(image_source_uid) == ImgSrcEnum.STATIC:
-        image_source_type = "static"
     try:
+        await manager.connect(ws_uid, websocket)
+        
+        # Safely read image source configuration
+        try:
+            image_source = image_source_repository.read_id(image_source_uid)
+        except Exception as e:
+            print(f"Error reading image source {image_source_uid}: {e}")
+            await manager.disconnect(ws_uid)
+            return
+
+        if image_source_service.check_image_source_type(image_source_uid) == ImgSrcEnum.DYNAMIC:
+            image_source_type = "dynamic"
+        elif image_source_service.check_image_source_type(image_source_uid) == ImgSrcEnum.STATIC:
+            image_source_type = "static"
+            
         while True:
             if manager.is_closed(ws_uid):
                 break
 
-            frame = image_source_service.grab_from_image_source(image_source_uid)
+            try:
+                frame = image_source_service.grab_from_image_source(image_source_uid)
+                
+                if frame is None:
+                    continue
 
-            if image_source.get("camera_calibration_uid"):
-                frame = camera_calibration_service.undistort_image(frame, image_source.get("camera_calibration_uid"))
+                if image_source.get("camera_calibration_uid"):
+                    frame = camera_calibration_service.undistort_image(frame, image_source.get("camera_calibration_uid"))
 
-            image = frame_to_base64(frame)
-            ret = {'frame': image.decode('utf-8'),
-                   'placeholder': ''}
-            # await websocket.send_json(ret)
-            await websocket.send_bytes(image)
-            # if image_source_type == ImgSrcEnum.STATIC:
-            await sleep(1 / image_source['fps'])
+                # Handle frame encoding with proper error handling
+                try:
+                    image = frame_to_base64(frame, quality=85)
+                    await websocket.send_bytes(image)
+                except (ValueError, TypeError) as e:
+                    print(f"Frame encoding error for image source {image_source_uid}: {e}")
+                    continue
+                except Exception as e:
+                    print(f"WebSocket send error for {ws_uid}: {e}")
+                    break
+                    
+            except Exception as e:
+                print(f"Error grabbing frame from image source {image_source_uid}: {e}")
+                continue
+                
+            try:
+                fps = image_source.get('fps', 10)  # Default to 10 FPS if not set
+                await sleep(1 / fps)
+            except Exception as e:
+                print(f"Error in sleep: {e}")
+                await sleep(0.1)  # Fallback sleep
 
         print("Exiting loop...")
         await manager.disconnect(ws_uid)
@@ -193,19 +224,36 @@ async def websocket_live_image_source_with_fps(
             if manager.is_closed(ws_uid):
                 break
 
-            image = np.zeros(shape=(640, 480, 3), dtype=np.uint8)
-            if image_source_type == ImgSrcEnum.DYNAMIC:
-                image = image_source_service.camera_service.grab_from_camera(generator_or_camera_uid)
+            try:
+                image = np.zeros(shape=(640, 480, 3), dtype=np.uint8)
+                if image_source_type == "dynamic":
+                    image = image_source_service.camera_service.grab_from_camera(generator_or_camera_uid)
 
-                if image_source.get("camera_calibration_uid"):
-                    image = camera_calibration_service.undistort_image(image,
-                                                                       image_source.get("camera_calibration_uid"))
-            elif image_source_type == ImgSrcEnum.STATIC:
-                image = image_source_service.image_generator_service.grab_from_generator(generator_or_camera_uid)
-            image_source_service.images_sources_last_frame[image_source_uid] = image
-            image_bytes = frame_to_base64(image)
-            await websocket.send_bytes(image_bytes)
-            # if image_source_type == ImgSrcEnum.STATIC:
+                    if image_source.get("camera_calibration_uid"):
+                        image = camera_calibration_service.undistort_image(image,
+                                                                           image_source.get("camera_calibration_uid"))
+                elif image_source_type == "static":
+                    image = image_source_service.image_generator_service.grab_from_generator(generator_or_camera_uid)
+                
+                image_source_service.images_sources_last_frame[image_source_uid] = image
+                
+                # Handle frame encoding with proper error handling
+                try:
+                    image_bytes = frame_to_base64(image, quality=85)
+                    await websocket.send_bytes(image_bytes)
+                except (ValueError, TypeError) as e:
+                    print(f"Frame encoding error for image source {image_source_uid}: {e}")
+                    # Skip this frame and continue with next one
+                    continue
+                except Exception as e:
+                    print(f"WebSocket send error for {ws_uid}: {e}")
+                    # WebSocket connection is likely closed, break the loop
+                    break
+                    
+            except Exception as e:
+                print(f"Error processing frame for image source {image_source_uid}: {e}")
+                # Continue loop to try again
+                continue
 
             await sleep(1 / int(fps))
 

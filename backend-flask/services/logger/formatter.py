@@ -26,15 +26,46 @@ class TraceabilityFormatter(Formatter):
 
     @staticmethod
     def unzip(log_entry: str):
-        timestamp, user, log_type, title, description, details_str = log_entry.split(';')
-
-        details_lst = json.loads(details_str)
-
-        return {
-            'timestamp': timestamp,
-            'user': user,
-            'type': log_type,
-            'title': title,
-            'description': description,
-            'details': details_lst
-        }
+        try:
+            # Try to parse the standard format
+            parts = log_entry.split(';')
+            if len(parts) == 6:
+                timestamp, user, log_type, title, description, details_str = parts
+                
+                # Handle empty or invalid details
+                try:
+                    if details_str and details_str.strip():
+                        details_lst = json.loads(details_str)
+                    else:
+                        details_lst = []
+                except (json.JSONDecodeError, ValueError):
+                    details_lst = []
+                
+                return {
+                    'timestamp': timestamp,
+                    'user': user,
+                    'type': log_type,
+                    'title': title,
+                    'description': description,
+                    'details': details_lst
+                }
+            else:
+                # Return a default entry for malformed log lines
+                return {
+                    'timestamp': '',
+                    'user': 'system',
+                    'type': 'ERROR',
+                    'title': 'Malformed log entry',
+                    'description': log_entry[:100],  # First 100 chars
+                    'details': []
+                }
+        except Exception as e:
+            # Return a safe default for any parsing errors
+            return {
+                'timestamp': '',
+                'user': 'system',
+                'type': 'ERROR',
+                'title': 'Log parsing error',
+                'description': str(e),
+                'details': []
+            }

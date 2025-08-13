@@ -76,10 +76,10 @@ import AlgorithmResultTable from '../../layout/AlgorithmResultTable.vue';
 import MaskScene from '../../layout/MaskScene.vue';
 import JsonDataContainer from '../../layout/JsonDataRenderer.vue';
 import { ipAddress, port } from '../../../url';
-import useAlgorithms from '../../../hooks/algorithms.js';
-import useComponents from '../../../hooks/components.js';
-import useGraphics from '../../../hooks/graphics.js';
-import useNotification from '../../../hooks/notifications.js';
+import useAlgorithms from '../../../hooks/algorithms.ts';
+import useComponents from '../../../hooks/components.ts';
+import useGraphics from '../../../hooks/graphics.ts';
+import useNotification from '../../../hooks/notifications.ts';
 
 export default {
     components: {
@@ -134,7 +134,7 @@ export default {
         const components = computed(function () {
             const c = store.getters["components/getIdentifications"];
             componentsRetrieving.value = false;
-            return c;
+            return Array.isArray(c) ? c : [];
         });
 
         const references = computed(function () {

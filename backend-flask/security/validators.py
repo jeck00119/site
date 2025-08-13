@@ -382,265 +382,149 @@ class SecurityValidator:
         except Exception:
             # If we can't analyze the content, be conservative
             return True
+
+
+# Validation Decorators for Routes
+
+import functools
+from typing import Dict, Any, Callable
+from fastapi import HTTPException, status
+
+def validate_input(**validation_rules):
+    """
+    Decorator to validate route input parameters.
     
-    def validate_algorithm_property(self, key: str, value: Any) -> Dict[str, Any]:
-        """
-        Validate algorithm property values with centralized logic.
+    Args:
+        validation_rules: Mapping of parameter names to validation types
         
-        Args:
-            key: Property name (e.g., 'golden_position', 'graphics')
-            value: Property value to validate
+    Usage:
+        @validate_input(email="email", username="username", password="password")
+        async def create_user(email: str, username: str, password: str):
+            pass
+    """
+    def decorator(func: Callable) -> Callable:
+        @functools.wraps(func)
+        async def async_wrapper(*args, **kwargs):
+            validator = SecurityValidator()
             
-        Returns:
-            Dict with 'valid', 'error_message', and 'sanitized_value' keys
-        """
-        try:
-            # Specific validation rules for algorithm properties
-            validation_rules = {
-                'golden_position': self._validate_golden_position,
-                'graphics': self._validate_graphics,
-                'model_path': self._validate_model_path,
-                'confidence_threshold': self._validate_confidence_threshold,
-                'iou_threshold': self._validate_iou_threshold,
-                'reference_point_idx': self._validate_reference_point_idx,
-            }
+            # Validate each specified parameter
+            for param_name, validation_type in validation_rules.items():
+                if param_name in kwargs:
+                    value = kwargs[param_name]
+                    if not validator.validate_input(value, validation_type):
+                        raise HTTPException(
+                            status_code=status.HTTP_400_BAD_REQUEST,
+                            detail=f"Invalid {param_name}: {validation_type} validation failed"
+                        )
+                    
+                    # Sanitize the input
+                    sanitized = validator.sanitize_input(value)
+                    kwargs[param_name] = sanitized
             
-            # Get validator function or use generic validation
-            validator = validation_rules.get(key, self._validate_generic_algorithm_property)
+            return await func(*args, **kwargs)
+        
+        @functools.wraps(func)
+        def sync_wrapper(*args, **kwargs):
+            validator = SecurityValidator()
             
-            return validator(value)
+            # Validate each specified parameter
+            for param_name, validation_type in validation_rules.items():
+                if param_name in kwargs:
+                    value = kwargs[param_name]
+                    if not validator.validate_input(value, validation_type):
+                        raise HTTPException(
+                            status_code=status.HTTP_400_BAD_REQUEST,
+                            detail=f"Invalid {param_name}: {validation_type} validation failed"
+                        )
+                    
+                    # Sanitize the input
+                    sanitized = validator.sanitize_input(value)
+                    kwargs[param_name] = sanitized
             
-        except Exception as e:
-            self.logger.error(f"Algorithm property validation error for {key}: {e}")
-            return {
-                'valid': False,
-                'error_message': f"Validation failed for property '{key}': {str(e)}",
-                'sanitized_value': None
-            }
+            return func(*args, **kwargs)
+        
+        # Return appropriate wrapper based on function type
+        import inspect
+        if inspect.iscoroutinefunction(func):
+            return async_wrapper
+        else:
+            return sync_wrapper
     
-    def _validate_golden_position(self, value: Any) -> Dict[str, Any]:
-        """Validate golden_position property."""
-        try:
-            # Must be a list of exactly 2 numeric values
-            if not isinstance(value, (list, tuple)):
-                return {
-                    'valid': False,
-                    'error_message': f"golden_position must be a list or tuple, got {type(value).__name__}",
-                    'sanitized_value': None
-                }
-            
-            if len(value) != 2:
-                return {
-                    'valid': False,
-                    'error_message': f"golden_position must have exactly 2 values, got {len(value)}",
-                    'sanitized_value': None
-                }
-            
-            # Convert to list and validate numeric values
-            try:
-                sanitized = [float(x) for x in value]
-            except (ValueError, TypeError):
-                return {
-                    'valid': False,
-                    'error_message': "golden_position values must be numeric",
-                    'sanitized_value': None
-                }
-            
-            return {
-                'valid': True,
-                'error_message': None,
-                'sanitized_value': sanitized
-            }
-            
-        except Exception as e:
-            return {
-                'valid': False,
-                'error_message': f"golden_position validation error: {str(e)}",
-                'sanitized_value': None
-            }
+    return decorator
+
+def validate_file_upload(allowed_types: list = None, max_size_mb: int = None):
+    """
+    Decorator to validate file uploads.
     
-    def _validate_graphics(self, value: Any) -> Dict[str, Any]:
-        """Validate graphics property."""
-        try:
-            if not isinstance(value, list):
-                return {
-                    'valid': False,
-                    'error_message': f"graphics must be a list, got {type(value).__name__}",
-                    'sanitized_value': None
-                }
+    Args:
+        allowed_types: List of allowed file extensions
+        max_size_mb: Maximum file size in MB
+        
+    Usage:
+        @validate_file_upload(allowed_types=['.jpg', '.png'], max_size_mb=10)
+        async def upload_image(file: UploadFile):
+            pass
+    """
+    def decorator(func: Callable) -> Callable:
+        @functools.wraps(func)
+        async def wrapper(*args, **kwargs):
+            validator = SecurityValidator()
             
-            # Basic validation - each graphic should be a dict
-            for i, graphic in enumerate(value):
-                if not isinstance(graphic, dict):
-                    return {
-                        'valid': False,
-                        'error_message': f"graphics[{i}] must be a dictionary, got {type(graphic).__name__}",
-                        'sanitized_value': None
-                    }
+            # Find file parameters
+            for param_name, param_value in kwargs.items():
+                if hasattr(param_value, 'filename') and hasattr(param_value, 'read'):
+                    # This is a file upload
+                    content = await param_value.read()
+                    validation_result = validator.validate_file_upload(
+                        param_value.filename, 
+                        content,
+                        allowed_types=allowed_types,
+                        max_size_mb=max_size_mb
+                    )
+                    
+                    if not validation_result["valid"]:
+                        raise HTTPException(
+                            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                            detail=f"File validation failed: {', '.join(validation_result['errors'])}"
+                        )
+                    
+                    # Reset file pointer
+                    param_value.file.seek(0)
             
-            return {
-                'valid': True,
-                'error_message': None,
-                'sanitized_value': value
-            }
-            
-        except Exception as e:
-            return {
-                'valid': False,
-                'error_message': f"graphics validation error: {str(e)}",
-                'sanitized_value': None
-            }
+            return await func(*args, **kwargs)
+        
+        return wrapper
+    return decorator
+
+def detect_security_threats(check_all_strings: bool = True):
+    """
+    Decorator to detect security threats in input parameters.
     
-    def _validate_model_path(self, value: Any) -> Dict[str, Any]:
-        """Validate model_path property."""
-        try:
-            if not isinstance(value, str):
-                return {
-                    'valid': False,
-                    'error_message': f"model_path must be a string, got {type(value).__name__}",
-                    'sanitized_value': None
-                }
+    Args:
+        check_all_strings: If True, check all string parameters for threats
+        
+    Usage:
+        @detect_security_threats()
+        async def process_user_input(data: str):
+            pass
+    """
+    def decorator(func: Callable) -> Callable:
+        @functools.wraps(func)
+        async def wrapper(*args, **kwargs):
+            validator = SecurityValidator()
             
-            # Sanitize the path for security
-            sanitized = self._sanitize_filename(value)
+            if check_all_strings:
+                for param_name, param_value in kwargs.items():
+                    if isinstance(param_value, str):
+                        threats = validator.detect_threats(param_value)
+                        if threats:
+                            raise HTTPException(
+                                status_code=status.HTTP_400_BAD_REQUEST,
+                                detail=f"Security threats detected in {param_name}: {', '.join(threats)}"
+                            )
             
-            return {
-                'valid': True,
-                'error_message': None,
-                'sanitized_value': sanitized
-            }
-            
-        except Exception as e:
-            return {
-                'valid': False,
-                'error_message': f"model_path validation error: {str(e)}",
-                'sanitized_value': None
-            }
-    
-    def _validate_confidence_threshold(self, value: Any) -> Dict[str, Any]:
-        """Validate confidence_threshold property."""
-        try:
-            try:
-                float_value = float(value)
-            except (ValueError, TypeError):
-                return {
-                    'valid': False,
-                    'error_message': "confidence_threshold must be numeric",
-                    'sanitized_value': None
-                }
-            
-            if not 0.0 <= float_value <= 1.0:
-                return {
-                    'valid': False,
-                    'error_message': "confidence_threshold must be between 0.0 and 1.0",
-                    'sanitized_value': None
-                }
-            
-            return {
-                'valid': True,
-                'error_message': None,
-                'sanitized_value': float_value
-            }
-            
-        except Exception as e:
-            return {
-                'valid': False,
-                'error_message': f"confidence_threshold validation error: {str(e)}",
-                'sanitized_value': None
-            }
-    
-    def _validate_iou_threshold(self, value: Any) -> Dict[str, Any]:
-        """Validate iou_threshold property."""
-        try:
-            try:
-                float_value = float(value)
-            except (ValueError, TypeError):
-                return {
-                    'valid': False,
-                    'error_message': "iou_threshold must be numeric",
-                    'sanitized_value': None
-                }
-            
-            if not 0.0 <= float_value <= 1.0:
-                return {
-                    'valid': False,
-                    'error_message': "iou_threshold must be between 0.0 and 1.0",
-                    'sanitized_value': None
-                }
-            
-            return {
-                'valid': True,
-                'error_message': None,
-                'sanitized_value': float_value
-            }
-            
-        except Exception as e:
-            return {
-                'valid': False,
-                'error_message': f"iou_threshold validation error: {str(e)}",
-                'sanitized_value': None
-            }
-    
-    def _validate_reference_point_idx(self, value: Any) -> Dict[str, Any]:
-        """Validate reference_point_idx property."""
-        try:
-            try:
-                int_value = int(value)
-            except (ValueError, TypeError):
-                return {
-                    'valid': False,
-                    'error_message': "reference_point_idx must be an integer",
-                    'sanitized_value': None
-                }
-            
-            if int_value < 0:
-                return {
-                    'valid': False,
-                    'error_message': "reference_point_idx must be non-negative",
-                    'sanitized_value': None
-                }
-            
-            return {
-                'valid': True,
-                'error_message': None,
-                'sanitized_value': int_value
-            }
-            
-        except Exception as e:
-            return {
-                'valid': False,
-                'error_message': f"reference_point_idx validation error: {str(e)}",
-                'sanitized_value': None
-            }
-    
-    def _validate_generic_algorithm_property(self, value: Any) -> Dict[str, Any]:
-        """Generic validation for unknown algorithm properties."""
-        try:
-            # Basic security check - no malicious content
-            if isinstance(value, str):
-                threats = self.detect_threats(value)
-                if threats:
-                    return {
-                        'valid': False,
-                        'error_message': f"Property contains potential security threats: {', '.join(threats)}",
-                        'sanitized_value': None
-                    }
-                
-                # Sanitize string values
-                sanitized_value = self.sanitize_input(value, "html")
-            else:
-                sanitized_value = value
-            
-            return {
-                'valid': True,
-                'error_message': None,
-                'sanitized_value': sanitized_value
-            }
-            
-        except Exception as e:
-            return {
-                'valid': False,
-                'error_message': f"Generic validation error: {str(e)}",
-                'sanitized_value': None
-            }
+            return await func(*args, **kwargs)
+        
+        return wrapper
+    return decorator
 

@@ -9,7 +9,8 @@
 
 <script>
 import { ref, computed } from 'vue';
-import { useStore } from 'vuex';
+import { useErrorsStore } from '@/composables/useStore';
+import { createLogger } from '@/utils/logger';
 
 import TheErrorList from './TheErrorList.vue';
 
@@ -19,25 +20,25 @@ export default {
     },
 
     setup() {
-        const store = useStore();
-
-        const hasErrors = computed(function() {
-            return !store.getters['errors/isEmpty'];
-        });
-
-        const numberOfErrors = computed(function() {
-            return store.getters['errors/numberOfErrors'];
-        });
-
+        const logger = createLogger('TheErrorListButton');
+        
+        // Use centralized errors store composable
+        const { errors, hasErrors } = useErrorsStore();
+        const numberOfErrors = computed(() => errors.value.length);
+        
         const listVisible = ref(false);
 
         function showErrorList() {
+            logger.debug('Showing error list');
             listVisible.value = true;
-        };
+        }
 
         function hideErrorList() {
+            logger.debug('Hiding error list');
             listVisible.value = false;
-        };
+        }
+        
+        logger.lifecycle('mounted', 'TheErrorListButton component mounted');
 
         return {
             listVisible,
@@ -52,21 +53,26 @@ export default {
 
 <style scoped>
 button {
-    border: none;
-    border-radius: 50%;
-    padding: 10%;
-    color: black;
-    background-color: rgb(204, 161, 82);
-    box-shadow: 0 2px 4px black;
+    border: var(--border-width-0);
+    border-radius: var(--border-radius-full);
+    padding: var(--space-2);
+    color: var(--color-text-inverse);
+    background-color: var(--color-primary);
+    box-shadow: var(--shadow-button);
+    transition: var(--transition-button);
+}
+
+button:hover {
+    box-shadow: var(--shadow-button-hover);
 }
 
 .error-button {
     position: relative;
-    font-size: 1vw;
+    font-size: var(--font-size-sm);
     display: flex;
     justify-content: center;
     align-items: center;
-    margin: 0;
+    margin: var(--space-0);
     height: auto;
 }
 
@@ -74,15 +80,16 @@ button {
     position: absolute;
     top: -15%;
     right: -10%;
-    background-color: red;
-    border-radius: 50%;
+    background-color: var(--color-error);
+    border-radius: var(--border-radius-full);
     width: 50%;
     height: 50%;
-    color: white;
+    color: var(--color-text-secondary);
     display: flex;
     justify-content: center;
     align-items: center;
-    padding: 3%;
-    font-size: 0.8vw;
+    padding: var(--space-1);
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-bold);
 }
 </style>

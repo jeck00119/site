@@ -58,7 +58,7 @@
 
 <script>
 import { ref, computed, watch } from 'vue';
-import { useStore } from 'vuex';
+import { useImageSourcesStore } from '@/composables/useStore';
 
 import VueMultiselect from 'vue-multiselect';
 
@@ -75,7 +75,7 @@ export default {
     emits: ['files-dropped', 'image-source-changed', 'start-camera', 'stop-camera', 'reset-camera-scene'],
 
     setup(_, context){
-        const store = useStore();
+        const { imageSources } = useImageSourcesStore();
 
         const fileDropperActive = ref(false);
         const message = ref('Drag Image Here');
@@ -84,12 +84,9 @@ export default {
 
         const currentImageSource = ref(null);
 
-        const imageSources = computed(function() {
-            return store.getters["imageSources/getImageSources"];
-        });
-
         const imageSourcesNames = computed(function() {
-            return store.getters["imageSources/getImageSources"].map(imageSource => imageSource.name);
+            const sources = imageSources.value;
+            return Array.isArray(sources) ? sources.map(imageSource => imageSource.name) : [];
         });
 
         watch(currentImageSource, (newValue) => {

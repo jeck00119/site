@@ -32,15 +32,21 @@ class WebCamera(SlowUSBCamera):
             if camera_property == WebCameraSettings.resolution.name:
                 try:
                     ret_width = self._cap.set(cv2.CAP_PROP_FRAME_WIDTH, value[0])
-                except cv2.error:
+                except cv2.error as e:
+                    print(f"[ERROR] Resolution width {value[0]} (Exception: {e})")
                     ret_width = False
 
                 try:
                     ret_height = self._cap.set(cv2.CAP_PROP_FRAME_HEIGHT, value[1])
-                except cv2.error:
+                except cv2.error as e:
+                    print(f"[ERROR] Resolution height {value[1]} (Exception: {e})")
                     ret_height = False
 
                 if ret_width and ret_height:
+                    print(f"[SUCCESS] Resolution set to {value[0]}x{value[1]}")
+                    self._data[camera_property] = value
+                else:
+                    print(f"[FAILED] Resolution {value[0]}x{value[1]} (width: {ret_width}, height: {ret_height})")
                     self._data[camera_property] = value
             elif camera_property == WebCameraSettings.auto_exposure.name:
                 try:
@@ -48,16 +54,27 @@ class WebCamera(SlowUSBCamera):
                     ret = self._cap.set(self.settings[camera_property].value, val)
 
                     if ret:
+                        print(f"[SUCCESS] Auto exposure set to {val}")
                         self._data[camera_property] = val
-                except cv2.error:
-                    pass
+                    else:
+                        print(f"[FAILED] Auto exposure = {val} (camera rejected)")
+                        self._data[camera_property] = val
+                except cv2.error as e:
+                    print(f"[ERROR] Auto exposure = {val} (Exception: {e})")
+                    self._data[camera_property] = val
             else:
                 try:
                     ret = self._cap.set(self.settings[camera_property].value, int(value))
 
-                    print(f"Camera property: {camera_property} value: {value} ret: {ret}")
-
                     if ret:
+                        print(f"[SUCCESS] Camera property '{camera_property}' = {value}")
                         self._data[camera_property] = value
-                except cv2.error:
-                    pass
+                    else:
+                        print(f"[FAILED] Camera property '{camera_property}' = {value} (camera rejected)")
+                        # Still update internal data - camera might have accepted it despite returning False
+                        self._data[camera_property] = value
+                        
+                except cv2.error as e:
+                    print(f"[ERROR] Camera property '{camera_property}' = {value} (Exception: {e})")
+                    # Update internal data anyway
+                    self._data[camera_property] = value

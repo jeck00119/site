@@ -8,6 +8,7 @@ import logging
 from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Optional, Type, TypeVar, Generic
 from src.metaclasses.singleton import Singleton
+from services.base.repository_factory import RepositoryFactory
 
 # Type variable for repository types
 T = TypeVar('T')
@@ -32,20 +33,26 @@ class BaseService(ABC, metaclass=SingletonABCMeta):
     - Initialization patterns
     """
     
-    def __init__(self, repository_class: Optional[Type] = None):
+    def __init__(self, repository_class: Optional[Type] = None, repository_type: Optional[str] = None):
         """
         Initialize base service.
         
         Args:
-            repository_class: Repository class to initialize (optional)
+            repository_class: Repository class to initialize (optional, for backward compatibility)
+            repository_type: Repository type for RepositoryFactory (preferred method)
         """
         self.logger = logging.getLogger(self.__class__.__name__)
         self._is_initialized = False
         self._repository = None
         
-        # Initialize repository if provided
-        if repository_class:
+        # Initialize repository using factory or class
+        if repository_type:
+            self._repository = RepositoryFactory.get_repository(repository_type, singleton=True)
+            self.logger.debug(f"Initialized repository via factory: {repository_type}")
+        elif repository_class:
+            # Fallback to direct instantiation for backward compatibility
             self._repository = repository_class()
+            self.logger.debug(f"Initialized repository via class: {repository_class.__name__}")
             
         # Initialize service-specific components
         self._initialize_service()

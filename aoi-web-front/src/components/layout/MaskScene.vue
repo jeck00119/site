@@ -53,6 +53,8 @@ import { ref, onMounted, onBeforeUnmount, toRef, watch } from 'vue';
 
 import { ipAddress, port } from '../../url';
 import { uuid } from 'vue3-uuid';
+import { useWebSocket, useFabricCanvas } from '@/composables/useStore';
+import { DEFAULT_IMAGE_DATA_URI_PREFIX, ImageDataUtils } from '../../utils/imageConstants';
 
 export default {
     props: ['graphics', 'imageSourceId', 'width', 'height', 'canvasId'],
@@ -60,9 +62,20 @@ export default {
     emits: ['closed', 'save'],
 
     setup(props, context) {
-        let socket = null;
-        let canvas = null;
         const canvasContainer = ref(null);
+        
+        // Initialize Fabric.js canvas using composable
+        const {
+            canvas,
+            initCanvas,
+            clearCanvas,
+            throttledRender,
+            batchRender,
+            addObjects,
+            removeObjects
+        } = useFabricCanvas(props.canvasId, {
+            containerRef: canvasContainer
+        });
 
         let polyPoints = [];
         let canvasPoints = [];
@@ -74,10 +87,19 @@ export default {
         const graphicsRect = toRef(props, 'graphics');
         const imageSourceId = toRef(props, 'imageSourceId');
 
+        // Initialize WebSocket connection
+        const wsUid = uuid.v4();
+        const wsUrl = `ws://${ipAddress}:${port}/mask/${wsUid}/crop_roi/ws`;
+        const { socket, isConnected, connect, disconnect, send } = useWebSocket(wsUrl, {
+            autoConnect: false,
+            onOpen: onSocketOpen,
+            onMessage: roiReceived
+        });
+
         watch(graphicsRect, (current) => {
             if(current)
             {
-                if(socket)
+                if(isConnected.value)
                 {
                     let loadFromImageSource = false;
                     if(imageSourceId.value)
@@ -85,7 +107,7 @@ export default {
                         loadFromImageSource = true;
                     }
 
-                    socket.send(JSON.stringify({
+                    send(JSON.stringify({
                         command: 'set',
                         image_source_uid: imageSourceId.value,
                         load_from_image_source: loadFromImageSource,
@@ -102,15 +124,15 @@ export default {
                 removePoints();
                 removePolygons();
                 // Fabric.js v6: Use direct property assignment instead of setBackgroundImage
-                canvas.backgroundImage = null;
-                canvas.renderAll();
+                canvas.value.backgroundImage = null;
+                throttledRender();
             }
         });
 
         watch(imageSourceId, (current) => {
-            if(socket)
+            if(isConnected.value)
             {
-                socket.send(JSON.stringify({
+                send(JSON.stringify({
                     command: 'set',
                     image_source_uid: current,
                     graphics: graphicsRect.value
@@ -152,41 +174,31 @@ export default {
                     fill: hexString
                 });
 
-                canvas.add(polygon);
+                addObjects(polygon);
             }
         }
 
         function connectToCropROISocket()
         {
-            let ws_uid = uuid.v4();
-            let url = `ws://${ipAddress}:${port}/mask/${ws_uid}/crop_roi/ws`;
-            socket = new WebSocket(url);
-
-            socket.addEventListener('open', onSocketOpen);
-            socket.addEventListener('message', roiReceived);
+            connect();
         }
 
         function disconnectFromCropROISocket()
         {
-            if(socket)
+            if(isConnected.value)
             {
-                socket.send(JSON.stringify({command: "disconnect"}));
-
-                socket.removeEventListener('open', onSocketOpen);
-                socket.removeEventListener('message', roiReceived);
-
-                socket.close();
-                socket = null;
+                send(JSON.stringify({command: "disconnect"}));
             }
-
+            
+            disconnect();
             removePoints();
             removePolygons();
         }
 
         function onSocketOpen() {
-            if(socket)
+            if(isConnected.value)
             {
-                socket.send(JSON.stringify({
+                send(JSON.stringify({
                     command: 'set',
                     image_source_uid: imageSourceId.value,
                     graphics: graphicsRect.value
@@ -197,12 +209,12 @@ export default {
         function roiReceived(event) {
             let recvData = JSON.parse(event.data);
             // Fabric.js v6: Use direct property assignment instead of setBackgroundImage
-            canvas.backgroundImage = 'data:image/png;base64,' + recvData.roi;
-            canvas.renderAll();
+            canvas.value.backgroundImage = ImageDataUtils.createJpegDataURI(recvData.roi);
+            throttledRender();
         }
 
         function addPolyPoint(mouseEvent) {
-            let pointer = canvas.getPointer(mouseEvent);
+            let pointer = canvas.value.getPointer(mouseEvent);
 
             polyPoints.push({
                 x: pointer.x,
@@ -219,13 +231,12 @@ export default {
             });
 
             canvasPoints.push(c);
-            canvas.add(c);
+            addObjects(c);
         }
 
         function removePointsFromCanvas() {
-            for(let point of canvasPoints)
-            {
-                canvas.remove(point);
+            if(canvasPoints.length > 0) {
+                removeObjects(canvasPoints);
             }
 
             canvasPoints = [];
@@ -237,19 +248,19 @@ export default {
         }
 
         function removePolygons() {
-            const objects = canvas.getObjects();
-
-            objects.forEach(function(object){
-                if(object.type === 'polygon')
-                {
-                    canvas.remove(object);
-                }
-            });
+            const objects = canvas.value.getObjects();
+            const polygonsToRemove = objects.filter(object => object.type === 'polygon');
+            
+            if(polygonsToRemove.length > 0) {
+                removeObjects(polygonsToRemove);
+            }
         }
 
         function deleteSelected() {
-            const activeObject = canvas.getActiveObject();
-            canvas.remove(activeObject);
+            const activeObject = canvas.value.getActiveObject();
+            if(activeObject) {
+                removeObjects(activeObject);
+            }
         }
 
         function toggleEditMode() {
@@ -258,7 +269,7 @@ export default {
 
         function save() {
             const polygons = [];
-            const objects = canvas.getObjects();
+            const objects = canvas.value.getObjects();
 
             objects.forEach(function(object){
                 if(object.type === 'polygon')
@@ -275,12 +286,9 @@ export default {
         }
 
         onMounted(() => {
-            canvas = new fabric.Canvas(props.canvasId);
+            initCanvas();
 
-            canvas.setHeight(canvasContainer.value.clientHeight);
-            canvas.setWidth(canvasContainer.value.clientWidth);
-
-            canvas.on('mouse:down', function(opt) {
+            canvas.value.on('mouse:down', function(opt) {
                 let evt = opt.e;
                 if (evt.altKey === true) {
                     this.isDragging = true;
@@ -290,7 +298,7 @@ export default {
                 }
             });
 
-            canvas.on('mouse:move', function(opt) {
+            canvas.value.on('mouse:move', function(opt) {
                 if (this.isDragging) {
                     let e = opt.e;
                     let vpt = this.viewportTransform;
@@ -302,7 +310,7 @@ export default {
                 }
             });
 
-            canvas.on('mouse:up', function(options) {
+            canvas.value.on('mouse:up', function(options) {
                 this.setViewportTransform(this.viewportTransform);
                 this.isDragging = false;
                 this.selection = true;
@@ -313,13 +321,13 @@ export default {
                 }
             });
 
-            canvas.on("mouse:wheel", (opt) => {
+            canvas.value.on("mouse:wheel", (opt) => {
                 let delta = opt.e.deltaY;
-                let zoom = canvas.getZoom();
+                let zoom = canvas.value.getZoom();
                 zoom *= 0.999 ** delta;
                 if (zoom > 20) zoom = 20;
                 if (zoom < 0.01) zoom = 0.01;
-                canvas.zoomToPoint({
+                canvas.value.zoomToPoint({
                     x: opt.e.offsetX,
                     y: opt.e.offsetY
                 },
@@ -329,7 +337,7 @@ export default {
                 opt.e.stopPropagation();
             });
 
-            canvas.on('mouse:dblclick', function() {
+            canvas.value.on('mouse:dblclick', function() {
                 if(isEditMode.value)
                 {
                     removePointsFromCanvas();
@@ -341,7 +349,7 @@ export default {
                         fill: color.value
                     });
 
-                    canvas.add(polygon);
+                    addObjects(polygon);
 
                     polyPoints = [];
                 }

@@ -134,6 +134,7 @@
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue';
 import { useStore } from 'vuex';
 import { uuid } from "vue3-uuid";
+import { createLogger } from '@/utils/logger';
 
 import * as fabric from 'fabric';
 
@@ -147,8 +148,10 @@ import JsonDataContainer from '../../layout/JsonDataRenderer.vue';
 
 import graphic from '../../../utils/graphics';
 import { ipAddress, port } from '../../../url';
-import useComponents from '../../../hooks/components.js';
-import useNotification from '../../../hooks/notifications.js';
+import useComponents from '../../../hooks/components.ts';
+import useNotification from '../../../hooks/notifications.ts';
+import { useWebSocket, useFabricCanvas, useLoadingState } from '@/composables/useStore';
+import { DEFAULT_IMAGE_DATA_URI_PREFIX, ImageDataUtils } from '../../../utils/imageConstants';
 
 export default{
     components: {
@@ -162,16 +165,34 @@ export default{
     setup(){
         const moduleName = 'custom_component';
         const store = useStore();
+        const logger = createLogger('CustomComponentsConfiguration');
 
+        // Initialize loading state composable
+        const { isLoading, setLoading, withLoading } = useLoadingState();
+        
         const {showNotification, notificationMessage, notificationIcon, notificationTimeout, 
             setNotification, clearNotification} = useNotification();
 
         // playground variables
-        let playgroundCanvas = null;
-
         const playgroundMode = ref(false);
-
         const playgroundContainer = ref(null);
+        
+        // Initialize Fabric.js canvas using composable
+        const {
+            canvas: playgroundCanvas,
+            initCanvas,
+            clearCanvas,
+            throttledRender,
+            batchRender,
+            addObjects,
+            removeObjects
+        } = useFabricCanvas('playground', {
+            isDrawingMode: false,
+            selection: true,
+            fireRightClick: true,
+            stopContextMenu: true,
+            containerRef: playgroundContainer
+        });
         const algTypesContainer = ref(null);
 
         const currentDraggedName = ref('');
@@ -210,7 +231,8 @@ export default{
         let graphicsObject = null;
         let currentGraphicsId = -1;
 
-        let liveProcessSocket = null;
+        // WebSocket state
+        let liveProcessSocketInstance = null;
 
         const compoundResult = ref([]);
 
@@ -230,7 +252,10 @@ export default{
 
         const resultImage = computed(function() {
             const result = store.getters["algorithms/getAlgorithmResult"];
-            return result ? result.frame : '';
+            if(result && result.frame) {
+                return Array.isArray(result.frame) ? result.frame[0] : result.frame;
+            }
+            return '';
         });
 
         const unwatch = store.watch(
@@ -248,12 +273,12 @@ export default{
 
                     for(const output of outputs)
                     {
-                        outputImages.value.push('data:image/png;base64,' + output);
+                        outputImages.value.push(ImageDataUtils.createJpegDataURI(output));
                     }
 
                     for(const input of inputs)
                     {
-                        inputImages.value.push('data:image/png;base64,' + input);
+                        inputImages.value.push(ImageDataUtils.createJpegDataURI(input));
                     }
                 }
             }
@@ -400,7 +425,7 @@ export default{
                 algType.addWithUpdate(outputRect);
             }
 
-            playgroundCanvas.add(algType);
+            addObjects(algType);
         }
 
         function handleDrop(event){
@@ -551,11 +576,7 @@ export default{
                                         objectToConnect.addWithUpdate(circle1);
                                         event.target.addWithUpdate(circle2);
 
-                                        playgroundCanvas.add(line1);
-                                        playgroundCanvas.add(line2);
-                                        playgroundCanvas.add(line3);
-                                        playgroundCanvas.add(line4);
-                                        playgroundCanvas.add(line5);
+                                        addObjects([line1, line2, line3, line4, line5]);
 
                                         blockToConnect.item.set({'fill': typeToColor[blockToConnect.item.get('valueType')]});
 
@@ -623,7 +644,7 @@ export default{
         }
 
         function deleteCurrentActive(){
-            let current = playgroundCanvas.getActiveObject();
+            let current = playgroundCanvas.value.getActiveObject();
             if(current)
             {
                 const group = current.getObjects();
@@ -632,14 +653,10 @@ export default{
                     {
                         groupItem.pairBlock.removeWithUpdate(groupItem.pairCircle);
 
-                        playgroundCanvas.remove(groupItem.line1);
-                        playgroundCanvas.remove(groupItem.line2);
-                        playgroundCanvas.remove(groupItem.line3);
-                        playgroundCanvas.remove(groupItem.line4);
-                        playgroundCanvas.remove(groupItem.line5);
+                        removeObjects([groupItem.line1, groupItem.line2, groupItem.line3, groupItem.line4, groupItem.line5]);
                     }
                 });
-                playgroundCanvas.remove(current);
+                removeObjects(current);
 
                 unsavedChanges.value = '*';
             }
@@ -650,7 +667,7 @@ export default{
             algorithms.value = [];
             let blocks = [];
 
-            const groups = playgroundCanvas.getObjects();
+            const groups = playgroundCanvas.value.getObjects();
 
             groups.forEach(function(group, i){
                 if(group.type === 'group')
@@ -762,12 +779,12 @@ export default{
         }
 
         function setPlaygroundItemsSelectable(value){
-            playgroundCanvas.discardActiveObject().renderAll();
-            const obj = playgroundCanvas.getObjects();
+            playgroundCanvas.value.discardActiveObject().renderAll();
+            const obj = playgroundCanvas.value.getObjects();
             obj.forEach(function(item, i){
                 item.set({selectable: value});
             });
-            playgroundCanvas.renderAll();
+            throttledRender();
         }
 
         function loadBlocks(types, blocks) {
@@ -779,7 +796,7 @@ export default{
             let currentBlockY = 20;
             const currentBlockX = 150;
 
-            playgroundCanvas.clear();
+            clearCanvas();
 
             for(const type of types)
             {
@@ -796,8 +813,8 @@ export default{
                     {
                         const pairOutputIdx = block.outputIndex[inputIdx];
 
-                        const currentBlock = playgroundCanvas.getObjects()[blockIdx];
-                        const pairBlock = playgroundCanvas.getObjects()[pairBlockIdx];
+                        const currentBlock = playgroundCanvas.value.getObjects()[blockIdx];
+                        const pairBlock = playgroundCanvas.value.getObjects()[pairBlockIdx];
 
                         const currentBlockItems = currentBlock.getObjects();
                         const pairBlockItems = pairBlock.getObjects();
@@ -867,11 +884,7 @@ export default{
                                 pairOutputCircle.line5 = line5;
                                 pairOutputCircle.offset = 100;
 
-                                playgroundCanvas.add(line1);
-                                playgroundCanvas.add(line2);
-                                playgroundCanvas.add(line3);
-                                playgroundCanvas.add(line4);
-                                playgroundCanvas.add(line5);
+                                addObjects([line1, line2, line3, line4, line5]);
 
                                 currentInputCircle.pairBlock = pairBlock;
                                 currentInputCircle.pairCircle = pairOutputCircle;
@@ -890,6 +903,7 @@ export default{
 
         function addComponent(name) {
             try{
+                logger.debug('Saving component', { name });
                 add(name);
 
                 store.dispatch("log/addEvent", {
@@ -898,7 +912,10 @@ export default{
                     title: moduleName.toUpperCase().replace(/_/g, ' ') + ' Added',
                     description: `New ` + moduleName.replace(/_/g, ' ') +  ` added: ${name}`
                 });
+                
+                logger.info('Component saved successfully', { name });
             }catch(err) {
+                logger.error('Failed to save component', err);
                 setNotification(3000, "Error while trying to save component.", 'bi-exclamation-circle-fill');
             }
             
@@ -906,6 +923,7 @@ export default{
 
         async function loadComponent(id) {
             try {
+                logger.debug('Loading component', { id });
                 if(id)
                 {
                     await load(id);
@@ -949,9 +967,12 @@ export default{
                     store.dispatch("algorithms/loadCurrentBasicAlgorithmFromConfig", parametersList);
 
                     resetOnLoad();
+                    
+                    logger.info('Component loaded successfully', { id, types });
                 }
                 else
                 {
+                    logger.debug('Resetting component state');
                     store.dispatch("algorithms/resetBasicAlgorithmsAttributes");
                     store.dispatch("algorithms/resetCurrentBasicAlgorithms");
                     store.dispatch("algorithms/setAlgorithmResult", null);
@@ -960,7 +981,9 @@ export default{
 
                     showCamera.value = false;
                 }
-            }catch(err) {
+            } catch(err) {
+                logger.error('Failed to load component', err);
+                addErrorToStore(store, 'Component Load Error', err);
                 setNotification(3000, "Error while trying to load component.", 'bi-exclamation-circle-fill');
             }
             
@@ -988,12 +1011,12 @@ export default{
 
                 for(const output of outputs)
                 {
-                    outputImages.value.push('data:image/png;base64,' + output);
+                    outputImages.value.push(ImageDataUtils.createJpegDataURI(output));
                 }
 
                 for(const input of inputs)
                 {
-                    inputImages.value.push('data:image/png;base64,' + input);
+                    inputImages.value.push(ImageDataUtils.createJpegDataURI(input));
                 }
             }
         }
@@ -1049,30 +1072,27 @@ export default{
                 let id = uuid.v4();
                 let url = `ws://${ipAddress}:${port}/algorithm/basic/live_algorithm_result/${currentImageSourceId.value}/${id}/ws`;
 
-                liveProcessSocket = new WebSocket(url);
-
-                liveProcessSocket.addEventListener('open', onSocketOpen);
-                liveProcessSocket.addEventListener('message', liveResultMsgRecv);
+                liveProcessSocketInstance = useWebSocket(url, {
+                    autoConnect: true,
+                    onOpen: onSocketOpen,
+                    onMessage: liveResultMsgRecv
+                });
             }
             else
             {
-                if(liveProcessSocket)
+                if(liveProcessSocketInstance)
                 {
-                    liveProcessSocket.send(JSON.stringify({command: "disconnect"}));
-
-                    liveProcessSocket.removeEventListener('open', onSocketOpen);
-                    liveProcessSocket.removeEventListener('message', liveResultMsgRecv);
-
-                    liveProcessSocket.close();
-                    liveProcessSocket = null;
+                    liveProcessSocketInstance.send(JSON.stringify({command: "disconnect"}));
+                    liveProcessSocketInstance.disconnect();
+                    liveProcessSocketInstance = null;
                 }
             }
         }
 
         function onSocketOpen() {
-            if(liveProcessSocket)
+            if(liveProcessSocketInstance)
             {
-                liveProcessSocket.send(JSON.stringify({
+                liveProcessSocketInstance.send(JSON.stringify({
                     command: ''
                 }));
             }
@@ -1082,14 +1102,14 @@ export default{
             let recvData = JSON.parse(event.data);
 
             store.dispatch("algorithms/setAlgorithmResult", {
-                frame: 'data:image/png;base64,' + recvData.frame,
+                frame: recvData.frame ? ImageDataUtils.createJpegDataURI(recvData.frame) : '',
                 results: recvData.results,
                 data: recvData.data
             });
 
             if(graphicsObject)
             {
-                liveProcessSocket.send(JSON.stringify({
+                liveProcessSocketInstance.send(JSON.stringify({
                     command: 'set',
                     idx: currentGraphicsId,
                     key: 'graphics',
@@ -1100,7 +1120,7 @@ export default{
             }
             else
             {
-                liveProcessSocket.send(JSON.stringify({command: ''}));
+                liveProcessSocketInstance.send(JSON.stringify({command: ''}));
             }
         }
 
@@ -1173,6 +1193,7 @@ export default{
 
                 setNotification(3000, "Configuration saved.", 'fc-ok');
             }).catch(err => {
+                logger.error('Failed to save configuration', err);
                 setNotification(3000, "Error while trying to save component.", 'bi-exclamation-circle-fill');
             });
         }
@@ -1268,30 +1289,19 @@ export default{
         }
 
         onMounted(() => {
-            playgroundCanvas = new fabric.Canvas('playground', {
-                isDrawingMode: false,
-                selection: true,
-                fireRightClick: true,
-                stopContextMenu: true
-            });
+            logger.lifecycle('mounted', 'CustomComponentsConfiguration component mounted');
+            initCanvas();
 
-            const resizeObserver = new ResizeObserver(() => {
-                playgroundCanvas.setHeight(playgroundContainer.value.clientHeight);
-                playgroundCanvas.setWidth(playgroundContainer.value.clientWidth);
-            });
+            playgroundCanvas.value.on('drop', handleDrop);
+            playgroundCanvas.value.on('mouse:down', handleMouseDown);
 
-            resizeObserver.observe(playgroundContainer.value);
-
-            playgroundCanvas.on('drop', handleDrop);
-            playgroundCanvas.on('mouse:down', handleMouseDown);
-
-            playgroundCanvas.on("mouse:wheel", (opt) => {
+            playgroundCanvas.value.on("mouse:wheel", (opt) => {
                 let delta = opt.e.deltaY;
-                let zoom = playgroundCanvas.getZoom();
+                let zoom = playgroundCanvas.value.getZoom();
                 zoom *= 0.999 ** delta;
                 if (zoom > 20) zoom = 20;
                 if (zoom < 0.01) zoom = 0.01;
-                playgroundCanvas.zoomToPoint({
+                playgroundCanvas.value.zoomToPoint({
                     x: opt.e.offsetX,
                     y: opt.e.offsetY
                 },
@@ -1301,7 +1311,7 @@ export default{
                 opt.e.stopPropagation();
             });
 
-            playgroundCanvas.on('object:moving', function(e) {
+            playgroundCanvas.value.on('object:moving', function(e) {
                 unsavedChanges.value = '*';
 
                 let p = e.target;
@@ -1361,7 +1371,7 @@ export default{
                                 });
                             }
 
-                            playgroundCanvas.renderAll();
+                            throttledRender();
                         }
                     })
                 }
@@ -1376,6 +1386,7 @@ export default{
         });
 
         onBeforeUnmount(() => {
+            logger.lifecycle('beforeUnmount', 'CustomComponentsConfiguration component before unmount');
             unwatch();
             store.dispatch("algorithms/resetBasicAlgorithmsAttributes");
             store.dispatch("algorithms/resetCurrentBasicAlgorithms");
@@ -1383,6 +1394,7 @@ export default{
             store.dispatch("components/setComponents", []);
             store.dispatch("components/setCurrentComponent", null);
             store.dispatch("graphics/resetCompoundGraphicItems");
+            logger.lifecycle('cleanup', 'CustomComponentsConfiguration cleanup completed');
         });
 
         return {
@@ -1403,6 +1415,7 @@ export default{
             showCamera,
             showInputs,
             showResults,
+            isLoading,
             feedLocation,
             resultImage,
             outputImages,

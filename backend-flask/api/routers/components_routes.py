@@ -5,6 +5,7 @@ from starlette import status
 from api.dependencies.services import get_service_by_type
 from api.error_handlers import create_error_response
 from api.route_utils import RouteHelper, require_authentication
+from security.validators import validate_input, detect_security_threats
 from repo.repositories import ComponentsRepository, AlgorithmsRepository
 from repo.repository_exceptions import UidNotFound
 from services.authorization.authorization import get_current_user
@@ -33,6 +34,7 @@ async def list_components(
 
 
 @router.get("/{component_uid}")
+@validate_input(component_uid="safe_string")
 async def get_component(
         component_uid: str,
         components_repository: ComponentsRepository = Depends(get_service_by_type(ComponentsRepository)),
@@ -53,6 +55,7 @@ async def get_component(
 
 
 @router.post("")
+@detect_security_threats()
 async def post_component(
         component: ComponentModel,
         _: dict = Depends(require_authentication("create component")),
@@ -72,6 +75,8 @@ async def post_component(
 
 
 @router.put("/{component_uid}")
+@validate_input(component_uid="safe_string")
+@detect_security_threats()
 async def put_component(
         component_uid: str,
         component: ComponentModel,
@@ -92,6 +97,7 @@ async def put_component(
 
 
 @router.delete("/{component_uid}")
+@validate_input(component_uid="safe_string")
 async def delete_component(
         component_uid: str,
         _: dict = Depends(require_authentication("delete component")),

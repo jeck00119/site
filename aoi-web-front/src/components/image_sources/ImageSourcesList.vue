@@ -74,8 +74,11 @@
     </div>
 </template>
 <script>
-import { ref, watch } from 'vue';
-import { useStore } from 'vuex';
+import { ref, watch, onMounted } from 'vue';
+import { useImageSourcesStore, useAuthStore, useConfigurationsStore } from '@/composables/useStore';
+import { createLogger } from '@/utils/logger';
+import { addErrorToStore, handleApiError } from '@/utils/errorHandler';
+import { validateRequired, validateLength } from '@/utils/validation';
 
 import VueMultiselect from 'vue-multiselect';
 
@@ -88,7 +91,16 @@ export default {
     emits: ['load-current-image-source', 'delete-source'],
 
     setup(_, context) {
-        const store = useStore();
+        const logger = createLogger('ImageSourcesList');
+        
+        // Use centralized store composables
+        const { imageSources, selectImageSource, dispatch: dispatchImageSources } = useImageSourcesStore();
+        const { currentUser } = useAuthStore();
+        const { currentConfiguration } = useConfigurationsStore();
+        
+        // For remaining store access until fully migrated
+        const { store } = useImageSourcesStore();
+        
         const sourceIsLoaded = ref(false);
         const loadedSource = ref(null);
         const sourceToDelete = ref(null);
@@ -105,12 +117,18 @@ export default {
         watch(currentImageSource, (newValue, _) => {
             if(newValue)
             {
+                logger.debug('Image source selected', { sourceId: newValue.uid, sourceName: newValue.name });
                 context.emit('load-current-image-source', newValue.uid);
             }
             else
             {
+                logger.debug('Image source deselected');
                 context.emit('load-current-image-source', null);
             }
+        });
+        
+        onMounted(() => {
+            logger.lifecycle('mounted', 'ImageSourcesList component mounted');
         });
 
         function setCurrentId(id) {
@@ -146,17 +164,52 @@ export default {
         }
 
         function addSource() {
-            const newSource = {
-                name: newSourceName.value,
-                type: newSourceType.value
+            // Validate input
+            const nameValidation = validateRequired(newSourceName.value, 'Source name');
+            const nameLength = validateLength(newSourceName.value, 1, 50, 'Source name');
+            
+            if (!nameValidation.isValid) {
+                logger.warn('Source name validation failed', { errors: nameValidation.errors });
+                return;
             }
-            store.dispatch("imageSources/addImageSource", newSource);
-            closeAddDialog();
+            
+            if (!nameLength.isValid) {
+                logger.warn('Source name length validation failed', { errors: nameLength.errors });
+                return;
+            }
+            
+            if (!newSourceType.value) {
+                logger.warn('Source type validation failed');
+                return;
+            }
+            
+            try {
+                const newSource = {
+                    name: newSourceName.value.trim(),
+                    type: newSourceType.value
+                };
+                
+                logger.debug('Adding new image source', newSource);
+                dispatchImageSources("imageSources/addImageSource", newSource);
+                
+                logger.info('Image source added successfully', { name: newSource.name, type: newSource.type });
+                closeAddDialog();
+            } catch (error) {
+                logger.error('Failed to add image source', error);
+                addErrorToStore(store, 'Add Source Error', error);
+            }
         }
 
         function deleteSource(source) {
-            context.emit("delete-source", source);
-            closeDeleteDialog();
+            try {
+                logger.debug('Deleting image source', { sourceId: source?.uid, sourceName: source?.name });
+                context.emit("delete-source", source);
+                logger.info('Image source deleted successfully', { sourceId: source?.uid });
+                closeDeleteDialog();
+            } catch (error) {
+                logger.error('Failed to delete image source', error);
+                addErrorToStore(store, 'Delete Source Error', error);
+            }
         }
 
         return {

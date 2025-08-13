@@ -31,7 +31,8 @@
   
 <script>
 import { ref, computed } from 'vue';
-import { useStore } from 'vuex';
+import { useErrorsStore } from '@/composables/useStore';
+import { createLogger } from '@/utils/logger';
 
 export default {
 props: {
@@ -53,26 +54,27 @@ props: {
 emits: ['close'],
 
 setup(props, context) {
-    const store = useStore();
-
-    const errors = computed(function() {
-        return store.getters['errors/getErrors'];
-    });
-
+    const logger = createLogger('TheErrorList');
+    
+    // Use centralized errors store composable
+    const { errors, hasErrors, removeError: removeErrorFromStore } = useErrorsStore();
+    
     function removeError(id) {
-        store.dispatch('errors/removeError', {errorId: id});
+        logger.debug('Removing error', { errorId: id });
+        removeErrorFromStore(id);
     }
 
     function tryClose() {
         if(props.fixed){
             return;
         }
+        logger.debug('Closing error list');
         context.emit('close');
-    };
+    }
 
-    const hasValues = computed(function() {
-        return !store.getters.isEmpty;
-    });
+    const hasValues = computed(() => hasErrors.value);
+    
+    logger.lifecycle('mounted', 'TheErrorList component mounted');
 
     return {
         errors,
@@ -91,25 +93,32 @@ setup(props, context) {
         left: 0;
         height: 100vh;
         width: 100%;
-        background-color: rgba(0, 0, 0, 0.75);
-        z-index: 10;
+        background-color: var(--color-bg-overlay);
+        z-index: var(--z-index-modal-backdrop);
     }
 
     .error-wrapper {
-        color: white;
-        margin: 5px;
+        color: var(--color-text-secondary);
+        margin: var(--space-2);
+        padding: var(--space-3);
+        border-radius: var(--border-radius-base);
+        background-color: var(--color-bg-secondary);
     }
 
     .title-wrapper {
         display: flex;
         justify-content: space-between;
-        height: 7vh;
-        padding-bottom: 10px;
-        padding-top: 10px;
+        align-items: center;
+        min-height: var(--button-height-lg);
+        padding: var(--space-3) var(--space-0);
+        margin-bottom: var(--space-2);
     }
 
     .no-errors {
-        color: white;
+        color: var(--color-text-secondary);
+        text-align: center;
+        padding: var(--space-8);
+        font-style: italic;
     }
 
     dialog {
@@ -118,36 +127,38 @@ setup(props, context) {
         left: 10%;
         width: 80%;
         height: 60%;
-        z-index: 100;
-        border-radius: 12px;
-        border: none;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.26);
-        padding: 0;
-        margin: 0;
+        z-index: var(--z-index-modal);
+        border-radius: var(--border-radius-modal);
+        border: var(--border-width-0);
+        box-shadow: var(--shadow-modal);
+        padding: var(--space-0);
+        margin: var(--space-0);
         overflow-y: auto;
-        background-color: rgb(0, 0, 0);
+        background-color: var(--color-bg-primary);
     }
 
     header {
-        background-color: rgb(204, 161, 82);
-        color: rgb(0, 0, 0);
+        background-color: var(--color-primary);
+        color: var(--color-text-inverse);
         width: 100%;
-        padding: 1rem;
+        padding: var(--space-4);
     }
 
     header h2 {
-        margin: 0;
+        margin: var(--space-0);
+        font-size: var(--font-size-xl);
+        font-weight: var(--font-weight-semibold);
     }
 
     section {
-        padding: 1rem;
+        padding: var(--space-4);
     }
 
     menu {
-        padding: 1rem;
+        padding: var(--space-4);
         display: flex;
         justify-content: flex-end;
-        margin: 0;
+        margin: var(--space-0);
     }
 
     .dialog-enter-from,
@@ -163,27 +174,28 @@ setup(props, context) {
     }
 
     .dialog-enter-active {
-        transition: all 0.3s ease-out;
+        transition: all var(--duration-slow) var(--ease-out);
     }
 
     .dialog-leave-active {
-        transition: all 0.3s ease-in;
+        transition: all var(--duration-slow) var(--ease-in);
     }
 
     ::-webkit-scrollbar {
-            width: 10px;
+        width: var(--space-3);
     }
 
     ::-webkit-scrollbar-track {
-        background: #888; 
+        background: var(--color-border-secondary); 
     }
     
     ::-webkit-scrollbar-thumb {
-        background: black; 
+        background: var(--color-bg-tertiary); 
+        border-radius: var(--border-radius-base);
     }
 
     ::-webkit-scrollbar-thumb:hover {
-        background: rgb(204, 161, 82); 
+        background: var(--color-primary); 
     }
   
     @media (min-width: 768px) {

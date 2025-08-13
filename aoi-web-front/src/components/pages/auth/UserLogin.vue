@@ -21,11 +21,25 @@
                     <div class="fields-container">
                         <div class="form-control">
                             <label for="email">Email:</label>
-                            <input type="text" id="email" v-model.trim="email"/>
+                            <input 
+                                type="text" 
+                                id="email" 
+                                :value="formData.email" 
+                                @input="updateField('email', $event.target.value)"
+                                :class="{ 'error': formErrors.email }"
+                            />
+                            <span v-if="formErrors.email" class="error-message">{{ formErrors.email }}</span>
                         </div>
                         <div class="form-control">
                             <label for="password">Password:</label>
-                            <input type="password" id="password" v-model.trim="password"/>
+                            <input 
+                                type="password" 
+                                id="password" 
+                                :value="formData.password" 
+                                @input="updateField('password', $event.target.value)"
+                                :class="{ 'error': formErrors.password }"
+                            />
+                            <span v-if="formErrors.password" class="error-message">{{ formErrors.password }}</span>
                         </div>
                     </div>
                     <div class="button-container">
@@ -59,52 +73,108 @@
 <script>
 import { onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
-import { useStore } from 'vuex';
 
+import { useAuthStore, useFormState } from '@/composables/useStore';
 import useNotification from '../../../hooks/notifications.js';
-import { validateEmail, validatePassword, sanitizeInput } from '../../../utils/validation.js';
+import { validateEmail, validatePassword, validateRequired, sanitizeInput } from '../../../utils/validation.js';
 
 export default{
     setup() {
-        const email = ref('');
-        const password = ref('');
-
         const {showNotification, notificationMessage, notificationIcon, notificationTimeout, 
             setNotification, clearNotification} = useNotification();
 
-        const store = useStore();
+        const authStore = useAuthStore();
         const router = useRouter();
+        
+        // Use form state composable for form management
+        const { formData, updateField, resetForm } = useFormState({
+            email: '',
+            password: ''
+        });
+
+        // Form validation state
+        const formErrors = ref({});
+
+        // Validate individual field
+        const validateField = (fieldName, value) => {
+            const errors = {};
+            
+            if (fieldName === 'email') {
+                const requiredResult = validateRequired(value, 'Email');
+                if (!requiredResult.isValid) {
+                    errors.email = requiredResult.errors[0];
+                } else {
+                    const emailResult = validateEmail(value);
+                    if (!emailResult.isValid) {
+                        errors.email = emailResult.errors[0];
+                    }
+                }
+            }
+            
+            if (fieldName === 'password') {
+                const requiredResult = validateRequired(value, 'Password');
+                if (!requiredResult.isValid) {
+                    errors.password = requiredResult.errors[0];
+                } else {
+                    const passwordResult = validatePassword(value);
+                    if (!passwordResult.isValid) {
+                        errors.password = passwordResult.errors[0];
+                    }
+                }
+            }
+            
+            return errors;
+        };
+
+        // Enhanced field update with validation
+        const onFieldUpdate = (fieldName, value) => {
+            // Update field value
+            updateField(fieldName, value);
+            
+            // Clear existing error when user starts typing
+            if (formErrors.value[fieldName]) {
+                const newErrors = { ...formErrors.value };
+                delete newErrors[fieldName];
+                formErrors.value = newErrors;
+            }
+        };
+
+        // Validate entire form
+        const validateForm = () => {
+            const errors = {
+                ...validateField('email', formData.value.email),
+                ...validateField('password', formData.value.password)
+            };
+            
+            formErrors.value = errors;
+            return Object.keys(errors).length === 0;
+        };
 
         async function login() {
-            let error = false;
-
-            // Use centralized validation
-            const emailValidation = validateEmail(email.value);
-            if (!emailValidation.isValid) {
-                setNotification(3000, emailValidation.errors[0], 'bi-exclamation-circle-fill');
-                error = true;
+            // Validate entire form
+            const isValid = validateForm();
+            
+            if (!isValid) {
+                // Show first validation error
+                const firstError = Object.values(formErrors.value)[0];
+                setNotification(3000, firstError, 'bi-exclamation-circle-fill');
+                return;
             }
-
-            const passwordValidation = validatePassword(password.value);
-            if (!passwordValidation.isValid) {
-                setNotification(3000, passwordValidation.errors[0], 'bi-exclamation-circle-fill');
-                error = true;
-            }
-
-            if(!error)
             {
                 // Use centralized sanitization
-                const sanitizedEmail = sanitizeInput(email.value);
-                const sanitizedPassword = password.value.trim();
+                const sanitizedEmail = sanitizeInput(formData.value.email);
+                const sanitizedPassword = formData.value.password.trim();
                 
                 const user = new FormData();
                 user.append('username', sanitizedEmail);
                 user.append('password', sanitizedPassword);
                 
                 try {
-                    await store.dispatch("auth/login", user);
+                    // Use auth store composable
+                    await authStore.login(user);
 
                     router.replace('/configurations');
+                    resetForm(); // Clear form after successful login
                 }catch(e) {
                     // Display the specific error message from the backend
                     const errorMessage = e.message || 'Something went wrong. Please try again.';
@@ -114,12 +184,13 @@ export default{
         }
 
         onMounted(() => {
-            store.dispatch("auth/loadUsers");
+            authStore.loadUsers();
         });
 
         return {
-            email,
-            password,
+            formData,
+            updateField: onFieldUpdate,
+            formErrors,
             showNotification,
             notificationMessage,
             notificationIcon,
@@ -244,6 +315,16 @@ input {
 input:focus {
     border: none;
     border-bottom: 1px solid black;
+}
+
+input.error {
+    border-bottom: 1px solid #dc3545;
+}
+
+.error-message {
+    color: #dc3545;
+    font-size: 0.8em;
+    margin-top: 2px;
 }
 
 .submit-button {

@@ -98,11 +98,13 @@ import VueMultiselect from 'vue-multiselect';
 
 import useNotification from '../../../hooks/notifications';
 import { ref, onMounted, onUnmounted, computed, watch } from 'vue';
-import { useStore } from 'vuex';
+import { useCameraCalibrationStore, useImageSourcesStore } from '@/composables/useStore';
 import { uuid } from 'vue3-uuid';
 
 import CameraScene from '../../camera/CameraScene.vue';
 import { ipAddress, port } from '../../../url';
+import { useWebSocket } from '@/composables/useStore';
+import { DEFAULT_IMAGE_DATA_URI_PREFIX, ImageDataUtils } from '../../../utils/imageConstants';
 
 export default {
     components :{
@@ -133,29 +135,46 @@ export default {
 
         const calibrationRunning = ref(false);
 
-        let socket = null;
-        let wsUid = null;
+        const cameraCalibrationStore = useCameraCalibrationStore();
+        const imageSourcesStore = useImageSourcesStore();
 
-        const store = useStore();
+        // WebSocket state
+        let wsUid = null;
+        let webSocketInstance = null;
 
         const {showNotification, notificationMessage, notificationIcon, notificationTimeout, 
             setNotification, clearNotification} = useNotification();
 
-        const imageSources = computed(() => {
-            return store.getters['imageSources/getImageSources'];
-        });
+        // These are already computed refs from the composables
 
-        const imageSourcesNames = computed(function() {
-            return store.getters["imageSources/getImageSources"].map(imageSource => imageSource.name);
-        });
+
+        const imageSources = imageSourcesStore.imageSources;
+
+        const imageSourcesNames = computed(() => 
+            (imageSourcesStore.imageSources.value || []).map(imageSource => imageSource.name)
+        );
 
         watch(currentImageSource, (newValue) => {
             const imageSource = imageSources.value.find(imageSource => imageSource.name === newValue);
 
             if(imageSource)
             {
-                feedLocation.value = `ws://${ipAddress}:${port}/image_source/${imageSource.uid}/ws`;
+                // Include FPS parameter for proper frame rate control
+                const fps = imageSource.fps || 1; // Default to 1 FPS if not specified
+                let wsUrl;
+                
+                if (imageSource.image_source_type === "static") {
+                    wsUrl = `ws://${ipAddress}:${port}/image_source/${imageSource.uid}/${imageSource.image_generator_uid}/${fps}/ws`;
+                } else if (imageSource.image_source_type === "dynamic") {
+                    wsUrl = `ws://${ipAddress}:${port}/image_source/${imageSource.uid}/${imageSource.camera_uid}/${fps}/ws`;
+                } else {
+                    // Fallback to old format if type is unknown
+                    wsUrl = `ws://${ipAddress}:${port}/image_source/${imageSource.uid}/ws`;
+                }
+                
+                feedLocation.value = wsUrl;
                 showCamera.value = true;
+                console.log('CameraCalibration - WebSocket URL with FPS:', wsUrl, 'FPS:', fps);
             }
             else
             {
@@ -166,10 +185,37 @@ export default {
         watch(currentImageIdx, (newValue) => {
             if(newValue >= 0)
             {
-                socket.send(JSON.stringify({
+                webSocketInstance.send(JSON.stringify({
                     "command": "retrieve",
                     "idx": currentImageIdx.value
                 }));
+            }
+        });
+
+        // Watch for FPS changes in the current image source to trigger WebSocket reconnection
+        watch(() => {
+            const imageSource = imageSources.value.find(imageSource => imageSource.name === currentImageSource.value);
+            return imageSource?.fps;
+        }, (newFps, oldFps) => {
+            if (newFps !== oldFps && newFps != null && currentImageSource.value) {
+                console.log('CameraCalibration - FPS changed, updating WebSocket URL', { newFps, oldFps });
+                // Trigger the currentImageSource watcher to update the WebSocket URL
+                const imageSource = imageSources.value.find(imageSource => imageSource.name === currentImageSource.value);
+                if (imageSource) {
+                    const fps = newFps;
+                    let wsUrl;
+                    
+                    if (imageSource.image_source_type === "static") {
+                        wsUrl = `ws://${ipAddress}:${port}/image_source/${imageSource.uid}/${imageSource.image_generator_uid}/${fps}/ws`;
+                    } else if (imageSource.image_source_type === "dynamic") {
+                        wsUrl = `ws://${ipAddress}:${port}/image_source/${imageSource.uid}/${imageSource.camera_uid}/${fps}/ws`;
+                    } else {
+                        wsUrl = `ws://${ipAddress}:${port}/image_source/${imageSource.uid}/ws`;
+                    }
+                    
+                    feedLocation.value = wsUrl;
+                    console.log('CameraCalibration - Updated WebSocket URL for FPS change:', wsUrl);
+                }
             }
         });
 
@@ -178,11 +224,11 @@ export default {
 
             connectToWs();
 
-            store.dispatch('cameraCalibration/setCalibrationParameters', {
-                rows: checkerboardRows.value,
-                cols: checkerboardCols.value,
-                square_size: checkerboardSquareSize.value
-            });
+            cameraCalibrationStore.setCalibrationParameters(
+                checkerboardRows.value,
+                checkerboardCols.value,
+                checkerboardSquareSize.value
+            );
 
             timeRemaining.value = cooldown.value;
 
@@ -193,7 +239,7 @@ export default {
                 }
                 else
                 {
-                    socket.send(JSON.stringify({
+                    webSocketInstance.send(JSON.stringify({
                         command: "capture"
                     }));
                     framesAcquired.value += 1;
@@ -203,7 +249,7 @@ export default {
                     }
                     else
                     {
-                        socket.send(JSON.stringify({
+                        webSocketInstance.send(JSON.stringify({
                             command: "calibrate"
                         }));
                         setNotification(null, 'Calibrating...', 'fa-cog');
@@ -217,23 +263,23 @@ export default {
         {
             wsUid = uuid.v4();
             const imageSource = imageSources.value.find(imageSource => imageSource.name === currentImageSource.value);
-            socket = new WebSocket(`ws://${ipAddress}:${port}/camera_calibration/${imageSource.uid}/ws/${wsUid}`);
-
-            socket.addEventListener("message", onCalibrationSocketMsgRecv);
+            const wsUrl = `ws://${ipAddress}:${port}/camera_calibration/${imageSource.uid}/ws/${wsUid}`;
+            
+            webSocketInstance = useWebSocket(wsUrl, {
+                autoConnect: true,
+                onMessage: onCalibrationSocketMsgRecv
+            });
         }
 
         async function disconnectFromWs() 
         {
             const imageSource = imageSources.value.find(imageSource => imageSource.name === currentImageSource.value);
-            await store.dispatch("cameraCalibration/closeCalibrationSocket", {
-                uid: imageSource.uid
-            });
-            socket.removeEventListener("message", onCalibrationSocketMsgRecv);
+            await cameraCalibrationStore.closeCalibrationSocket(imageSource.uid);
 
-            if(socket)
+            if(webSocketInstance)
             {
-                socket.close();
-                socket = null;
+                webSocketInstance.disconnect();
+                webSocketInstance = null;
             }
         }
 
@@ -253,7 +299,7 @@ export default {
             }
             else if(data.details === "calibFrame")
             {
-                currentCalibFrameSrc.value = 'data:image/png;base64,' + data.data;
+                currentCalibFrameSrc.value = ImageDataUtils.createJpegDataURI(data.data);
             }
             else if(data.details === "calibError")
             {
@@ -285,21 +331,19 @@ export default {
 
         function saveCalibration()
         {
-            socket.send(JSON.stringify({
+            webSocketInstance.send(JSON.stringify({
                 "command": "save",
                 "uid": uuid.v4()
             }));
-            socket.send(JSON.stringify({
+            webSocketInstance.send(JSON.stringify({
                 "command": "stop",
             }));
             showFrames.value = false;
 
-            socket.removeEventListener("message", onCalibrationSocketMsgRecv);
-
-            if(socket)
+            if(webSocketInstance)
             {
-                socket.close();
-                socket = null;
+                webSocketInstance.disconnect();
+                webSocketInstance = null;
             }
         }
 
@@ -308,7 +352,7 @@ export default {
         });
 
         onUnmounted(() => {
-            if(socket)
+            if(webSocketInstance)
                 disconnectFromWs();
         });
 
@@ -316,6 +360,7 @@ export default {
             currentImageSource,
             imageSources,
             imageSourcesNames,
+            type: 'camera-calibration',
             checkerboardRows,
             checkerboardCols,
             checkerboardSquareSize,

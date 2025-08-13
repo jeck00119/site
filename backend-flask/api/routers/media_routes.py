@@ -6,6 +6,7 @@ from starlette.responses import JSONResponse
 from api.dependencies.services import get_service_by_type
 from api.error_handlers import create_error_response
 from api.route_utils import RouteHelper, require_authentication
+from security.validators import validate_input, detect_security_threats, validate_file_upload
 from repo.repositories import AudioEventsRepository
 from services.authorization.authorization import get_current_user
 from services.media.audio_model import AudioModel
@@ -85,6 +86,8 @@ async def add_media_channel(
 
 
 @router.post('/add_event')
+@validate_input(name="filename", path="safe_string")
+@detect_security_threats()
 async def add_event(
         audio: AudioModel,
         _: dict = Depends(require_authentication("add media event")),

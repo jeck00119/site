@@ -45,9 +45,9 @@ export const api = {
         return normalizeResponse<T>(get(url, headers));
     },
 
-    async post<T = any>(endpoint: string, payload?: any, headers?: Headers): Promise<ApiResponse<T>> {
+    async post<T = any>(endpoint: string, payload?: any, headers?: Headers, timeout?: number): Promise<ApiResponse<T>> {
         const url = await buildApiUrl(endpoint);
-        return normalizeResponse<T>(post(url, payload, headers));
+        return normalizeResponse<T>(post(url, payload, headers, timeout));
     },
 
     async put<T = any>(endpoint: string, payload?: any, headers?: Headers): Promise<ApiResponse<T>> {
@@ -83,6 +83,12 @@ export const api = {
     // Helper method to get full URL for cases like WebSocket connections
     async getFullUrl(endpoint: string): Promise<string> {
         return await buildApiUrl(endpoint);
+    },
+
+    // Helper method to get base URL for WebSocket connections
+    async getBaseUrl(): Promise<string> {
+        const port = await getPort();
+        return `http://${ipAddress}:${port}`;
     }
 };
 

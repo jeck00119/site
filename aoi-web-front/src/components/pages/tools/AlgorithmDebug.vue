@@ -75,22 +75,34 @@
 </template>
 
 <script>
-import { ref, computed, watch, onBeforeUnmount } from 'vue';
+// Vue and utilities
+import { ref, computed, watch, onBeforeUnmount, onMounted } from 'vue';
 import { useStore } from 'vuex';
 import { uuid } from "vue3-uuid";
+import * as fabric from 'fabric';
 
+// Component imports
 import CameraScene from '../../camera/CameraScene.vue';
 import DirectoryFilesList from '../../layout/DirectoryFilesList.vue';
 import AlgorithmDebugControl from '../../layout/AlgorithmDebugControl.vue';
 import MaskScene from '../../layout/MaskScene.vue';
 
-import graphic from '../../../utils/graphics.js';
-import { ipAddress, port } from '../../../url';
-import useAlgorithms from '../../../hooks/algorithms.js';
-import useGraphics from '../../../hooks/graphics.js';
-
-import useNotification from '../../../hooks/notifications.js'
-import * as fabric from 'fabric';
+// CENTRALIZED IMPORTS - Using all modern centralized patterns
+import { useFabricCanvas } from '@/composables/useFabricCanvas';
+import graphic from '@/utils/graphics.js';
+import { 
+    useAlgorithmsStore, 
+    useGraphicsStore, 
+    useConfigurationsStore, 
+    useImageSourcesStore, 
+    useErrorsStore,
+    useWebSocket, 
+    useLoadingState,
+    useAuthStore
+} from '@/composables/useStore';
+import { api } from '@/utils/api';
+import { addErrorToStore, handleApiError } from '@/utils/errorHandler';
+import { createLogger } from '@/utils/logger';
 
 export default {
     components: {
@@ -101,74 +113,428 @@ export default {
     },
 
     setup() {
+        // CENTRALIZED LOGGING
+        const logger = createLogger('AlgorithmDebug');
+        logger.lifecycle('setup', 'Initializing AlgorithmDebug with centralized patterns');
+
+        // CENTRALIZED STORE COMPOSABLES - All using modern patterns
+        const store = useStore(); // For backward compatibility with existing functions
+        const algorithmsStore = useAlgorithmsStore();
+        const graphicsStore = useGraphicsStore();
+        const configurationsStore = useConfigurationsStore();
+        const imageSourcesStore = useImageSourcesStore();
+        const errorsStore = useErrorsStore();
+        const authStore = useAuthStore();
+
+        // CENTRALIZED LOADING STATE
+        const { isLoading, setLoading, withLoading } = useLoadingState();
+
+        // CENTRALIZED FABRIC CANVAS MANAGEMENT
+        const { 
+            canvas, 
+            initializeCanvas, 
+            addBackgroundImage, 
+            renderCanvas,
+            dispose 
+        } = useFabricCanvas('camera-scene-canvas', {
+            width: 800,
+            height: 600,
+            selection: true
+        });
+
+        // Component state
         const show = ref(false);
         const showMasks = ref(false);
-
         const feedLocation = ref('');
         const currentImageSourceId = ref(null);
-
         const imageEncoding = ref('');
-
         const disableActions = ref(true);
-
-        let liveProcessSocket = null;
-
         const selectedTabSource = ref("Image Source");
         const selectedTabDebug = ref("References");
-
         const importFilePath = ref('');
         const loadedAlgorithm = ref(null);
-
         const currentReferenceName = ref(null);
         const currentAlgorithmName = ref(null);
-
         const referenceToSave = ref([]);
         const currentReferencePointIdx = ref(-1);
         const showSelectReferenceDialog = ref(false);
-
         const referenceOverlay = ref(null);
         const hole = ref(null);
         const circleRefPoint = ref(null);
 
-        const store = useStore();
+        // CENTRALIZED WEBSOCKET MANAGEMENT
+        let liveProcessSocket = null;
 
-        const {showNotification, notificationMessage, notificationIcon, notificationTimeout, 
-            setNotification, clearNotification} = useNotification();
+        // CENTRALIZED NOTIFICATION SYSTEM (migrate from old hook)
+        const showNotification = ref(false);
+        const notificationMessage = ref('');
+        const notificationIcon = ref('');
+        const notificationTimeout = ref(3000);
 
-        const { selectedGraphic, graphicsObject, _, graphicItems,
-            canvas, updateGraphics, selectionChanged, selectionCleared, selectionModified,
-            saveMasks } = useGraphics();
+        const setNotification = (timeout, message, icon) => {
+            notificationTimeout.value = timeout || 3000;
+            notificationMessage.value = message || '';
+            notificationIcon.value = icon || 'info';
+            showNotification.value = true;
+        };
 
-        const { _2, algorithms, currentAlgorithm, algorithmAttributes, parameters,
-            resultImage, outputImages, _3, _4, _5, loadUIandAlgorithm, _6,
-            _7, download, _8, _9, _10, liveResultMsgRecv, setLiveAlgorithmSocket } = useAlgorithms(null, null, currentImageSourceId, null, graphicsObject, ipAddress, port);
+        const clearNotification = () => {
+            showNotification.value = false;
+            notificationMessage.value = '';
+            notificationIcon.value = '';
+        };
 
-        const referenceAlgorithms = computed(function () {
-            return store.getters["algorithms/getReferenceAlgorithms"].map(alg => alg.type);
+        // CENTRALIZED COMPUTED PROPERTIES - Using centralized store composables
+        const algorithms = computed(() => {
+            // Get algorithms directly from the centralized store
+            // These are already computed refs from the composables
+
+            const algs = algorithmsStore.algorithms;
+            
+            // Ensure we always return an array
+            let result = [];
+            if (Array.isArray(algs)) {
+                result = algs;
+            } else if (!algs) {
+                result = [];
+            }
+            
+            logger.debug('algorithms computed:', { 
+                count: result.length,
+                algorithms: result
+            });
+            
+            return result;
         });
 
-        const currentReferenceAlgorithm = computed(function () {
-            return store.getters["algorithms/getCurrentReferenceAlgorithm"];
+        const configuredAlgorithms = computed(() => {
+            // Get configured algorithms directly from the centralized store
+            const configAlgs = algorithmsStore.configuredAlgorithms;
+            
+            // Ensure we always return an array
+            let result = [];
+            if (Array.isArray(configAlgs)) {
+                result = configAlgs;
+            } else if (!configAlgs) {
+                result = [];
+            }
+            
+            logger.debug('configuredAlgorithms computed:', { 
+                count: result.length,
+                algorithms: result
+            });
+            
+            // Debug: Log the actual structure of configured algorithms
+            if (result.length > 0) {
+                logger.debug('First configured algorithm structure:', { 
+                    algorithm: result[0], 
+                    keys: Object.keys(result[0]),
+                    uid: result[0].uid,
+                    type: result[0].type,
+                    stringified: JSON.stringify(result[0])
+                });
+            }
+            
+            return result;
         });
 
-        const referenceAlgorithmAttributes = computed(function () {
-            return store.getters["algorithms/getCurrentReferenceAlgorithmAttributes"];
+        const currentAlgorithm = algorithmsStore.currentAlgorithm;
+        const algorithmAttributes = computed(() => {
+            // Get the algorithm attributes (UI schema) from the store
+            const attrs = algorithmsStore.algorithmAttributes;
+            
+            // Ensure we always return an array
+            let result = [];
+            if (Array.isArray(attrs)) {
+                result = attrs;
+            } else if (!attrs) {
+                result = [];
+            }
+            
+            logger.debug('algorithmAttributes computed:', { 
+                count: result.length,
+                attributes: result 
+            });
+            
+            return result;
+        });
+        const resultImage = computed(() => {
+            const result = algorithmsStore.algorithmResult;
+            if(result && result.frame) {
+                if(Array.isArray(result.frame) && result.frame.length === 0) {
+                    return '';
+                }
+                else if(Array.isArray(result.frame)) {
+                    return result.frame[0];
+                }
+                else {
+                    return result.frame;
+                }
+            }
+            return '';
+        });
+        
+        const outputImages = computed(() => {
+            const result = algorithmsStore.algorithmResult;
+            let outputImages = [];
+            if(result && result.frame) {
+                outputImages = Array.isArray(result.frame) ? result.frame : [result.frame];
+            }
+            return outputImages;
+        });
+        const parameters = computed(() => {
+            if(currentAlgorithm.value && currentAlgorithm.value.parameters)
+                return currentAlgorithm.value.parameters;
+            else
+                return [];
+        });
+        
+        // CENTRALIZED GRAPHICS MANAGEMENT
+        const graphicItems = computed(() => graphicsStore.graphicsItems || []);
+        const selectedGraphic = graphicsStore.selectedGraphic;
+        const graphicsObject = ref(null);
+        
+        // CENTRALIZED GRAPHICS FUNCTIONS - Using centralized utilities
+        function updateGraphics() {
+            try {
+                // Use centralized canvas from useFabricCanvas
+                if (canvas.value && graphicItems.value) {
+                    // This would use centralized graphics utility if available
+                    // For now, maintain compatibility with existing system
+                    const graphicsData = {
+                        items: graphicItems.value,
+                        canvas: canvas.value
+                    };
+                    graphicsObject.value = graphicsData;
+                    logger.debug('Graphics updated via centralized pattern');
+                }
+            } catch (error) {
+                logger.error('Failed to update graphics', error);
+                addErrorToStore(errorsStore, 'Graphics Update Error', error);
+            }
+        }
+        
+        function selectionChanged(rect) {
+            try {
+                if (rect && canvas.value) {
+                    // Use centralized graphics store for selection
+                    graphicsStore.selectGraphic(rect);
+                    logger.debug('Selection changed via centralized pattern');
+                }
+            } catch (error) {
+                logger.error('Failed to handle selection change', error);
+                addErrorToStore(errorsStore, 'Graphics Selection Error', error);
+            }
+        }
+        
+        function selectionCleared() {
+            try {
+                graphicsStore.selectGraphic(null);
+                logger.debug('Selection cleared via centralized pattern');
+            } catch (error) {
+                logger.error('Failed to clear selection', error);
+                addErrorToStore(errorsStore, 'Graphics Clear Error', error);
+            }
+        }
+        
+        function selectionModified(obj) {
+            try {
+                if (obj === selectedGraphic.value) {
+                    graphicsStore.selectGraphic(obj);
+                    logger.debug('Selection modified via centralized pattern');
+                }
+            } catch (error) {
+                logger.error('Failed to handle selection modification', error);
+                addErrorToStore(errorsStore, 'Graphics Modification Error', error);
+            }
+        }
+        
+        function saveMasks(polygons) {
+            const masks = [];
+            const masksColors = [];
+            
+            for (const polygon of polygons) {
+                const points = [];
+                const updatedPoints = graphic.getUpdatedPolygonPoints(polygon, canvas.value);
+                
+                for (let i = 0; i < updatedPoints.length; i++) {
+                    points.push([updatedPoints[i].x, updatedPoints[i].y]);
+                }
+                
+                masks.push(points);
+                
+                let hexColor = polygon.fill;
+                let r = parseInt(hexColor.substring(1, 3), 16);
+                let g = parseInt(hexColor.substring(3, 5), 16);
+                let b = parseInt(hexColor.substring(5, 7), 16);
+                
+                masksColors.push([r, g, b]);
+            }
+            
+            if (selectedGraphic.value) {
+                selectedGraphic.value.masks = masks;
+                selectedGraphic.value.masksColors = masksColors;
+                let data = graphic.getRectProps(selectedGraphic.value, canvas.value);
+                centralGraphicsStore.selectGraphic(data);
+            }
+        }
+        
+        // CENTRALIZED API CALLS - Using centralized API utility
+        async function loadUIandAlgorithm(type, uid) {
+            logger.debug('loadUIandAlgorithm started', { type, uid });
+            try {
+                await withLoading(async () => {
+                    logger.debug('Loading algorithm via centralized API', { type, uid });
+                    
+                    // ALWAYS load the UI schema first (parameter definitions)
+                    await algorithmsStore.loadAlgorithm({ type });
+                    
+                    // Set the live algorithm on the backend
+                    await algorithmsStore.setLiveAlgorithm({ type });
+                    
+                    if (uid) {
+                        // Load the saved algorithm data (including saved parameter values)
+                        await algorithmsStore.loadCurrentAlgorithm({ uid });
+                    } else {
+                        // For new algorithms, create default parameters from the UI schema
+                        // Wait for algorithm attributes to be loaded before using them
+                        await new Promise(resolve => setTimeout(resolve, 100)); // Small delay for reactive updates
+                        
+                        const attributes = algorithmsStore.algorithmAttributes;
+                        logger.debug('Creating new algorithm from attributes:', { attributes });
+                        
+                        if (attributes && attributes.length > 0) {
+                            algorithmsStore.loadCurrentAlgorithmFromParameters({
+                                attributes: attributes,
+                                type: type
+                            });
+                        } else {
+                            logger.warn('No algorithm attributes available after loading algorithm', { type, attributes });
+                        }
+                    }
+                    
+                    logger.info('Algorithm loaded successfully via centralized pattern');
+                    logger.debug('Algorithm state after load:', { 
+                        algorithmAttributes: algorithmAttributes.value,
+                        currentAlgorithm: algorithmsStore.currentAlgorithm,
+                        parameters: parameters.value
+                    });
+                });
+            } catch (error) {
+                logger.error('Failed to load algorithm', error);
+                addErrorToStore(errorsStore, 'Algorithm Load Error', error);
+                setNotification(5000, `Failed to load algorithm: ${error.message}`, 'bi-exclamation-circle-fill');
+            }
+        }
+        
+        function download(algorithm) {
+            let text = JSON.stringify(algorithm);
+            const currentDate = new Date();
+            
+            let suffix = currentDate.getDate() + "_" + (currentDate.getMonth() + 1) + "_"
+                + currentDate.getFullYear() + "_" + currentDate.getHours() + "_"
+                + currentDate.getMinutes() + "_" + currentDate.getSeconds() + ".json";
+                
+            let filename = algorithm.type.replace(/\s/g, '') + suffix;
+            
+            let element = document.createElement('a');
+            element.setAttribute('href', 'data:application/json;charset=utf-8,' + encodeURIComponent(text));
+            element.setAttribute('download', filename);
+            
+            element.style.display = 'none';
+            document.body.appendChild(element);
+            
+            element.click();
+            document.body.removeChild(element);
+        }
+        
+        // CENTRALIZED WEBSOCKET MESSAGE HANDLING
+        function liveResultMsgRecv(event) {
+            try {
+                logger.debug('Received WebSocket message via centralized handler');
+                const recvData = JSON.parse(event.data);
+                
+                let outputImages = [];
+                if (recvData.frame && Array.isArray(recvData.frame)) {
+                    for(const frame of recvData.frame) {
+                        outputImages.push(`data:image/jpeg;base64,${frame}`);
+                    }
+                } else {
+                    if (recvData.frame) {
+                        outputImages.push(`data:image/jpeg;base64,${recvData.frame}`);
+                    }
+                }
+                
+                // Use centralized store dispatch
+                algorithmsStore.setAlgorithmResult({
+                    frame: outputImages,
+                    data: recvData.data
+                });
+                
+                // CENTRALIZED WEBSOCKET COMMUNICATION
+                if(graphicsObject.value && liveProcessSocket) {
+                    liveProcessSocket.send(JSON.stringify({
+                        command: 'set',
+                        key: 'graphics',
+                        value: graphicsObject.value
+                    }));
+                    graphicsObject.value = null;
+                    logger.debug('Graphics data sent via centralized WebSocket');
+                } else if (liveProcessSocket) {
+                    liveProcessSocket.send(JSON.stringify({command: ''}));
+                }
+                
+            } catch (error) {
+                logger.error('Failed to process WebSocket message', error);
+                addErrorToStore(errorsStore, 'WebSocket Message Error', error);
+            }
+        }
+        
+        function setLiveAlgorithmSocket(socket) {
+            liveProcessSocket = socket;
+            logger.debug('Live algorithm socket set via centralized pattern');
+        }
+
+        const referenceAlgorithms = computed(() => {
+            // Get reference algorithms from the centralized store
+            const refAlgs = algorithmsStore.referenceAlgorithms;
+            
+            // Ensure we have an array before calling map
+            let algorithms = [];
+            if (Array.isArray(refAlgs)) {
+                algorithms = refAlgs;
+            } else if (!refAlgs) {
+                algorithms = [];
+            }
+            
+            // Extract only the type names for the dropdown
+            const result = algorithms.map(alg => alg?.type).filter(type => type);
+            
+            logger.debug('referenceAlgorithms computed:', { 
+                count: result.length,
+                types: result
+            });
+            
+            return result;
+        });
+
+        const currentReferenceAlgorithm = algorithmsStore.currentReferenceAlgorithm;
+
+        const referenceAlgorithmAttributes = computed(() => {
+            const attrs = algorithmsStore.currentReferenceAlgorithmAttributes;
+            return Array.isArray(attrs) ? attrs : [];
         });
 
         const referenceParameters = computed(function () {
-            if (currentReferenceAlgorithm.value)
+            if (currentReferenceAlgorithm?.value && currentReferenceAlgorithm.value.parameters)
                 return currentReferenceAlgorithm.value.parameters;
             else
                 return [];
         });
 
-        const algorithmGraphics = computed(function () {
-            return store.getters["graphics/getCurrentGraphics"];
-        });
+        const algorithmGraphics = computed(() => graphicsStore.currentGraphics || []);
 
-        const referenceGraphics = computed(function () {
-            return store.getters["graphics/getCurrentReferenceGraphics"];
-        });
+        const referenceGraphics = computed(() => graphicsStore.currentReferenceGraphics || []);
 
         const currentGraphics = computed(function () {
             if (selectedTabDebug.value === "References")
@@ -192,7 +558,7 @@ export default {
         });
 
         const disableRoiMasks = computed(function () {
-            return (!currentAlgorithm.value && !currentReferenceAlgorithm.value) || (!currentImageSourceId.value && !imageEncoding.value);
+            return (!currentAlgorithm.value && !currentReferenceAlgorithm?.value) || (!currentImageSourceId.value && !imageEncoding.value);
         });
 
         const resultsWatch = store.watch(
@@ -291,10 +657,10 @@ export default {
 
         watch(imageEncoding, (newValue) => {
             if (newValue !== '') {
-                store.dispatch("algorithms/setStaticImage", newValue);
+                algorithmsStore.setStaticImage(newValue);
             }
             else {
-                store.dispatch("algorithms/setStaticImage", null);
+                algorithmsStore.setStaticImage(null);
             }
         });
 
@@ -307,20 +673,23 @@ export default {
                 onReferenceAlgorithmChanged(newValue);
             }
             else {
-                store.dispatch("algorithms/setCurrentReferenceAlgorithm", null);
-                store.dispatch("algorithms/setCurrentReferenceAlgorithmAttributes", []);
-                store.dispatch("graphics/resetReferenceGraphicItems");
-                store.dispatch("algorithms/setAlgorithmResult", null);
-                store.dispatch("algorithms/resetLiveAlgorithmReference");
+                algorithmsStore.setCurrentReferenceAlgorithm(null);
+                algorithmsStore.setCurrentReferenceAlgorithmAttributes([]);
+                graphicsStore.resetReferenceGraphicItems();
+                algorithmsStore.setAlgorithmResult(null);
+                algorithmsStore.resetLiveAlgorithmReference();
             }
         });
 
         function algorithmChanged(value) {
+            logger.debug('Algorithm selection changed', { newAlgorithm: value });
             currentAlgorithmName.value = value;
         }
 
         watch(currentAlgorithmName, (newValue) => {
+            logger.debug('currentAlgorithmName watcher triggered', { newValue, oldValue: currentAlgorithmName.value });
             if (newValue) {
+                logger.debug('Calling onAlgorithmChanged', { algorithm: newValue });
                 onAlgorithmChanged(newValue);
             }
         });
@@ -337,26 +706,26 @@ export default {
 
                 let algorithm = null;
 
-                if (currentTab.value === tabs.value[0]) {
-                    algorithm = store.getters["algorithms/getReferenceAlgorithmByType"](loadedAlgorithm.value.type);
+                if (selectedTabDebug.value === "References") {
+                    algorithm = algorithmsStore.getReferenceAlgorithmByType(loadedAlgorithm.value.type);
                 }
                 else {
-                    algorithm = store.getters["algorithms/getAlgorithmByType"](loadedAlgorithm.value.type);
+                    algorithm = algorithmsStore.getAlgorithmByType(loadedAlgorithm.value.type);
                 }
 
                 if (algorithm !== undefined) {
                     if (algorithm.type === currentAlgorithmName.value) {
-                        if (currentTab.value === tabs.value[0]) {
-                            store.dispatch("algorithms/loadCurrentReferenceAlgorithmFromObject", loadedAlgorithm.value.parameters);
+                        if (selectedTabDebug.value === "References") {
+                            algorithmsStore.loadCurrentReferenceAlgorithmFromObject(loadedAlgorithm.value.parameters);
                         }
                         else {
-                            store.dispatch("algorithms/loadCurrentAlgorithmFromObject", loadedAlgorithm.value.parameters);
+                            algorithmsStore.loadCurrentAlgorithmFromObject(loadedAlgorithm.value.parameters);
                         }
 
                         loadedAlgorithm.value = null;
                     }
                     else {
-                        if (currentTab.value === tabs.value[0]) {
+                        if (selectedTabDebug.value === "References") {
                             currentReferenceName.value = algorithm.type;
                         }
                         else {
@@ -369,48 +738,119 @@ export default {
             fileread.readAsText(newValue);
         });
 
+        // Watch for FPS changes in the current image source to trigger WebSocket reconnection
+        watch(() => {
+            if (currentImageSourceId.value) {
+                const imageSource = imageSourcesStore.getImageSourceById(currentImageSourceId.value);
+                return imageSource?.fps;
+            }
+            return null;
+        }, async (newFps, oldFps) => {
+            if (newFps !== oldFps && newFps != null && currentImageSourceId.value) {
+                logger.debug('Image source FPS changed, reconnecting WebSocket', { newFps, oldFps, imageSourceId: currentImageSourceId.value });
+                await updateImageSource(currentImageSourceId.value);
+            }
+        });
+
         async function loadReferenceAlgorithmUI(type) {
-            await store.dispatch("algorithms/loadReferenceAlgorithm", {
+            await algorithmsStore.loadReferenceAlgorithm({
                 type: type
             });
 
-            await store.dispatch("algorithms/setReferenceAlgorithm", {
+            await algorithmsStore.setReferenceAlgorithm({
                 type: type
             });
 
-            store.dispatch("algorithms/loadCurrentReferenceAlgorithmFromParameters", {
+            algorithmsStore.loadCurrentReferenceAlgorithmFromParameters({
                 attributes: referenceAlgorithmAttributes.value,
                 type: type
             });
         }
 
         async function onAlgorithmChanged(type) {
-            await loadUIandAlgorithm(type, null);
+            logger.debug('onAlgorithmChanged called', { type });
+            
+            // For the Detections tab, we need to check if we're selecting a generic algorithm
+            // or re-selecting a configured algorithm
+            const isConfigured = configuredAlgorithms.value.some(alg => alg.type === type);
+            
+            if (isConfigured) {
+                // This is a configured algorithm with saved data
+                const configuredAlg = configuredAlgorithms.value.find(alg => alg.type === type);
+                logger.debug('Loading configured algorithm:', { configuredAlg, type });
+                await loadUIandAlgorithm(type, configuredAlg.uid);
+            } else {
+                // This is a generic algorithm type - create new instance
+                logger.debug('Loading generic algorithm type:', type);
+                await loadUIandAlgorithm(type, null);
+            }
 
             if (loadedAlgorithm.value) {
-                store.dispatch("algorithms/loadCurrentAlgorithmFromObject", loadedAlgorithm.value.parameters);
+                algorithmsStore.loadCurrentAlgorithmFromObject(loadedAlgorithm.value.parameters);
                 loadedAlgorithm.value = null;
             }
+            
+            // Debug the state after loading
+            logger.debug('Algorithm state after loading:', {
+                currentAlgorithm: algorithmsStore.currentAlgorithm,
+                algorithmAttributes: algorithmAttributes.value,
+                parameters: parameters.value
+            });
         }
 
         async function onReferenceAlgorithmChanged(type) {
             await loadReferenceAlgorithmUI(type);
 
             if (loadedAlgorithm.value) {
-                store.dispatch("algorithms/loadCurrentReferenceAlgorithmFromObject", loadedAlgorithm.value.parameters);
+                algorithmsStore.loadCurrentReferenceAlgorithmFromObject(loadedAlgorithm.value.parameters);
                 loadedAlgorithm.value = null;
             }
         }
 
-        function updateImageSource(id) {
-            currentImageSourceId.value = id;
+        async function updateImageSource(id) {
+            try {
+                currentImageSourceId.value = id;
 
-            if (id) {
-                feedLocation.value = `ws://${ipAddress}:${port}/image_source/${id}/ws`;
-                disableActions.value = false;
-            }
-            else {
-                disableActions.value = true;
+                if (id) {
+                    // CENTRALIZED URL CONSTRUCTION - Use centralized API for dynamic URL
+                    const baseUrl = await api.getBaseUrl();
+                    const wsBaseUrl = baseUrl.replace('http', 'ws');
+                    
+                    // Get image source data to include FPS parameter
+                    const imageSource = imageSourcesStore.getImageSourceById(id);
+                    
+                    if (imageSource) {
+                        // Include FPS parameter for proper frame rate control
+                        const fps = imageSource.fps || 1; // Default to 1 FPS if not specified
+                        let wsUrl;
+                        
+                        if (imageSource.image_source_type === "static") {
+                            wsUrl = `${wsBaseUrl}/image_source/${id}/${imageSource.image_generator_uid}/${fps}/ws`;
+                        } else if (imageSource.image_source_type === "dynamic") {
+                            wsUrl = `${wsBaseUrl}/image_source/${id}/${imageSource.camera_uid}/${fps}/ws`;
+                        } else {
+                            // Fallback to old format if type is unknown
+                            wsUrl = `${wsBaseUrl}/image_source/${id}/ws`;
+                        }
+                        
+                        feedLocation.value = wsUrl;
+                        logger.debug('Image source updated with FPS control', { id, fps, type: imageSource.image_source_type, feedLocation: feedLocation.value });
+                    } else {
+                        // Fallback if image source not found in store
+                        feedLocation.value = `${wsBaseUrl}/image_source/${id}/ws`;
+                        logger.warn('Image source not found in store, using fallback URL without FPS', { id });
+                    }
+                    
+                    disableActions.value = false;
+                }
+                else {
+                    disableActions.value = true;
+                    feedLocation.value = '';
+                    logger.debug('Image source cleared');
+                }
+            } catch (error) {
+                logger.error('Failed to update image source', error);
+                addErrorToStore(errorsStore, 'Image Source Error', error);
             }
         }
 
@@ -422,196 +862,234 @@ export default {
             show.value = false;
         }
 
+        // CENTRALIZED ALGORITHM PROCESSING
         async function singleRunAlgorithm() {
-            const data = graphic.getGraphicsProps(graphicItems.value, canvas.value);
-
-            await store.dispatch("algorithms/updateCurrentAlgorithmProperty", {
-                name: 'graphics',
-                value: data
-            });
-
-            await store.dispatch("algorithms/setLiveAlgorithmReference");
-
-            if (currentReferenceAlgorithm.value) {
-                await store.dispatch("algorithms/updateCurrentReferenceAlgorithmProperty", {
-                    name: 'golden_position',
-                    value: referenceToSave.value[currentReferencePointIdx.value]
-                });
-            }
-
-            if (selectedTabSource.value === "Image Source") {
-                store.dispatch("algorithms/singleProcessAlgorithmCamera", {
-                    uid: currentImageSourceId.value,
-                    type: "component"
-                }).catch((err) => {
-                    setNotification(3000, err, 'bi-exclamation-circle-fill');
-
-                    store.dispatch("errors/addError", {
-                        id: uuid.v4(),
-                        title: "Algorithm Debug Error",
-                        description: err
-                    });
-                });
-            }
-            else {
-                store.dispatch("algorithms/singleProcessAlgorithmStatic", {
-                    type: "component"
-                }).catch((err) => {
-                    setNotification(3000, err, 'bi-exclamation-circle-fill');
+            try {
+                await withLoading(async () => {
+                    logger.debug('Starting single algorithm run via centralized pattern');
                     
-                    store.dispatch("errors/addError", {
-                        id: uuid.v4(),
-                        title: "Algorithm Debug Error",
-                        description: err
+                    // Use centralized graphics processing
+                    const graphicsData = {
+                        items: graphicItems.value,
+                        canvas: canvas.value
+                    };
+
+                    // CENTRALIZED API CALLS instead of direct store dispatch
+                    await api.post('/algorithm/__API__/edit_live_algorithm', {
+                        key: 'graphics',
+                        value: graphicsData
                     });
+                    
+                    await algorithmsStore.setLiveAlgorithmReference();
+
+                    if (currentReferenceAlgorithm.value) {
+                        // Ensure we have a valid golden_position value
+                        const goldenPositionValue = (referenceToSave.value && 
+                                                   currentReferencePointIdx.value >= 0 && 
+                                                   currentReferencePointIdx.value < referenceToSave.value.length) 
+                                                   ? referenceToSave.value[currentReferencePointIdx.value] 
+                                                   : [0, 0];
+                        
+                        await api.post('/algorithm/__API__/edit_reference_algorithm', {
+                            key: 'golden_position',
+                            value: goldenPositionValue
+                        });
+                    }
+
+                    // CENTRALIZED API PROCESSING
+                    let apiEndpoint;
+                    let requestData;
+                    
+                    if (selectedTabSource.value === "Image Source") {
+                        apiEndpoint = `/algorithm/__API__/single_process_algorithm_camera/${currentImageSourceId.value}/component`;
+                        requestData = {};
+                    } else {
+                        apiEndpoint = '/algorithm/__API__/single_process_algorithm_static/component';
+                        requestData = {};
+                    }
+
+                    const response = await api.post(apiEndpoint, requestData);
+                    
+                    if (response.ok) {
+                        logger.info('Algorithm processed successfully via centralized API');
+                        setNotification(2000, 'Algorithm processed successfully', 'bi-check-circle-fill');
+                    } else {
+                        throw new Error(`Algorithm processing failed: ${response.statusText}`);
+                    }
                 });
+            } catch (error) {
+                logger.error('Failed to process algorithm', error);
+                addErrorToStore(errorsStore, 'Algorithm Processing Error', error);
+                setNotification(5000, `Algorithm processing failed: ${error.message}`, 'bi-exclamation-circle-fill');
             }
         }
 
         async function liveProcessAlgorithm(state) {
             if (state) {
-                const data = graphic.getGraphicsProps(graphicItems.value, canvas.value);
+                    if (!canvas.value) {
+                    logger.warn('Canvas not available for graphics processing');
+                    return;
+                }
+            const data = graphic.getGraphicsProps(graphicItems.value, canvas.value);
 
-                await store.dispatch("algorithms/updateCurrentAlgorithmProperty", {
+                await algorithmsStore.updateCurrentAlgorithmProperty({
                     name: 'graphics',
                     value: data
                 });
-
-                await store.dispatch("algorithms/setLiveAlgorithmReference");
+                await algorithmsStore.setLiveAlgorithmReference();
 
                 if (currentReferenceAlgorithm.value) {
-                    await store.dispatch("algorithms/updateCurrentReferenceAlgorithmProperty", {
-                        name: 'golden_position',
-                        value: referenceToSave.value[currentReferencePointIdx.value]
-                    });
+                    // Ensure we have a valid golden_position value
+                    const goldenPositionValue = (referenceToSave.value && 
+                                               currentReferencePointIdx.value >= 0 && 
+                                               currentReferencePointIdx.value < referenceToSave.value.length) 
+                                               ? referenceToSave.value[currentReferencePointIdx.value] 
+                                               : [0, 0];
+                    
+                    await algorithmsStore.updateCurrentReferenceAlgorithmProperty({
+                    name: 'golden_position',
+                    value: goldenPositionValue
+                });
                 }
 
                 let url = null;
                 let id = uuid.v4();
 
+                const baseUrl = await api.getBaseUrl();
+                const wsBaseUrl = baseUrl.replace('http', 'ws');
+                
                 if (selectedTabSource.value === "Image Source") {
-                    url = `ws://${ipAddress}:${port}/algorithm/live_algorithm_result/${currentImageSourceId.value}/${id}/ws`;
+                    url = `${wsBaseUrl}/algorithm/live_algorithm_result/${currentImageSourceId.value}/${id}/ws`;
                 }
                 else {
-                    url = `ws://${ipAddress}:${port}/algorithm/live_algorithm_result/${id}/ws`;
+                    url = `${wsBaseUrl}/algorithm/live_algorithm_result/${id}/ws`;
                 }
 
-                liveProcessSocket = new WebSocket(url);
+                // Use centralized WebSocket composable
+                liveProcessSocket = useWebSocket(url, {
+                    autoConnect: true,
+                    reconnectAttempts: 3,
+                    reconnectInterval: 2000,
+                    onOpen: onSocketOpen,
+                    onMessage: liveResultMsgRecv
+                });
 
-                liveProcessSocket.addEventListener('open', onSocketOpen);
-                liveProcessSocket.addEventListener('message', liveResultMsgRecv);
-
-                setLiveAlgorithmSocket(liveProcessSocket);
+                setLiveAlgorithmSocket(liveProcessSocket.socket.value);
             }
             else {
                 if (liveProcessSocket) {
                     liveProcessSocket.send(JSON.stringify({ command: "disconnect" }));
-
-                    liveProcessSocket.removeEventListener('open', onSocketOpen);
-                    liveProcessSocket.removeEventListener('message', liveResultMsgRecv);
-
-                    liveProcessSocket.close();
+                    liveProcessSocket.disconnect();
                     liveProcessSocket = null;
-
-                    setLiveAlgorithmSocket(liveProcessSocket);
+                    setLiveAlgorithmSocket(null);
                 }
             }
         }
 
         async function singleRunReference() {
-            const graphicItems = store.getters["graphics/getCurrentReferenceGraphics"];
-            const canvas = store.getters["graphics/getCanvas"];
+            const graphicItems = graphicsStore.currentReferenceGraphics;
+            
+            if (!canvas.value) {
+                logger.warn('Canvas not available for reference graphics processing');
+                return;
+            }
 
-            const data = graphic.getGraphicsProps(graphicItems, canvas);
+            const data = graphic.getGraphicsProps(graphicItems, canvas.value);
 
-            await store.dispatch("algorithms/updateCurrentReferenceAlgorithmProperty", {
+            await algorithmsStore.updateCurrentReferenceAlgorithmProperty({
                 name: 'graphics',
                 value: data
             });
 
             currentReferencePointIdx.value = 0;
 
-            await store.dispatch("algorithms/updateCurrentReferenceAlgorithmProperty", {
+            await algorithmsStore.updateCurrentReferenceAlgorithmProperty({
                 name: 'reference_point_idx',
                 value: currentReferencePointIdx.value
             });
 
             if (selectedTabSource.value === "Image Source") {
-                await store.dispatch("algorithms/singleProcessReferenceCamera", {
+                await algorithmsStore.singleProcessReferenceCamera({
                     uid: currentImageSourceId.value,
                     type: "component"
                 }).catch((err) => {
-                    setNotification(3000, err, 'bi-exclamation-circle-fill');
-
-                    store.dispatch("errors/addError", {
+                    logger.error('Failed to process reference algorithm with camera', err);
+                    errorsStore.addError({
                         id: uuid.v4(),
-                        title: "Algorithm Debug Error",
+                        title: 'Reference Algorithm Debug Error',
                         description: err
                     });
+                    setNotification(3000, err, 'bi-exclamation-circle-fill');
                 });
             }
             else {
-                await store.dispatch("algorithms/singleProcessReferenceStatic", {
+                await algorithmsStore.singleProcessReferenceStatic({
                     type: "component"
                 }).catch((err) => {
-                    setNotification(3000, err, 'bi-exclamation-circle-fill');
-
-                    store.dispatch("errors/addError", {
+                    logger.error('Failed to process reference algorithm with static image', err);
+                    errorsStore.addError({
                         id: uuid.v4(),
-                        title: "Algorithm Debug Error",
+                        title: 'Reference Algorithm Debug Error',
                         description: err
                     });
+                    setNotification(3000, err, 'bi-exclamation-circle-fill');
                 });
             }
         }
 
         async function liveProcessReference(state) {
             if (state) {
-                const graphicItems = store.getters["graphics/getCurrentReferenceGraphics"];
-                const canvas = store.getters["graphics/getCanvas"];
+                const graphicItems = graphicsStore.currentReferenceGraphics;
+                
+                if (!canvas.value) {
+                    logger.warn('Canvas not available for live reference processing');
+                    return;
+                }
 
-                const data = graphic.getGraphicsProps(graphicItems, canvas);
+                const data = graphic.getGraphicsProps(graphicItems, canvas.value);
 
-                await store.dispatch("algorithms/updateCurrentReferenceAlgorithmProperty", {
-                    name: 'graphics',
-                    value: data
-                });
+                await algorithmsStore.updateCurrentReferenceAlgorithmProperty({
+                name: 'graphics',
+                value: data
+            });
 
                 currentReferencePointIdx.value = 0;
 
-                await store.dispatch("algorithms/updateCurrentReferenceAlgorithmProperty", {
-                    name: 'reference_point_idx',
-                    value: currentReferencePointIdx.value
-                });
+                await algorithmsStore.updateCurrentReferenceAlgorithmProperty({
+                name: 'reference_point_idx',
+                value: currentReferencePointIdx.value
+            });
 
                 let url = null;
                 let id = uuid.v4();
 
+                const baseUrl = await api.getBaseUrl();
+                const wsBaseUrl = baseUrl.replace('http', 'ws');
+                
                 if (selectedTabSource.value === "Image Source") {
-                    url = `ws://${ipAddress}:${port}/algorithm/live_reference/${currentImageSourceId.value}/${id}/ws`;
+                    url = `${wsBaseUrl}/algorithm/live_reference/${currentImageSourceId.value}/${id}/ws`;
                 }
                 else {
-                    url = `ws://${ipAddress}:${port}/algorithm/live_reference/${id}/ws`;
+                    url = `${wsBaseUrl}/algorithm/live_reference/${id}/ws`;
                 }
 
-                liveProcessSocket = new WebSocket(url);
+                // Use centralized WebSocket composable
+                liveProcessSocket = useWebSocket(url, {
+                    autoConnect: true,
+                    reconnectAttempts: 3,
+                    reconnectInterval: 2000,
+                    onOpen: onSocketOpen,
+                    onMessage: liveResultMsgRecv
+                });
 
-                liveProcessSocket.addEventListener('open', onSocketOpen);
-                liveProcessSocket.addEventListener('message', liveResultMsgRecv);
-
-                setLiveAlgorithmSocket(liveProcessSocket);
+                setLiveAlgorithmSocket(liveProcessSocket.socket.value);
             }
             else {
                 if (liveProcessSocket) {
                     liveProcessSocket.send(JSON.stringify({ command: "disconnect" }));
-
-                    liveProcessSocket.removeEventListener('open', onSocketOpen);
-                    liveProcessSocket.removeEventListener('message', liveResultMsgRecv);
-
-                    liveProcessSocket.close();
+                    liveProcessSocket.disconnect();
                     liveProcessSocket = null;
-
-                    setLiveAlgorithmSocket(liveProcessSocket);
+                    setLiveAlgorithmSocket(null);
                 }
             }
         }
@@ -619,7 +1097,7 @@ export default {
         function closeSelectReferenceDialog() {
             showSelectReferenceDialog.value = false;
 
-            store.dispatch("algorithms/updateCurrentReferenceAlgorithmProperty", {
+            algorithmsStore.updateCurrentReferenceAlgorithmProperty({
                 name: 'reference_point_idx',
                 value: currentReferencePointIdx.value
             });
@@ -695,24 +1173,218 @@ export default {
             circleRefPoint.value = c;
         }
 
+        // COMPREHENSIVE ALGORITHM DEBUG FUNCTION
+        async function debugAlgorithms() {
+            try {
+                logger.debug('=== COMPREHENSIVE ALGORITHM DEBUG ===');
+                logger.debug('Debugging all algorithm types...');
+                
+                // Debug generic algorithms (from /algorithm/types)
+                const genericAlgorithms = algorithmsStore.algorithms.value;
+                logger.debug('=== GENERIC ALGORITHMS (/algorithm/types) ===');
+                logger.debug('Generic algorithms count:', Array.isArray(genericAlgorithms) ? genericAlgorithms.length : 'not an array');
+                logger.debug('Generic algorithms actual values:', Array.isArray(genericAlgorithms) ? genericAlgorithms : 'undefined or not array');
+                if (Array.isArray(genericAlgorithms) && genericAlgorithms.length > 0) {
+                    logger.debug('First generic algorithm:', {
+                        algorithm: genericAlgorithms[0],
+                        keys: Object.keys(genericAlgorithms[0]),
+                        type: genericAlgorithms[0].type,
+                        uid: genericAlgorithms[0].uid
+                    });
+                }
+                
+                // Debug configured algorithms (from /algorithm)
+                const configuredAlgorithms = algorithmsStore.configuredAlgorithms.value;
+                logger.debug('=== CONFIGURED ALGORITHMS (/algorithm) ===');
+                logger.debug('Configured algorithms count:', Array.isArray(configuredAlgorithms) ? configuredAlgorithms.length : 'not an array');
+                logger.debug('Configured algorithms actual values:', Array.isArray(configuredAlgorithms) ? configuredAlgorithms : 'undefined or not array');
+                if (configuredAlgorithms.length > 0) {
+                    logger.debug('First configured algorithm DETAILED:', {
+                        algorithm: configuredAlgorithms[0],
+                        keys: Object.keys(configuredAlgorithms[0]),
+                        uid: configuredAlgorithms[0].uid,
+                        type: configuredAlgorithms[0].type,
+                        name: configuredAlgorithms[0].name,
+                        parameters: configuredAlgorithms[0].parameters,
+                        stringified: JSON.stringify(configuredAlgorithms[0])
+                    });
+                    
+                    // Check all configured algorithms
+                    configuredAlgorithms.forEach((alg, index) => {
+                        logger.debug(`Configured algorithm ${index}:`, {
+                            uid: alg.uid,
+                            type: alg.type,
+                            name: alg.name,
+                            hasParameters: !!alg.parameters,
+                            parametersKeys: alg.parameters ? Object.keys(alg.parameters) : 'none'
+                        });
+                    });
+                }
+                
+                // Debug reference algorithms
+                const referenceAlgorithms = algorithmsStore.referenceAlgorithms.value;
+                logger.debug('=== REFERENCE ALGORITHMS (/algorithm/reference/types) ===');
+                logger.debug('Reference algorithms count:', Array.isArray(referenceAlgorithms) ? referenceAlgorithms.length : 'not an array');
+                logger.debug('Reference algorithms structure:', referenceAlgorithms);
+                
+                // Compare what we're using in the UI
+                logger.debug('=== UI DATA SOURCES ===');
+                logger.debug('Using for dropdown:', algorithmsStore.configuredAlgorithms.value);
+                logger.debug('Current selected algorithm name:', currentAlgorithmName.value);
+                logger.debug('Current algorithm attributes:', algorithmsStore.algorithmAttributes.value);
+                logger.debug('Current algorithm parameters:', parameters.value);
+                
+                // Debug the current configuration
+                const currentConfig = configurationsStore.currentConfiguration.value;
+                logger.debug('=== CONFIGURATION DEBUG ===');
+                logger.debug('Current configuration:', currentConfig);
+                
+                logger.debug('=== END COMPREHENSIVE DEBUG ===');
+                
+            } catch (error) {
+                logger.error('Failed to load algorithms:', error);
+            }
+        }
+
+        onMounted(async () => {
+            logger.lifecycle('mounted', 'AlgorithmDebug component mounted');
+            
+            // Check if algorithms are already loaded, if not load them
+            try {
+                // First check if algorithms are already available
+                const currentAlgorithms = algorithmsStore.algorithms.value;
+                const currentConfiguredAlgorithms = algorithmsStore.configuredAlgorithms.value;
+                const currentReferenceAlgorithms = algorithmsStore.referenceAlgorithms.value;
+                
+                logger.debug('Checking existing algorithm data:', {
+                    algorithms: Array.isArray(currentAlgorithms) ? currentAlgorithms.length : 'not loaded',
+                    configuredAlgorithms: Array.isArray(currentConfiguredAlgorithms) ? currentConfiguredAlgorithms.length : 'not loaded',
+                    referenceAlgorithms: Array.isArray(currentReferenceAlgorithms) ? currentReferenceAlgorithms.length : 'not loaded'
+                });
+                
+                // Only load if not already available
+                const loadPromises = [];
+                
+                if (!Array.isArray(currentAlgorithms) || currentAlgorithms.length === 0) {
+                    logger.debug('Loading generic algorithms');
+                    loadPromises.push(algorithmsStore.loadAlgorithms());
+                }
+                
+                if (!Array.isArray(currentReferenceAlgorithms) || currentReferenceAlgorithms.length === 0) {
+                    logger.debug('Loading reference algorithms');
+                    loadPromises.push(algorithmsStore.loadReferenceAlgorithms());
+                }
+                
+                if (!Array.isArray(currentConfiguredAlgorithms) || currentConfiguredAlgorithms.length === 0) {
+                    logger.debug('Loading configured algorithms');
+                    loadPromises.push(algorithmsStore.loadConfiguredAlgorithms());
+                }
+                
+                // Always ensure image sources are loaded
+                loadPromises.push(imageSourcesStore.loadImageSources());
+                
+                if (loadPromises.length > 0) {
+                    await Promise.all(loadPromises);
+                    logger.debug('Missing algorithms and image sources loaded in AlgorithmDebug');
+                    
+                    // Check what we actually got after loading
+                    const afterLoadAlgorithms = algorithmsStore.algorithms.value;
+                    const afterLoadConfiguredAlgorithms = algorithmsStore.configuredAlgorithms.value;
+                    const afterLoadReferenceAlgorithms = algorithmsStore.referenceAlgorithms.value;
+                    
+                    logger.debug('After loading - checking algorithm data:', {
+                        algorithms: Array.isArray(afterLoadAlgorithms) ? afterLoadAlgorithms.length : 'still not loaded',
+                        configuredAlgorithms: Array.isArray(afterLoadConfiguredAlgorithms) ? afterLoadConfiguredAlgorithms.length : 'still not loaded',
+                        referenceAlgorithms: Array.isArray(afterLoadReferenceAlgorithms) ? afterLoadReferenceAlgorithms.length : 'still not loaded'
+                    });
+                } else {
+                    logger.debug('All algorithms already available, skipping load');
+                }
+                
+                // Wait a bit for reactive updates to propagate
+                await new Promise(resolve => setTimeout(resolve, 200));
+                
+                // Run comprehensive algorithm debugging
+                await debugAlgorithms();
+                
+            } catch (error) {
+                logger.error('Failed to load algorithms in AlgorithmDebug', error);
+            }
+            
+            // Auto-load configuration if none are loaded
+            const currentConfig = configurationsStore.currentConfiguration;
+            if (!currentConfig) {
+                try {
+                    logger.debug('Loading configuration and algorithms');
+                    
+                    // Load configurations list first
+                    await configurationsStore.loadConfigurations();
+                    
+                    // Get the first available configuration
+                    const configurations = configurationsStore.configurations;
+                    if (configurations.length > 0) {
+                        const defaultConfig = configurations[0];
+                        
+                        // Load the configuration
+                        await configurationsStore.loadConfiguration(defaultConfig);
+                        
+                        logger.info('Configuration and algorithms loaded successfully');
+                    }
+                } catch (error) {
+                    logger.error('Failed to auto-load configuration', error);
+                    errorsStore.addError({
+                        id: uuid.v4(),
+                        title: 'Configuration Load Error',
+                        description: error
+                    });
+                }
+            } else {
+                // Configuration already loaded, ensure image sources are loaded
+                try {
+                    await imageSourcesStore.loadImageSources();
+                    logger.debug('Image sources loaded');
+                } catch (error) {
+                    logger.error('Failed to load image sources', error);
+                    errorsStore.addError({
+                        id: uuid.v4(),
+                        title: 'Image Sources Load Error',
+                        description: error
+                    });
+                }
+            }
+        });
+
         onBeforeUnmount(() => {
+            logger.lifecycle('beforeUnmount', 'AlgorithmDebug component before unmount');
+            
+            // Clean up WebSocket if it exists
+            if (liveProcessSocket) {
+                logger.webSocket('disconnecting');
+                liveProcessSocket.disconnect();
+                liveProcessSocket = null;
+            }
+            
             resultsWatch();
-            store.dispatch("algorithms/setCurrentAlgorithm", null);
-            store.dispatch("algorithms/setCurrentAlgorithmAttributes", []);
-            store.dispatch("algorithms/setCurrentReferenceAlgorithm", null);
-            store.dispatch("algorithms/setCurrentReferenceAlgorithmAttributes", []);
-            store.dispatch("graphics/resetReferenceGraphicItems");
-            store.dispatch("graphics/resetGraphicsItems");
-            store.dispatch("algorithms/setAlgorithmResult", null);
-            store.dispatch("algorithms/resetLiveAlgorithmReference");
+            algorithmsStore.setCurrentAlgorithm(null);
+            algorithmsStore.setCurrentAlgorithmAttributes([]);
+            algorithmsStore.setCurrentReferenceAlgorithm(null);
+            algorithmsStore.setCurrentReferenceAlgorithmAttributes([]);
+            graphicsStore.resetReferenceGraphicItems();
+            graphicsStore.resetGraphicsItems();
+            algorithmsStore.setAlgorithmResult(null);
+            algorithmsStore.resetLiveAlgorithmReference();
+            
+            logger.lifecycle('cleanup', 'AlgorithmDebug cleanup completed');
         });
 
         return {
             algorithms,
+            configuredAlgorithms,
             referenceAlgorithms,
             currentImageSourceId,
             currentAlgorithm,
             currentReferenceAlgorithm,
+            type: computed(() => currentAlgorithm?.value?.type || ''),
             algorithmAttributes,
             referenceAlgorithmAttributes,
             parameters,
@@ -723,6 +1395,7 @@ export default {
             resultImage,
             outputImages,
             currentGraphics,
+            isLoading,
             disableActions,
             disableProcessButton,
             selectedGraphic,

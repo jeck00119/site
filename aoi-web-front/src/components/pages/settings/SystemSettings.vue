@@ -63,12 +63,13 @@
 
 <script>
 import { ref, onMounted, computed } from 'vue';
-import { useStore } from 'vuex';
+import { useConfigurationsStore, useAuthStore, useCncStore, useRobotsStore, useProfilometersStore, useLogStore } from '@/composables/useStore';
 
 import CncSettings from '../../settings/CncSettings.vue';
 import RobotSettings from '../../settings/RobotSettings.vue';
 import ProfilometerSettings from '../../settings/ProfilometerSettings.vue';
-import useNotification from '../../../hooks/notifications.js';
+import useNotification from '../../../hooks/notifications';
+import { validateRequired, validateIP, validateLength, sanitizeInput } from '../../../utils/validation.js';
 
 export default {
     components: {
@@ -78,297 +79,305 @@ export default {
     },
 
     setup() {
-        const store = useStore();
+        const configurationsStore = useConfigurationsStore();
+        const authStore = useAuthStore();
+        const cncStore = useCncStore();
+        const robotsStore = useRobotsStore();
+        const profilometersStore = useProfilometersStore();
+        const logStore = useLogStore();
 
         const {showNotification, notificationMessage, notificationIcon, notificationTimeout, 
             setNotification, clearNotification} = useNotification();
 
-        const currentConfiguration = computed(function() {
-            return store.getters["configurations/getCurrentConfiguration"];
-        });
-
-        const currentUser = computed(function() {
-            return store.getters["auth/getCurrentUser"];
-        });
-
-        const cncs = computed(function() {
-            return store.getters["cnc/getCNCs"];
-        });
-
-        const robots = computed(function() {
-            return store.getters["robots/getRobots"];
-        });
-
-        const profilometers = computed(function() {
-            return store.getters["profilometers/getProfilometers"];
-        });
-
-        const availablePorts = computed(function() {
-            return store.getters["cnc/getPorts"];
-        });
-
-        const robotPorts = computed(function() {
-            return store.getters["robots/getUltraArmPorts"];
-        });
-
-        const cncTypes = computed(function() {
-            return store.getters["cnc/getCNCTypes"];
-        });
-        
-        const robotTypes = computed(function() {
-            return store.getters["robots/getRobotTypes"];
-        });
-        const profilometerTypes = computed(function() {
-            return store.getters["profilometers/getProfilometerTypes"];
-        });
+        // These are already computed refs from the composables, no need to wrap again
+        const currentConfiguration = configurationsStore.currentConfiguration;
+        const currentUser = authStore.currentUser;
+        const cncs = cncStore.cncs;
+        const robots = robotsStore.robots;
+        const profilometers = profilometersStore.profilometers;
+        const availablePorts = cncStore.ports;
+        const robotPorts = robotsStore.ultraArmPorts;
+        const cncTypes = cncStore.cncTypes;
+        const robotTypes = robotsStore.robotTypes;
+        const profilometerTypes = profilometersStore.profilometerTypes;
 
         function addCNC(name)
         {
-            store.dispatch("cnc/addCNC", {
-                name: name,
-                port: '',
-                type: ''
-            });
+            // Validate CNC name
+            const nameValidation = validateRequired(name, 'CNC Name');
+            if (!nameValidation.isValid) {
+                setNotification(3000, nameValidation.errors[0], 'bi-exclamation-circle-fill');
+                return;
+            }
+            
+            const lengthValidation = validateLength(name, 1, 50, 'CNC Name');
+            if (!lengthValidation.isValid) {
+                setNotification(3000, lengthValidation.errors[0], 'bi-exclamation-circle-fill');
+                return;
+            }
+            
+            const sanitizedName = sanitizeInput(name);
+            cncStore.addCNC(sanitizedName, '', '');
 
             setNotification(
                 3000, 
-                `Added new CNC named ${name}. Do not forget to save in order for the changes to take place.`,
+                `Added new CNC named ${sanitizedName}. Do not forget to save in order for the changes to take place.`,
                 'bi-exclamation-circle-fill'
             );
 
-            store.dispatch("log/addEvent", {
-                type: 'CNC SETTINGS',
-                user: currentUser.value ? currentUser.value.username : 'Unknown',
-                title: 'CNC Added',
-                description: `CNC ${name} was added.`
-            });
+            logStore.addEvent(
+                'CNC SETTINGS',
+                currentUser.value ? currentUser.value.username : 'Unknown',
+                'CNC Added',
+                `CNC ${sanitizedName} was added.`
+            );
         }
 
         function removeCNC(uid)
         {
-            store.dispatch("cnc/removeCNC", {
-                uid: uid
-            });
+            cncStore.removeCNC(uid);
 
-            store.dispatch("log/addEvent", {
-                type: 'CNC SETTINGS',
-                user: currentUser.value ? currentUser.value.username : 'Unknown',
-                title: 'CNC Removed',
-                description: `CNC with uid ${uid} was removed.`
-            });
+            logStore.addEvent(
+                'CNC SETTINGS',
+                currentUser.value ? currentUser.value.username : 'Unknown',
+                'CNC Removed',
+                `CNC with uid ${uid} was removed.`
+            );
         }
 
         function saveCNCs() {
-            const ports = cncs.value.map(cnc => cnc.port);
-            const types = cncs.value.map(cnc => cnc.type);
-
-            let error = false;
-
-            if(ports.includes('') || hasDuplicates(ports))
-            {
-                setNotification(
-                    3000,
-                    `There are CNCs with no port chosen or two or more CNCs with the same port assigned. Cannot save the changes.`,
-                    'bi-exclamation-circle-fill'
-                );
-                error = true;
-            }
-
-            if(types.includes(''))
-            {
-                setNotification(
-                    3000,
-                    `There are CNCs with no type chosen. Cannot save the changes.`,
-                    'bi-exclamation-circle-fill'
-                );
-                error = true;
-            }
-
-            if(!error)
-            {
-                try {
-                    store.dispatch("cnc/saveCNCs");
-
-                    store.dispatch("log/addEvent", {
-                        type: 'CNC SETTINGS',
-                        user: currentUser.value ? currentUser.value.username : 'Unknown',
-                        title: 'CNCs Saved',
-                        description: `CNCs configuration was saved.`
-                    });
-                }catch(err) {
-                    setNotification(3000, err, 'bi-exclamation-circle-fill');
+            const errors = [];
+            
+            // Validate each CNC
+            cncs.value.forEach((cnc, index) => {
+                const nameValidation = validateRequired(cnc.name, `CNC ${index + 1} Name`);
+                if (!nameValidation.isValid) {
+                    errors.push(nameValidation.errors[0]);
                 }
+                
+                const portValidation = validateRequired(cnc.port, `CNC ${index + 1} Port`);
+                if (!portValidation.isValid) {
+                    errors.push(portValidation.errors[0]);
+                }
+                
+                const typeValidation = validateRequired(cnc.type, `CNC ${index + 1} Type`);
+                if (!typeValidation.isValid) {
+                    errors.push(typeValidation.errors[0]);
+                }
+            });
+            
+            // Check for duplicate ports
+            const ports = cncs.value.map(cnc => cnc.port).filter(port => port !== '');
+            if (hasDuplicates(ports)) {
+                errors.push('Two or more CNCs have the same port assigned.');
+            }
+            
+            if (errors.length > 0) {
+                setNotification(3000, errors[0], 'bi-exclamation-circle-fill');
+                return;
+            }
+            
+            try {
+                cncStore.saveCNCs();
+                setNotification(2000, 'CNCs configuration saved successfully.', 'bi-check-circle-fill');
+
+                logStore.addEvent(
+                    'CNC SETTINGS',
+                    currentUser.value ? currentUser.value.username : 'Unknown',
+                    'CNCs Saved',
+                    `CNCs configuration was saved.`
+                );
+            } catch(err) {
+                setNotification(3000, err.message || 'Failed to save CNCs configuration.', 'bi-exclamation-circle-fill');
             }
         }
 
         function updatePort(uid, value) {
-            store.dispatch("cnc/updateCNCPort", {
-                uid: uid,
-                port: value
-            });
+            cncStore.updateCNCPort(uid, value);
 
-            store.dispatch("log/addEvent", {
-                type: 'CNC SETTINGS',
-                user: currentUser.value ? currentUser.value.username : 'Unknown',
-                title: 'CNC Port Changed',
-                description: `CNC with uid ${uid} changed its port to ${value}.`
-            });
+            logStore.addEvent(
+                'CNC SETTINGS',
+                currentUser.value ? currentUser.value.username : 'Unknown',
+                'CNC Port Changed',
+                `CNC with uid ${uid} changed its port to ${value}.`
+            );
         }
 
         function updateCNCType(uid, value) {
-            store.dispatch("cnc/updateCNCType", {
-                uid: uid,
-                type: value
-            });
+            cncStore.updateCNCType(uid, value);
 
-            store.dispatch("log/addEvent", {
-                type: 'CNC SETTINGS',
-                user: currentUser.value ? currentUser.value.username : 'Unknown',
-                title: 'CNC Type Changed',
-                description: `CNC with uid ${uid} changed its type to ${value}.`
-            });
+            logStore.addEvent(
+                'CNC SETTINGS',
+                currentUser.value ? currentUser.value.username : 'Unknown',
+                'CNC Type Changed',
+                `CNC with uid ${uid} changed its type to ${value}.`
+            );
         }
 
         function addRobot(name)
         {
-            store.dispatch("robots/addRobot", {
-                name: name,
-                ip: '',
-                type: ''
-            });
+            // Validate robot name
+            const nameValidation = validateRequired(name, 'Robot Name');
+            if (!nameValidation.isValid) {
+                setNotification(3000, nameValidation.errors[0], 'bi-exclamation-circle-fill');
+                return;
+            }
+            
+            const lengthValidation = validateLength(name, 1, 50, 'Robot Name');
+            if (!lengthValidation.isValid) {
+                setNotification(3000, lengthValidation.errors[0], 'bi-exclamation-circle-fill');
+                return;
+            }
+            
+            const sanitizedName = sanitizeInput(name);
+            robotsStore.addRobot(sanitizedName, '', '');
 
             setNotification(
                 3000,
-                `Added new robot named ${name}. Do not forget to save in order for the changes to take place.`,
+                `Added new robot named ${sanitizedName}. Do not forget to save in order for the changes to take place.`,
                 'bi-exclamation-circle-fill'
             );
 
-            store.dispatch("log/addEvent", {
-                type: 'ROBOT SETTINGS',
-                user: currentUser.value ? currentUser.value.username : 'Unknown',
-                title: 'Robot Added',
-                description: `Robot ${name} was added.`
-            });
+            logStore.addEvent(
+                'ROBOT SETTINGS',
+                currentUser.value ? currentUser.value.username : 'Unknown',
+                'Robot Added',
+                `Robot ${sanitizedName} was added.`
+            );
         }
 
         function removeRobot(uid)
         {
-            store.dispatch("robots/removeRobot", {
-                uid: uid
-            });
+            robotsStore.removeRobot(uid);
 
-            store.dispatch("log/addEvent", {
-                type: 'ROBOT SETTINGS',
-                user: currentUser.value ? currentUser.value.username : 'Unknown',
-                title: 'Robot Removed',
-                description: `Robot with uid ${uid} was removed.`
-            });
+            logStore.addEvent(
+                'ROBOT SETTINGS',
+                currentUser.value ? currentUser.value.username : 'Unknown',
+                'Robot Removed',
+                `Robot with uid ${uid} was removed.`
+            );
         }
 
         function saveRobots() {
-            const ips = robots.value.map(robot => robot.ip);
-            const types = robots.value.map(robot => robot.type);
-
-            let error = false;
-
-            if(ips.includes(''))
-            {
-                setNotification(
-                    3000,
-                    `There are robots with no IP chosen. Cannot save the changes.`,
-                    'bi-exclamation-circle-fill'
-                );
-
-                error = true;
+            const errors = [];
+            
+            // Validate each robot
+            robots.value.forEach((robot, index) => {
+                const nameValidation = validateRequired(robot.name, `Robot ${index + 1} Name`);
+                if (!nameValidation.isValid) {
+                    errors.push(nameValidation.errors[0]);
+                }
+                
+                const ipValidation = validateRequired(robot.ip, `Robot ${index + 1} IP`);
+                if (!ipValidation.isValid) {
+                    errors.push(ipValidation.errors[0]);
+                } else {
+                    const ipFormatValidation = validateIP(robot.ip);
+                    if (!ipFormatValidation.isValid) {
+                        errors.push(`Robot ${index + 1}: ${ipFormatValidation.errors[0]}`);
+                    }
+                }
+                
+                const typeValidation = validateRequired(robot.type, `Robot ${index + 1} Type`);
+                if (!typeValidation.isValid) {
+                    errors.push(typeValidation.errors[0]);
+                }
+            });
+            
+            if (errors.length > 0) {
+                setNotification(3000, errors[0], 'bi-exclamation-circle-fill');
+                return;
             }
+            
+            try {
+                robotsStore.saveRobots();
+                setNotification(2000, 'Robots configuration saved successfully.', 'bi-check-circle-fill');
 
-            if(types.includes(''))
-            {
-                setNotification(
-                    3000,
-                    `There are robots with no type chosen. Cannot save the changes.`,
-                    'bi-exclamation-circle-fill'
+                logStore.addEvent(
+                    'ROBOT SETTINGS',
+                    currentUser.value ? currentUser.value.username : 'Unknown',
+                    'Robots Saved',
+                    `Robots configuration was saved.`
                 );
-
-                error = true;
-            }
-
-            if(!error)
-            {
-                store.dispatch("robots/saveRobots");
-
-                store.dispatch("log/addEvent", {
-                    type: 'ROBOT SETTINGS',
-                    user: currentUser.value ? currentUser.value.username : 'Unknown',
-                    title: 'Robots Saved',
-                    description: `Robots configuration was saved.`
-                });
+            } catch(err) {
+                setNotification(3000, err.message || 'Failed to save robots configuration.', 'bi-exclamation-circle-fill');
             }
         }
 
         function updateRobotIP(uid, value) {
-            store.dispatch("robots/updateRobotConnectionID", {
-                uid: uid,
-                id: value
-            });
+            // Validate IP address if provided
+            if (value && value.trim() !== '') {
+                const ipValidation = validateIP(value);
+                if (!ipValidation.isValid) {
+                    setNotification(3000, ipValidation.errors[0], 'bi-exclamation-circle-fill');
+                    return;
+                }
+            }
+            
+            const sanitizedValue = sanitizeInput(value);
+            robotsStore.updateRobotConnectionID(uid, sanitizedValue);
 
-            store.dispatch("log/addEvent", {
-                type: 'ROBOT SETTINGS',
-                user: currentUser.value ? currentUser.value.username : 'Unknown',
-                title: 'Robot IP Changed',
-                description: `Robot with uid ${uid} changed its IP to ${value}.`
-            });
+            logStore.addEvent(
+                'ROBOT SETTINGS',
+                currentUser.value ? currentUser.value.username : 'Unknown',
+                'Robot IP Changed',
+                `Robot with uid ${uid} changed its IP to ${sanitizedValue}.`
+            );
         }
 
         function updateRobotType(uid, value) {
-            store.dispatch("robots/updateRobotType", {
-                uid: uid,
-                type: value
-            });
+            robotsStore.updateRobotType(uid, value);
 
-            store.dispatch("log/addEvent", {
-                type: 'Robot SETTINGS',
-                user: currentUser.value ? currentUser.value.username : 'Unknown',
-                title: 'Robot Type Changed',
-                description: `Robot with uid ${uid} changed its type to ${value}.`
-            });
+            logStore.addEvent(
+                'Robot SETTINGS',
+                currentUser.value ? currentUser.value.username : 'Unknown',
+                'Robot Type Changed',
+                `Robot with uid ${uid} changed its type to ${value}.`
+            );
         }
 
         function addProfilometer(name)
         {
-            store.dispatch("profilometers/addProfilometer", {
-                name: name,
-                id: '',
-                path: '',
-                type: ''
-            });
+            // Validate profilometer name
+            const nameValidation = validateRequired(name, 'Profilometer Name');
+            if (!nameValidation.isValid) {
+                setNotification(3000, nameValidation.errors[0], 'bi-exclamation-circle-fill');
+                return;
+            }
+            
+            const lengthValidation = validateLength(name, 1, 50, 'Profilometer Name');
+            if (!lengthValidation.isValid) {
+                setNotification(3000, lengthValidation.errors[0], 'bi-exclamation-circle-fill');
+                return;
+            }
+            
+            const sanitizedName = sanitizeInput(name);
+            profilometersStore.addProfilometer(sanitizedName, '', '', '');
 
             setNotification(
                 3000,
-                `Added new profilometer named ${name}. Do not forget to save in order for the changes to take place.`,
+                `Added new profilometer named ${sanitizedName}. Do not forget to save in order for the changes to take place.`,
                 'bi-exclamation-circle-fill'
             );
 
-            store.dispatch("log/addEvent", {
-                type: 'PROFILOMETER SETTINGS',
-                user: currentUser.value ? currentUser.value.username : 'Unknown',
-                title: 'Profilometer Added',
-                description: `Profilometer ${name} was added.`
-            });
+            logStore.addEvent(
+                'PROFILOMETER SETTINGS',
+                currentUser.value ? currentUser.value.username : 'Unknown',
+                'Profilometer Added',
+                `Profilometer ${sanitizedName} was added.`
+            );
         }
 
         function removeProfilometer(uid)
         {
-            store.dispatch("profilometers/removeProfilometer", {
-                uid: uid
-            });
+            profilometersStore.removeProfilometer(uid);
 
-            store.dispatch("log/addEvent", {
-                type: 'PROFILOMETER SETTINGS',
-                user: currentUser.value ? currentUser.value.username : 'Unknown',
-                title: 'Profilometer Removed',
-                description: `Profilometer with uid ${uid} was removed.`
-            });
+            logStore.addEvent(
+                'PROFILOMETER SETTINGS',
+                currentUser.value ? currentUser.value.username : 'Unknown',
+                'Profilometer Removed',
+                `Profilometer with uid ${uid} was removed.`
+            );
         }
 
         function saveProfilometers() {
@@ -413,57 +422,48 @@ export default {
 
             if(!error)
             {
-                store.dispatch("profilometers/saveProfilometers");
+                profilometersStore.saveProfilometers();
 
-                store.dispatch("log/addEvent", {
-                    type: 'PROFILOMETER SETTINGS',
-                    user: currentUser.value ? currentUser.value.username : 'Unknown',
-                    title: 'Profilometers Saved',
-                    description: `Profilometers configuration was saved.`
-                });
+                logStore.addEvent(
+                    'PROFILOMETER SETTINGS',
+                    currentUser.value ? currentUser.value.username : 'Unknown',
+                    'Profilometers Saved',
+                    `Profilometers configuration was saved.`
+                );
             }
         }
 
         function updateProfID(uid, value) {
-            store.dispatch("profilometers/updateProfilometerID", {
-                uid: uid,
-                id: value
-            });
+            profilometersStore.updateProfilometerID(uid, value);
 
-            store.dispatch("log/addEvent", {
-                type: 'PROFILOMETER SETTINGS',
-                user: currentUser.value ? currentUser.value.username : 'Unknown',
-                title: 'Profilometer ID Changed',
-                description: `Profilometer with uid ${uid} changed its ID to ${value}.`
-            });
+            logStore.addEvent(
+                'PROFILOMETER SETTINGS',
+                currentUser.value ? currentUser.value.username : 'Unknown',
+                'Profilometer ID Changed',
+                `Profilometer with uid ${uid} changed its ID to ${value}.`
+            );
         }
 
         function updateProfPath(uid, value) {
-            store.dispatch("profilometers/updateProfilometerServerPath", {
-                uid: uid,
-                path: value
-            });
+            profilometersStore.updateProfilometerServerPath(uid, value);
 
-            store.dispatch("log/addEvent", {
-                type: 'PROFILOMETER SETTINGS',
-                user: currentUser.value ? currentUser.value.username : 'Unknown',
-                title: 'Profilometer Path Changed',
-                description: `Profilometer with uid ${uid} changed its path to ${value}.`
-            });
+            logStore.addEvent(
+                'PROFILOMETER SETTINGS',
+                currentUser.value ? currentUser.value.username : 'Unknown',
+                'Profilometer Path Changed',
+                `Profilometer with uid ${uid} changed its path to ${value}.`
+            );
         }
 
         function updateProfType(uid, value) {
-            store.dispatch("profilometers/updateProfilometerType", {
-                uid: uid,
-                type: value
-            });
+            profilometersStore.updateProfilometerType(uid, value);
 
-            store.dispatch("log/addEvent", {
-                type: 'PROFILOMETER SETTINGS',
-                user: currentUser.value ? currentUser.value.username : 'Unknown',
-                title: 'Profilometer Type Changed',
-                description: `Profilometerr with uid ${uid} changed its type to ${value}.`
-            });
+            logStore.addEvent(
+                'PROFILOMETER SETTINGS',
+                currentUser.value ? currentUser.value.username : 'Unknown',
+                'Profilometer Type Changed',
+                `Profilometer with uid ${uid} changed its type to ${value}.`
+            );
         }
 
         function hasDuplicates(array) {
@@ -473,16 +473,16 @@ export default {
         onMounted(() => {
             if(currentConfiguration.value)
             {
-                store.dispatch("cnc/loadCNCs");
-                store.dispatch("cnc/loadCNCTypes");
-                store.dispatch("cnc/loadPorts");
+                cncStore.loadCNCs();
+                cncStore.loadCNCTypes();
+                cncStore.loadPorts();
 
-                store.dispatch("robots/loadRobots");
-                store.dispatch("robots/loadRobotTypes");
-                store.dispatch("robots/loadUltraArmPorts");
+                robotsStore.loadRobots();
+                robotsStore.loadRobotTypes();
+                robotsStore.loadUltraArmPorts();
 
-                store.dispatch("profilometers/loadProfilometers");
-                store.dispatch("profilometers/loadProfilometerTypes");
+                profilometersStore.loadProfilometers();
+                profilometersStore.loadProfilometerTypes();
             }
         });
 

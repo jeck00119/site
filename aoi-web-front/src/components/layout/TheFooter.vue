@@ -31,7 +31,8 @@
 
 <script>
 import { computed } from 'vue';
-import { useStore } from 'vuex';
+import { useAuthStore, useConfigurationsStore } from '@/composables/useStore';
+import { createLogger } from '@/utils/logger';
 import TheErrorListButton from './TheErrorListButton.vue';
 import { useRoute, useRouter } from 'vue-router';
 
@@ -41,26 +42,23 @@ export default {
     },
 
     setup() {
-        const store = useStore();
         const router = useRouter();
         const route = useRoute();
+        const logger = createLogger('TheFooter');
 
-        const currentConfiguration = computed(function() {
-            return store.getters["configurations/getCurrentConfiguration"];
-        });
-
-        const currentUser = computed(function() {
-            return store.getters["auth/getCurrentUser"];
-        });
+        // Use centralized store composables
+        const { currentUser, logout: authLogout } = useAuthStore();
+        const { currentConfiguration } = useConfigurationsStore();
 
         function logout() {
-            store.dispatch("auth/logout");
-
-            if(route.meta && route.meta.requiresAuth)
-            {
-                router.push('/');
-            }
+            logger.debug('User logout initiated');
+            authLogout();
+            
+            logger.info('Redirecting to login after logout');
+            router.replace('/login');
         }
+        
+        logger.lifecycle('mounted', 'TheFooter component mounted');
 
         return {
             currentConfiguration,

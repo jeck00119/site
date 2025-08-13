@@ -2,14 +2,35 @@
     "camera_settings": {
         "1": {
             "auto_exposure": 0,
-            "auto_focus": 0,
+            "auto_focus": 1,
+            "brightness": 129,
+            "camera_type": "webcam_logi",
+            "contrast": 129,
+            "exposure": 2,
+            "focus": 31,
+            "gain": 1,
+            "name": "webCamlvxubl77",
+            "pan": 1,
+            "resolution": [
+                1920,
+                1080
+            ],
+            "saturation": 128,
+            "sharpness": 128,
+            "tilt": 1,
+            "uid": "c27eff4a-3b47-4e20-889d-939bf77cf9d3",
+            "zoom": 1
+        },
+        "2": {
+            "auto_exposure": 0,
+            "auto_focus": 1,
             "brightness": 128,
             "camera_type": "webcam_logi",
             "contrast": 128,
             "exposure": 1,
             "focus": 30,
             "gain": 0,
-            "name": "Basic",
+            "name": "test",
             "pan": 0,
             "resolution": [
                 1920,
@@ -18,7 +39,28 @@
             "saturation": 128,
             "sharpness": 128,
             "tilt": 0,
-            "uid": "c27eff4a-3b47-4e20-889d-939bf77cf9d3",
+            "uid": "61f44ff2-d1b7-44ad-9de3-036bfcdeccce",
+            "zoom": 0
+        },
+        "3": {
+            "auto_exposure": 0,
+            "auto_focus": 1,
+            "brightness": 129,
+            "camera_type": "webcam_logi",
+            "contrast": 128,
+            "exposure": 1,
+            "focus": 30,
+            "gain": 0,
+            "name": "fgdfg",
+            "pan": 0,
+            "resolution": [
+                1920,
+                1080
+            ],
+            "saturation": 128,
+            "sharpness": 128,
+            "tilt": 0,
+            "uid": "67143d67-a1e5-405c-8e35-246923042493",
             "zoom": 0
         }
     }

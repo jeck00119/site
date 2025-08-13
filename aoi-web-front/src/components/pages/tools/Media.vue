@@ -105,7 +105,7 @@
 
 <script>
 import { computed, onMounted, ref } from 'vue';
-import { useStore } from 'vuex';
+import { useMediaStore, useConfigurationsStore } from '@/composables/useStore';
 import useNotification from '../../../hooks/notifications.js';
 
 export default {
@@ -115,23 +115,19 @@ export default {
         const {showNotification, notificationMessage, notificationIcon, notificationTimeout, 
             setNotification, clearNotification} = useNotification();
 
-        const store = useStore();
+        const mediaStore = useMediaStore();
+        const configurationsStore = useConfigurationsStore();
 
-        const currentConfiguration = computed(function() {
-            return store.getters["configurations/getCurrentConfiguration"];
-        });
+        // These are already computed refs from the composables
 
-        const events = computed(function() {
-            return store.getters["media/getEvents"];
-        });
 
-        const channels = computed(function() {
-            return store.getters["media/getChannels"];
-        });
+        const currentConfiguration = configurationsStore.currentConfiguration;
 
-        const files = computed(function() {
-            return store.getters["media/getFiles"];
-        });
+        const events = mediaStore.events;
+
+        const channels = mediaStore.channels;
+
+        const files = mediaStore.files;
 
         // Handle both array of strings and array of objects
         const getInitialEventName = () => {
@@ -199,14 +195,14 @@ export default {
             if(!error)
             {
                 try {
-                    store.dispatch("media/addEvent", {
-                        name: eventName.value,
-                        path: filename.value,
-                        timeout: timeout.value,
-                        channel: channel.value,
-                        priority: priorityIdx,
-                        volume: volume.value
-                    });
+                    mediaStore.addEvent(
+                        eventName.value,
+                        filename.value,
+                        timeout.value,
+                        channel.value,
+                        priorityIdx,
+                        volume.value
+                    );
                 }catch(err) {
                     setNotification(3000, err, 'bi-exclamation-circle-fill');
                 }
@@ -215,7 +211,7 @@ export default {
 
         function addChannel() {
             try {
-                store.dispatch("media/addChannel");
+                mediaStore.addChannel();
             }
             catch(err) {
                 setNotification(3000, err, 'bi-exclamation-circle-fill');
@@ -225,9 +221,9 @@ export default {
         onMounted(() => {
             if(currentConfiguration.value)
             {
-                store.dispatch("media/loadEvents");
-                store.dispatch("media/loadChannels");
-                store.dispatch("media/loadFiles");
+                mediaStore.loadEvents();
+                mediaStore.loadChannels();
+                mediaStore.loadFiles();
             }
         });
 

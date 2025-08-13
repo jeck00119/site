@@ -118,11 +118,13 @@ import VueMultiselect from 'vue-multiselect';
 
 import useNotification from '../../../hooks/notifications';
 import { ref, onMounted, onUnmounted, computed, watch } from 'vue';
-import { useStore } from 'vuex';
+import { useStereoCalibrationStore, useImageSourcesStore } from '@/composables/useStore';
 import { uuid } from 'vue3-uuid';
 
 import CameraScene from '../../camera/CameraScene.vue';
 import { ipAddress, port } from '../../../url';
+import { useWebSocket } from '@/composables/useStore';
+import { DEFAULT_IMAGE_DATA_URI_PREFIX, ImageDataUtils } from '../../../utils/imageConstants';
 
 export default {
     components :{
@@ -158,21 +160,24 @@ export default {
         const calibrationRunning = ref(false);
         const calibrationDone = ref(false);
 
-        let socket = null;
+        // WebSocket state
         let wsUid = null;
+        let webSocketInstance = null;
 
-        const store = useStore();
+        const stereoCalibrationStore = useStereoCalibrationStore();
+        const imageSourcesStore = useImageSourcesStore();
 
         const {showNotification, notificationMessage, notificationIcon, notificationTimeout, 
             setNotification, clearNotification} = useNotification();
 
-        const imageSources = computed(() => {
-            return store.getters['imageSources/getImageSources'];
-        });
+        // These are already computed refs from the composables
 
-        const imageSourcesNames = computed(function() {
-            return store.getters["imageSources/getImageSources"].map(imageSource => imageSource.name);
-        });
+
+        const imageSources = imageSourcesStore.imageSources;
+
+        const imageSourcesNames = computed(() => 
+            (imageSourcesStore.imageSources.value || []).map(imageSource => imageSource.name)
+        );
 
         const disableCalibButton = computed(function() {
             return !firstImageSource.value || !secondImageSource.value;
@@ -209,7 +214,7 @@ export default {
         watch(currentImageIdx, (newValue) => {
             if(newValue >= 0)
             {
-                socket.send(JSON.stringify({
+                webSocketInstance.send(JSON.stringify({
                     "command": "retrieve",
                     "idx": currentImageIdx.value
                 }));
@@ -217,7 +222,7 @@ export default {
         });
 
         function startCalibration() {
-            if (socket)
+            if (webSocketInstance)
             {
                 disconnectFromWs();
             }
@@ -226,11 +231,11 @@ export default {
 
             connectToWs();
 
-            store.dispatch('stereoCalibration/setCalibrationParameters', {
-                rows: checkerboardRows.value,
-                cols: checkerboardCols.value,
-                square_size: checkerboardSquareSize.value
-            });
+            stereoCalibrationStore.setCalibrationParameters(
+                checkerboardRows.value,
+                checkerboardCols.value,
+                checkerboardSquareSize.value
+            );
 
             timeRemaining.value = cooldown.value;
 
@@ -241,7 +246,7 @@ export default {
                 }
                 else
                 {
-                    socket.send(JSON.stringify({
+                    webSocketInstance.send(JSON.stringify({
                         command: "capture"
                     }));
                     framesAcquired.value += 1;
@@ -251,7 +256,7 @@ export default {
                     }
                     else
                     {
-                        socket.send(JSON.stringify({
+                        webSocketInstance.send(JSON.stringify({
                             command: "calibrate"
                         }));
                         setNotification(null, 'Calibrating...', 'fa-cog');
@@ -263,7 +268,7 @@ export default {
 
         function setWorldFrameOrigin()
         {
-            socket.send(JSON.stringify({
+            webSocketInstance.send(JSON.stringify({
                 command: "origin"
             }));
         }
@@ -273,28 +278,31 @@ export default {
             wsUid = uuid.v4();
             const firstImageSourceObj = imageSources.value.find(imageSource => imageSource.name === firstImageSource.value);
             const secondImageSourceObj = imageSources.value.find(imageSource => imageSource.name === secondImageSource.value);
-            socket = new WebSocket(`ws://${ipAddress}:${port}/stereo_calibration/${firstImageSourceObj.uid}/${secondImageSourceObj.uid}/ws/${wsUid}`);
-
-            socket.addEventListener("message", onCalibrationSocketMsgRecv);
+            const wsUrl = `ws://${ipAddress}:${port}/stereo_calibration/${firstImageSourceObj.uid}/${secondImageSourceObj.uid}/ws/${wsUid}`;
+            
+            webSocketInstance = useWebSocket(wsUrl, {
+                autoConnect: true,
+                onMessage: onCalibrationSocketMsgRecv
+            });
         }
 
         async function disconnectFromWs() 
         {
             const imageSource = imageSources.value.find(imageSource => imageSource.name === firstImageSource.value);
 
-            socket.send(JSON.stringify({
-                "command": "stop",
-            }));
-
-            await store.dispatch("stereoCalibration/closeCalibrationSocket", {
-                uid: imageSource.uid
-            });
-            socket.removeEventListener("message", onCalibrationSocketMsgRecv);
-
-            if(socket)
+            if(webSocketInstance)
             {
-                socket.close();
-                socket = null;
+                webSocketInstance.send(JSON.stringify({
+                    "command": "stop",
+                }));
+            }
+
+            await stereoCalibrationStore.closeCalibrationSocket(imageSource.uid);
+
+            if(webSocketInstance)
+            {
+                webSocketInstance.disconnect();
+                webSocketInstance = null;
             }
         }
 
@@ -314,8 +322,8 @@ export default {
             }
             else if(data.details === "calibFrame")
             {
-                currentCalibFrameFirstSrc.value = 'data:image/png;base64,' + data.data[0];
-                currentCalibFrameSecondSrc.value = 'data:image/png;base64,' + data.data[1];
+                currentCalibFrameFirstSrc.value = ImageDataUtils.createJpegDataURI(data.data[0]);
+                currentCalibFrameSecondSrc.value = ImageDataUtils.createJpegDataURI(data.data[1]);
             }
             else if(data.details === "calibError")
             {
@@ -351,7 +359,7 @@ export default {
 
         function saveCalibration()
         {
-            socket.send(JSON.stringify({
+            webSocketInstance.send(JSON.stringify({
                 "command": "save",
                 "uid": uuid.v4()
             }));
@@ -365,7 +373,7 @@ export default {
         });
 
         onUnmounted(() => {
-            if(socket)
+            if(webSocketInstance)
                 disconnectFromWs();
         });
 
@@ -374,6 +382,7 @@ export default {
             secondImageSource,
             imageSources,
             imageSourcesNames,
+            type: 'stereo-calibration',
             checkerboardRows,
             checkerboardCols,
             checkerboardSquareSize,

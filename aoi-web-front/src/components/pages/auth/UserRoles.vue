@@ -19,41 +19,82 @@
                 </div>
             </div>
         </div>
+        <base-notification
+            :show="showNotification"
+            height="15vh"
+            :timeout="notificationTimeout"
+            @close="clearNotification"
+        >
+            <div class="message-wrapper">
+                <div class="icon-wrapper">
+                    <v-icon :name="notificationIcon" scale="2.5" animation="spin"/>
+                </div>
+                <div class="text-wrapper">
+                    {{ notificationMessage }}
+                </div>
+            </div>
+        </base-notification>
     </div>
 </template>
 
 <script>
-import { computed , onMounted } from 'vue';
-import { useStore } from 'vuex';
+import { computed , onMounted, ref } from 'vue';
+import { useAuthStore } from '@/composables/useStore';
+import { validateRequired } from '../../../utils/validation.js';
+import useNotification from '../../../hooks/notifications.js';
 
 export default{
     setup() {
-        const store = useStore();
+        const authStore = useAuthStore();
+        const { showNotification, notificationMessage, notificationIcon, notificationTimeout, setNotification, clearNotification } = useNotification();
 
-        const users = computed(function() {
-            return store.getters["auth/getUsers"];
-        });
+        // These are already computed refs from the composables
+        const users = authStore.users;
 
-        const availableRoles = computed(function() {
-            return store.getters["auth/getAvailableRoles"].concat([""]);
+        const availableRoles = computed(() => {
+            const roles = authStore.availableRoles.value || [];
+            // Ensure roles is an array before using concat
+            if (Array.isArray(roles)) {
+                return roles.concat([""]);
+            }
+            return [""];
         });
 
         function updateRole(uid, role) {
-            store.dispatch("auth/updateUsersRole", {
-                uid: uid,
-                role: role
-            });
+            // Validate that a role is selected
+            const requiredValidation = validateRequired(role, 'Role');
+            
+            if (!requiredValidation.isValid) {
+                setNotification(3000, 'Please select a role for the user.', 'bi-exclamation-circle-fill');
+                return;
+            }
+            
+            try {
+                authStore.updateUsersRole({
+                    uid: uid,
+                    role: role
+                });
+                
+                setNotification(2000, 'User role updated successfully.', 'bi-check-circle-fill');
+            } catch (error) {
+                setNotification(3000, 'Failed to update user role. Please try again.', 'bi-exclamation-circle-fill');
+            }
         }
 
         onMounted(() => {
-            store.dispatch("auth/loadUsers");
-            store.dispatch("auth/loadAvailableRoles");
+            authStore.loadUsers();
+            authStore.loadAvailableRoles();
         });
 
         return {
             users,
             availableRoles,
-            updateRole
+            updateRole,
+            showNotification,
+            notificationMessage,
+            notificationIcon,
+            notificationTimeout,
+            clearNotification
         }
     }
 }
@@ -102,5 +143,25 @@ export default{
     display: flex;
     justify-content: center;
     align-items: center;
+}
+
+.message-wrapper {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+}
+
+.icon-wrapper {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin-bottom: 3%;
+}
+
+.text-wrapper {
+    font-size: 100%;
+    width: 95%;
+    text-align: center;
 }
 </style>

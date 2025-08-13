@@ -3,7 +3,7 @@
         <div class="select-container">
             <vue-multiselect
                 v-model="currentComponent"
-                :options="components"
+                :options="components || []"
                 track-by="uid"
                 label="name"
                 placeholder="Select Component"

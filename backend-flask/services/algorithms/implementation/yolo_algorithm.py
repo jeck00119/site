@@ -208,8 +208,7 @@ class YoloAlgorithm(AbstractAlgorithm):
 
                 labels += [
                     f"{self.model.model.names[class_id]} {confidence:0.2f}"
-                    for _, _, confidence, class_id, _
-                    in detections
+                    for class_id, confidence in zip(detections.class_id, detections.confidence)
                 ]
 
                 # box_annotator.annotate(

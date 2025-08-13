@@ -26,6 +26,7 @@
           :axis-uid="axisUid"
           :selected-steps="selectedSteps"
           :selected-feedrate="selectedFeedrate"
+          :is-connected="isConnected"
           @axis-moved="onAxisMoved"
         />
       </div>
@@ -34,6 +35,7 @@
       <div class="commands-section">
         <GeneralCommands
           :axis-uid="axisUid"
+          :is-connected="isConnected"
           @command-executed="onCommandExecuted"
         />
       </div>
@@ -42,6 +44,7 @@
       <div class="shortcuts-section">
         <LocationShortcuts
           :axis-uid="axisUid"
+          :is-connected="isConnected"
           @shortcut-executed="onShortcutExecuted"
           @shortcut-configured="onShortcutConfigured"
         />
@@ -72,6 +75,7 @@
         <TerminalConsole
           :axis-uid="axisUid"
           :terminal-history="ugsTerminalHistory"
+          :is-connected="isConnected"
           @command-sent="onTerminalCommand"
           @terminal-cleared="onTerminalCleared"
         />
@@ -115,9 +119,9 @@
 
 <script>
 import { ref, onMounted, onUnmounted, computed } from "vue";
-import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import api from "../../utils/api.js";
+import { useCncStore, useWebSocket, useLoadingState } from '@/composables/useStore';
 
 // Throttle utility for high-frequency updates
 function throttle(func, limit) {
@@ -166,8 +170,9 @@ export default {
     }
   },
   setup(props) {
-    const store = useStore();
     const router = useRouter();
+    const cncStore = useCncStore(props.axisUid);
+    const { isLoading, setLoading, withLoading } = useLoadingState();
 
     // Reactive state
     const selectedFeedrate = ref(1500);
@@ -181,10 +186,13 @@ export default {
     const portErrorData = ref({});
 
     // WebSocket connection
-    let socket = null;
+    let socketInstance = null;
 
-    // Computed properties
-    const pos = computed(() => store.getters["cnc/pos"](props.axisUid));
+    // Computed properties from CNC store
+    const { pos, mPos, wPos, cncState, feedrate } = cncStore;
+    
+    // Computed property for connection state
+    const isConnected = computed(() => webSocketState.value === "Connected");
 
     // Lifecycle hooks
     onMounted(() => {
@@ -202,13 +210,13 @@ export default {
     // Initialization
     async function initializeComponent() {
       try {
-        // Add position data to store
-        store.dispatch("cnc/addPositionData", {
+        // Add position data to store using composable
+        await cncStore.dispatch('cnc/addPositionData', {
           uid: props.axisUid
         });
 
-        // Fetch locations
-        await store.dispatch("cnc/fetchLocations", props.axisUid);
+        // Fetch locations using composable
+        await cncStore.dispatch('cnc/fetchLocations', props.axisUid);
 
       } catch (error) {
         console.error("Failed to initialize CNC component:", error);
@@ -224,12 +232,15 @@ export default {
     async function connectToWs() {
       try {
         const wsUrl = await api.getFullUrl(`/cnc/${props.axisUid}/ws`);
-        socket = new WebSocket(wsUrl.replace('http:', 'ws:'));
-
-        socket.addEventListener("open", onCncSocketOpen);
-        socket.addEventListener("close", onCncSocketClose);
-        socket.addEventListener("error", onCncSocketError);
-        socket.addEventListener("message", onCncSocketMsgRecv);
+        const webSocketUrl = wsUrl.replace('http:', 'ws:');
+        
+        socketInstance = useWebSocket(webSocketUrl, {
+          autoConnect: true,
+          onOpen: onCncSocketOpen,
+          onClose: onCncSocketClose,
+          onError: onCncSocketError,
+          onMessage: onCncSocketMsgRecv
+        });
 
       } catch (error) {
         console.error("Failed to connect to WebSocket:", error);
@@ -246,18 +257,13 @@ export default {
 
     async function disconnectFromWs() {
       try {
-        await store.dispatch("cnc/closeStateSocket", {
+        await cncStore.dispatch('cnc/closeStateSocket', {
           uid: props.axisUid
         });
 
-        if (socket) {
-          socket.removeEventListener("open", onCncSocketOpen);
-          socket.removeEventListener("close", onCncSocketClose);
-          socket.removeEventListener("error", onCncSocketError);
-          socket.removeEventListener("message", onCncSocketMsgRecv);
-
-          socket.close();
-          socket = null;
+        if (socketInstance) {
+          socketInstance.disconnect();
+          socketInstance = null;
         }
 
       } catch (error) {
@@ -267,9 +273,11 @@ export default {
 
     // WebSocket Event Handlers
     function onCncSocketOpen() {
-      webSocketState.value = "Connected";
-      if (socket) {
-        socket.send("eses");
+      // WebSocket is connected, but hardware might not be
+      // Don't set state to "Connected" here - wait for hardware confirmation
+      console.log("WebSocket connection opened for CNC:", props.axisUid);
+      if (socketInstance) {
+        socketInstance.send("eses");
       }
     }
 
@@ -297,10 +305,7 @@ export default {
           break;
 
         case "on_idle":
-          store.dispatch("cnc/setCNCState", {
-            uid: props.axisUid,
-            state: msg.message
-          });
+          cncStore.setCncState(props.axisUid, msg.message);
           break;
 
         case "on_read":
@@ -338,9 +343,13 @@ export default {
       }
     }
 
-    // Throttled position update to prevent excessive UI updates
+    // Throttled position update to prevent excessive UI updates using composable
     const throttledPositionUpdate = throttle((data) => {
-      store.dispatch("cnc/updatePositionData", data);
+      cncStore.updateCncData(data.uid, {
+        mPos: data.mPos,
+        wPos: data.wPos,
+        state: data.state
+      });
     }, 50); // Max 20 updates per second
 
     function handleStateUpdate(msg) {
@@ -372,6 +381,9 @@ export default {
     function handleConnectionError(msg) {
       // Log the connection error to console
       addToConsole(`Connection Error: ${msg.message} - ${msg.error}`);
+      
+      // Set state to disconnected when hardware connection fails
+      webSocketState.value = "Disconnected";
       
       // Show cross-platform port error dialog if applicable
       if (msg.is_cross_platform_issue) {
@@ -444,19 +456,24 @@ export default {
     // Connection handling methods
     async function handleConnect() {
       try {
-        // First initialize the CNC in the backend service
-        await store.dispatch("cnc/initializeCNC", {
+        // First initialize the CNC in the backend service using composable
+        await cncStore.dispatch('cnc/initializeCNC', {
           cncUid: props.axisUid
         });
         
         // Then connect to WebSocket
         await connectToWs();
         
-        addToConsole("CNC initialization and connection completed");
+        // Wait a bit for connection result through WebSocket
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        addToConsole("CNC initialization attempt completed");
         
       } catch (error) {
-        console.error("Failed to initialize and connect CNC:", error);
+        console.error("Failed to initialize CNC:", error);
         addToConsole(`Connection failed: ${error.message}`);
+        // Set state to disconnected on error
+        webSocketState.value = "Disconnected";
       }
     }
 
@@ -465,8 +482,8 @@ export default {
         // First disconnect WebSocket
         await disconnectFromWs();
         
-        // Then deinitialize the CNC in the backend service
-        await store.dispatch("cnc/deinitializeCNC", {
+        // Then deinitialize the CNC in the backend service using composable
+        await cncStore.dispatch('cnc/deinitializeCNC', {
           cncUid: props.axisUid
         });
         
@@ -486,9 +503,17 @@ export default {
       webSocketState,
       showPortErrorDialog,
       portErrorData,
+      isLoading,
       
-      // Computed
+      // Computed from CNC store
       pos,
+      mPos,
+      wPos,
+      cncState,
+      feedrate,
+      
+      // Connection state
+      isConnected,
       
       // Methods
       connectToWs,

@@ -14,24 +14,9 @@ class MarlinStates(Enum):
     HOME = "G28\n"
 
 
-ERROR_LIST_CNC = {
-    "Error:1": "Temperature is below target temperature",
-    "Error:2": "Temperature is above target temperature",
-    "Error:3": "MAXTEMP triggered",
-    "Error:4": "MINTEMP triggered",
-    "Error:5": "MAXTEMP_BED triggered",
-    "Error:6": "MINTEMP_BED triggered",
-    "Error:7": "Homing failed",
-    "Error:8": "Probing failed",
-    "Error:9": "Max travel exceeded",
-    "Error:10": "Printer halted. kill() called!",
-    "Error:11": "Failed to enable stepper motors",
-    "Error:12": "Unknown command",
-    "Error:13": "Invalid parameter",
-    "Error:14": "Command buffer overflow",
-    "Error:15": "Stepper driver error",
-    "Error:20": "Invalid G-code command"
-}
+# Import error list from centralized handler
+from services.cnc.cnc_error_handler import CncErrorHandler
+ERROR_LIST_CNC = CncErrorHandler.MARLIN_ERROR_LIST
 
 
 class CncMachineMarlin(BaseCncMachine):
@@ -41,7 +26,6 @@ class CncMachineMarlin(BaseCncMachine):
         self.callback = callback
         self._marlin = None
         self._marlin_state = None
-        self._abort_requested = False
 
         self.ui_cnc_event = lambda: print
 
@@ -89,8 +73,7 @@ class CncMachineMarlin(BaseCncMachine):
     def current_pos(self):
         if self._marlin:
             pos_tuple = self._marlin.current_position
-            return LocationModel(uid=None, axis_uid=None, degree_in_step=None, feedrate=None, name=None, x=pos_tuple[0],
-                                 y=pos_tuple[1], z=pos_tuple[2])
+            return self.create_location_model(pos_tuple)
         return None
 
     def get_instruction(self, data):
@@ -165,7 +148,7 @@ class CncMachineMarlin(BaseCncMachine):
                 self._marlin.stream("G91")
                 
                 # Use G1 (linear interpolation) to properly respect feedrate
-                command = f"G1 {self.parse_coordinates_with_decimals(x, y, z, feed_rate)}"
+                command = f"G1 {self.parse_coordinates(x, y, z, feed_rate)}"
                 print(f"[MOVE_BY DEBUG] Movement command: {command}")
                 self._marlin.stream(command)
                 
@@ -175,18 +158,6 @@ class CncMachineMarlin(BaseCncMachine):
             except Exception as e:
                 raise e
                 
-    def parse_coordinates_with_decimals(self, x, y, z, feed_rate):
-        """Parse coordinates with proper spacing"""
-        parts = []
-        if x is not None:
-            parts.append(f"X{x:.1f}")
-        if y is not None:
-            parts.append(f"Y{y:.1f}")
-        if z is not None:
-            parts.append(f"Z{z:.1f}")
-        if feed_rate is not None:
-            parts.append(f"F{int(feed_rate)}")
-        return " ".join(parts)
 
     def abort(self):
         if self._marlin:
@@ -239,14 +210,4 @@ class CncMachineMarlin(BaseCncMachine):
                 raise e
 
     def disconnect(self):
-        if self._marlin:
-            try:
-                self._abort_requested = False
-                self._marlin.soft_reset()
-                self._marlin.disconnect()
-                # Clean up reference to allow reconnection
-                self._marlin = None
-            except Exception as e:
-                # Still clean up even if disconnect fails
-                self._marlin = None
-                raise e
+        self.standard_disconnect_cleanup('_marlin')

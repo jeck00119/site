@@ -28,22 +28,58 @@
                 <div class="input-wrapper">
                     <font-awesome-icon class="icon" icon="signature" />
                     <label>Name</label>
-                    <input type="text" v-model="currentItac.name" /><br>
+                    <input 
+                        type="text" 
+                        :value="currentItac.name"
+                        @input="onFieldUpdate('name', $event.target.value)"
+                        :class="{ 'error': formErrors.name }"
+                    />
+                    <span v-if="formErrors.name" class="error-message">{{ formErrors.name }}</span><br>
                     <font-awesome-icon class="icon" icon="flag-checkered" />
                     <label>Destination IP</label>
-                    <input type="text" v-model="currentItac.destination_ip" /><br>
+                    <input 
+                        type="text" 
+                        :value="currentItac.destination_ip"
+                        @input="onFieldUpdate('destination_ip', $event.target.value)"
+                        :class="{ 'error': formErrors.destination_ip }"
+                    />
+                    <span v-if="formErrors.destination_ip" class="error-message">{{ formErrors.destination_ip }}</span><br>
                     <font-awesome-icon class="icon" icon="network-wired" />
                     <label>Destination Port</label>
-                    <input type="text" v-model="currentItac.destination_port" /><br>
+                    <input 
+                        type="text" 
+                        :value="currentItac.destination_port"
+                        @input="onFieldUpdate('destination_port', $event.target.value)"
+                        :class="{ 'error': formErrors.destination_port }"
+                    />
+                    <span v-if="formErrors.destination_port" class="error-message">{{ formErrors.destination_port }}</span><br>
                     <font-awesome-icon class="icon" icon="play-circle" />
                     <label>Start Booking Code</label>
-                    <input type="text" v-model="currentItac.start_booking_code" /><br>
+                    <input 
+                        type="text" 
+                        :value="currentItac.start_booking_code"
+                        @input="onFieldUpdate('start_booking_code', $event.target.value)"
+                        :class="{ 'error': formErrors.start_booking_code }"
+                    />
+                    <span v-if="formErrors.start_booking_code" class="error-message">{{ formErrors.start_booking_code }}</span><br>
                     <font-awesome-icon class="icon" icon="check" />
                     <label>Pass Booking Code</label>
-                    <input type="text" v-model="currentItac.pass_booking_code" /><br>
+                    <input 
+                        type="text" 
+                        :value="currentItac.pass_booking_code"
+                        @input="onFieldUpdate('pass_booking_code', $event.target.value)"
+                        :class="{ 'error': formErrors.pass_booking_code }"
+                    />
+                    <span v-if="formErrors.pass_booking_code" class="error-message">{{ formErrors.pass_booking_code }}</span><br>
                     <font-awesome-icon class="icon" icon="x" />
                     <label>Fail Booking Code</label>
-                    <input type="text" v-model="currentItac.fail_booking_code" /><br>
+                    <input 
+                        type="text" 
+                        :value="currentItac.fail_booking_code"
+                        @input="onFieldUpdate('fail_booking_code', $event.target.value)"
+                        :class="{ 'error': formErrors.fail_booking_code }"
+                    />
+                    <span v-if="formErrors.fail_booking_code" class="error-message">{{ formErrors.fail_booking_code }}</span><br>
                 </div>
             </div>
         </div>
@@ -65,6 +101,7 @@ import { ref, computed, onMounted } from 'vue';
 import { useStore } from 'vuex';
 import useNotification from '../../hooks/notifications';
 import { uuid } from "vue3-uuid";
+import { validateRequired, validateIP, validatePort, validateLength, sanitizeInput } from '../../utils/validation.js';
 
 import BaseButtonRectangle from '../base/BaseButtonRectangle.vue';
 
@@ -89,6 +126,107 @@ export default {
             fail_booking_code: '',
             uid: 0
         });
+        
+        // Form validation state
+        const formErrors = ref({});
+        
+        // Validate individual field
+        const validateField = (fieldName, value) => {
+            const errors = {};
+            
+            switch(fieldName) {
+                case 'name':
+                    const nameRequired = validateRequired(value, 'Name');
+                    if (!nameRequired.isValid) {
+                        errors.name = nameRequired.errors[0];
+                    } else {
+                        const nameLength = validateLength(value, 1, 50, 'Name');
+                        if (!nameLength.isValid) {
+                            errors.name = nameLength.errors[0];
+                        }
+                    }
+                    break;
+                    
+                case 'destination_ip':
+                    const ipRequired = validateRequired(value, 'Destination IP');
+                    if (!ipRequired.isValid) {
+                        errors.destination_ip = ipRequired.errors[0];
+                    } else {
+                        const ipValid = validateIP(value);
+                        if (!ipValid.isValid) {
+                            errors.destination_ip = ipValid.errors[0];
+                        }
+                    }
+                    break;
+                    
+                case 'destination_port':
+                    const portRequired = validateRequired(value, 'Destination Port');
+                    if (!portRequired.isValid) {
+                        errors.destination_port = portRequired.errors[0];
+                    } else {
+                        const portValid = validatePort(value);
+                        if (!portValid.isValid) {
+                            errors.destination_port = portValid.errors[0];
+                        }
+                    }
+                    break;
+                    
+                case 'start_booking_code':
+                    const startRequired = validateRequired(value, 'Start Booking Code');
+                    if (!startRequired.isValid) {
+                        errors.start_booking_code = startRequired.errors[0];
+                    }
+                    break;
+                    
+                case 'pass_booking_code':
+                    const passRequired = validateRequired(value, 'Pass Booking Code');
+                    if (!passRequired.isValid) {
+                        errors.pass_booking_code = passRequired.errors[0];
+                    }
+                    break;
+                    
+                case 'fail_booking_code':
+                    const failRequired = validateRequired(value, 'Fail Booking Code');
+                    if (!failRequired.isValid) {
+                        errors.fail_booking_code = failRequired.errors[0];
+                    }
+                    break;
+            }
+            
+            return errors;
+        };
+        
+        // Handle field updates with validation
+        const onFieldUpdate = (fieldName, value) => {
+            // Sanitize input for text fields
+            if (['name', 'start_booking_code', 'pass_booking_code', 'fail_booking_code'].includes(fieldName)) {
+                currentItac.value[fieldName] = sanitizeInput(value);
+            } else {
+                currentItac.value[fieldName] = value;
+            }
+            
+            // Clear existing error when user starts typing
+            if (formErrors.value[fieldName]) {
+                const newErrors = { ...formErrors.value };
+                delete newErrors[fieldName];
+                formErrors.value = newErrors;
+            }
+        };
+        
+        // Validate entire form
+        const validateForm = () => {
+            const errors = {
+                ...validateField('name', currentItac.value.name),
+                ...validateField('destination_ip', currentItac.value.destination_ip),
+                ...validateField('destination_port', currentItac.value.destination_port),
+                ...validateField('start_booking_code', currentItac.value.start_booking_code),
+                ...validateField('pass_booking_code', currentItac.value.pass_booking_code),
+                ...validateField('fail_booking_code', currentItac.value.fail_booking_code)
+            };
+            
+            formErrors.value = errors;
+            return Object.keys(errors).length === 0;
+        };
 
         const selectedItacUid = ref(null);
 
@@ -120,9 +258,13 @@ export default {
         }
 
         async function saveItac() {
-            if (currentItac.value.name === '') {
-                showNotification.value = true;
-                notificationMessage.value = "Empty name field - please add a name";
+            // Validate entire form
+            const isValid = validateForm();
+            
+            if (!isValid) {
+                // Show first validation error
+                const firstError = Object.values(formErrors.value)[0];
+                setNotification(3000, firstError, 'bi-exclamation-circle-fill');
                 return;
             }
 
@@ -190,6 +332,7 @@ export default {
             currentItac.value.pass_booking_code = '';
             currentItac.value.fail_booking_code = '';
             currentItac.value.uid = 0;
+            formErrors.value = {}; // Clear validation errors
         }
 
         function isSelected(itac) {
@@ -207,6 +350,8 @@ export default {
             currentItac,
             selectedItacUid,
             itacList,
+            formErrors,
+            onFieldUpdate,
             showNotification,
             notificationMessage,
             notificationIcon,
@@ -235,6 +380,17 @@ input::-webkit-outer-spin-button,
 input::-webkit-inner-spin-button {
     -webkit-appearance: none;
     margin: 0;
+}
+
+input.error {
+    border: 1px solid #dc3545;
+}
+
+.error-message {
+    color: #dc3545;
+    font-size: 0.8em;
+    margin-top: 2px;
+    display: block;
 }
 
 ::-webkit-scrollbar {

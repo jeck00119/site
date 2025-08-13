@@ -129,10 +129,10 @@
                 <label for="component">Reference:</label>
                 <select v-model="currentReferenceUid" style="border: none;">
                     <option
-                        v-for="reference in references"
-                        :key="reference.uid"
-                        :value="reference.uid"
-                    >{{ reference.name }}</option>
+                        v-for="(reference, index) in (references || [])"
+                        :key="reference?.uid || `ref-${index}`"
+                        :value="reference?.uid"
+                    >{{ reference?.name || 'Unnamed Reference' }}</option>
                 </select>
             </div>
         </div>
@@ -168,7 +168,7 @@
 
 <script>
 import { ref, computed, watch, toRef } from 'vue';
-import { useStore } from 'vuex';
+import { useImageSourcesStore } from '@/composables/useStore';
 
 import AlgorithmParameters from '../layout/AlgorithmParameters.vue';
 
@@ -182,7 +182,16 @@ export default {
     emits: ['show-camera', 'single-run', 'live-process', 'update-image-source', 'update-reference', 'algorithm-changed', 'import-path-changed', 'save-component', 'download-algorithm', 'save-ref-changed'],
 
     setup(props, context) {
-        const store = useStore();
+        // Use centralized composables instead of direct store access
+        const { imageSources } = useImageSourcesStore();
+
+        // Debug: Log availableAlgorithms prop changes
+        watch(() => props.availableAlgorithms, (newValue) => {
+            console.log('ComponentControl - availableAlgorithms changed:', {
+                length: newValue?.length || 0,
+                algorithms: newValue
+            });
+        }, { immediate: true });
 
         const selectedSection = ref(null);
 
@@ -215,10 +224,6 @@ export default {
         const cameraActive = ref(false);
 
         const liveRunningBtnText = ref('Live');
-
-        const imageSources = computed(function() {
-            return store.getters["imageSources/getImageSources"];
-        });
 
         function toggleCamera(value) {
             cameraActive.value = value

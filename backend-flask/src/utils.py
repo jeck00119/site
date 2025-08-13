@@ -1,7 +1,8 @@
 import base64
 import json
 import string
-from typing import List
+import logging
+from typing import List, Optional
 
 import cv2
 import imutils as imutils
@@ -9,6 +10,8 @@ import numpy as np
 import shortuuid
 from humps.camel import case
 from pydantic import BaseModel, ConfigDict
+
+logger = logging.getLogger(__name__)
 
 alphabet = string.ascii_lowercase + string.digits
 su = shortuuid.ShortUUID(alphabet=alphabet)
@@ -32,10 +35,85 @@ class CamelModel(BaseModel):
         return data
 
 
-def frame_to_base64(frame):
-    retval, buffer = cv2.imencode('.jpg', frame)
-    jpg_as_text = base64.b64encode(buffer)
-    return jpg_as_text
+def frame_to_base64(frame, quality: int = 95, format: str = '.jpg'):
+    """
+    Convert frame to base64 encoded string with proper error handling and validation.
+    
+    Args:
+        frame: OpenCV image frame (numpy array)
+        quality: JPEG quality (1-100, default 95)
+        format: Image format ('.jpg', '.png', default '.jpg')
+    
+    Returns:
+        bytes: Base64 encoded image data
+    
+    Raises:
+        ValueError: If frame is invalid or encoding fails
+        TypeError: If frame is not a numpy array
+    """
+    # Validate input frame
+    if frame is None:
+        raise ValueError("Frame cannot be None")
+    
+    if not isinstance(frame, np.ndarray):
+        raise TypeError(f"Frame must be numpy array, got {type(frame)}")
+    
+    if frame.size == 0:
+        raise ValueError("Frame cannot be empty")
+    
+    # Validate and clamp quality for JPEG
+    if format.lower() == '.jpg':
+        quality = max(1, min(100, quality))
+        encode_params = [cv2.IMWRITE_JPEG_QUALITY, quality]
+    else:
+        encode_params = []
+    
+    # Encode frame with error checking
+    retval, buffer = cv2.imencode(format, frame, encode_params)
+    
+    if not retval or buffer is None or buffer.size == 0:
+        raise ValueError(f"Failed to encode frame to {format} format")
+    
+    # Convert to base64
+    try:
+        jpg_as_text = base64.b64encode(buffer)
+        return jpg_as_text
+    except Exception as e:
+        raise ValueError(f"Failed to encode frame to base64: {str(e)}")
+
+
+def load_fallback_image(fallback_path: str = 'assets/no_camera.jpg', 
+                       width: int = 640, height: int = 480) -> np.ndarray:
+    """
+    Centralized fallback image loading with consistent error handling.
+    
+    Args:
+        fallback_path: Path to fallback image file
+        width: Width for generated placeholder if file loading fails
+        height: Height for generated placeholder if file loading fails
+    
+    Returns:
+        numpy.ndarray: Fallback image or generated placeholder
+    """
+    try:
+        image = cv2.imread(fallback_path)
+        if image is not None:
+            logger.debug(f"Successfully loaded fallback image: {fallback_path}")
+            return image
+        else:
+            logger.warning(f"Failed to load fallback image from {fallback_path}, generating placeholder")
+    except Exception as e:
+        logger.error(f"Error loading fallback image {fallback_path}: {e}")
+    
+    # Generate consistent placeholder image
+    try:
+        placeholder = np.full((height, width, 3), 128, dtype=np.uint8)
+        logger.debug(f"Generated {width}x{height} placeholder image")
+        return placeholder
+    except Exception as e:
+        logger.error(f"Failed to generate placeholder image: {e}")
+        # Last resort - minimal 1x1 gray image
+        return np.full((1, 1, 3), 128, dtype=np.uint8)
 
 
 def generate_uid(length: int = 8):

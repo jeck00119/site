@@ -5,6 +5,12 @@
             "password": "$2b$12$xZZNOr6tUpCLZD4U1ehneufPgZOUpkeqbJU9r/UzVlAahNuafPNfa",
             "uid": "admin-dev-001",
             "username": "admin@forvia.com"
+        },
+        "2": {
+            "level": "user",
+            "password": "$2b$12$Yl/jfq7420sHo294lzFy.eyd7t3Vvr.8ad7aJWicDwZc5IhoFdb/C",
+            "uid": "test123",
+            "username": "test@forvia.com"
         }
     }
 }

@@ -6,6 +6,7 @@
           <button
             class="button-up"
             @click="increaseAxis('x')"
+            :disabled="!isConnected"
           >
             <font-awesome-icon icon="plus" />
           </button>
@@ -15,6 +16,7 @@
           <button
             class="button-down"
             @click="decreaseAxis('x')"
+            :disabled="!isConnected"
           >
             <font-awesome-icon icon="minus" />
           </button>
@@ -28,6 +30,7 @@
           <button
             class="button-up"
             @click="increaseAxis('y')"
+            :disabled="!isConnected"
           >
             <font-awesome-icon icon="plus" />
           </button>
@@ -37,6 +40,7 @@
           <button
             class="button-down"
             @click="decreaseAxis('y')"
+            :disabled="!isConnected"
           >
             <font-awesome-icon icon="minus" />
           </button>
@@ -50,6 +54,7 @@
           <button
             class="button-up"
             @click="increaseAxis('z')"
+            :disabled="!isConnected"
           >
             <font-awesome-icon icon="plus" />
           </button>
@@ -59,6 +64,7 @@
           <button
             class="button-down"
             @click="decreaseAxis('z')"
+            :disabled="!isConnected"
           >
             <font-awesome-icon icon="minus" />
           </button>
@@ -69,7 +75,7 @@
 </template>
 
 <script>
-import { useStore } from "vuex";
+import { useCncStore } from '@/composables/useStore';
 
 export default {
   name: "MovementControls",
@@ -85,14 +91,18 @@ export default {
     selectedFeedrate: {
       type: [String, Number],
       required: true
+    },
+    isConnected: {
+      type: Boolean,
+      default: false
     }
   },
   emits: ['axis-moved'],
   setup(props, { emit }) {
-    const store = useStore();
+    const cncStore = useCncStore();
 
     function increaseAxis(axis) {
-      store.dispatch("cnc/api_increaseAxis", {
+      cncStore.increaseAxis({
         cncUid: props.axisUid,
         axis: axis,
         step: props.selectedSteps,
@@ -103,7 +113,7 @@ export default {
     }
 
     function decreaseAxis(axis) {
-      store.dispatch("cnc/api_decreaseAxis", {
+      cncStore.decreaseAxis({
         cncUid: props.axisUid,
         axis: axis,
         step: props.selectedSteps,
@@ -173,12 +183,19 @@ export default {
   justify-content: center;
 }
 
-.button-down:hover,
-.button-up:hover {
+.button-down:hover:not(:disabled),
+.button-up:hover:not(:disabled) {
   box-shadow: rgba(255, 255, 255, 0.2) 0 3px 15px inset,
     rgba(0, 0, 0, 0.1) 0 3px 5px, rgba(0, 0, 0, 0.1) 0 10px 13px;
   transform: scale(1.05);
   border: 1px solid rgb(61, 59, 59);
+}
+
+.button-down:disabled,
+.button-up:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
 }
 
 .button-up {

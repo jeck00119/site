@@ -77,7 +77,7 @@
 
 <script>
 import { ref, computed, onMounted } from 'vue';
-import { useStore } from 'vuex';
+import { useLogStore } from '@/composables/useStore';
 import useNotification from '../../../hooks/notifications.js';
 
 import VueMultiselect from 'vue-multiselect';
@@ -104,10 +104,15 @@ export default {
         const {showNotification, notificationMessage, notificationIcon, notificationTimeout, 
             setNotification, clearNotification} = useNotification();
         
-        const store = useStore();
+        const logStore = useLogStore();
 
         const events = computed(function() {
-            const events = store.getters["log/getEvents"];
+            const events = logStore.events;
+
+            // Ensure events is an array
+            if (!events || !Array.isArray(events)) {
+                return [];
+            }
 
             let filteredEvents = null;
 
@@ -124,7 +129,12 @@ export default {
         });
 
         const eventTypes = computed(function() {
-            const events = store.getters["log/getEvents"];
+            const events = logStore.events;
+
+            // Ensure events is an array
+            if (!events || !Array.isArray(events)) {
+                return [];
+            }
 
             const types = events.map(event => event.type);
 
@@ -133,9 +143,7 @@ export default {
 
         function removeEvent(timestamp) {
             try {
-                store.dispatch("log/removeEvent", {
-                    timestamp: timestamp
-                });
+                logStore.removeEvent(timestamp);
             }catch(err) {
                 setNotification(3000, err, 'bi-exclamation-circle-fill');
             }
@@ -173,8 +181,13 @@ export default {
             }
         }
 
-        onMounted(() => {
-            // updateDivPosition()
+        onMounted(async () => {
+            try {
+                await logStore.loadEvents();
+            } catch (error) {
+                console.error('Failed to load events:', error);
+                setNotification(3000, 'Failed to load events', 'bi-exclamation-circle-fill');
+            }
         });
 
         return {

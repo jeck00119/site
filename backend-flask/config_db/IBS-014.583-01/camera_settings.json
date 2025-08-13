@@ -12,13 +12,34 @@
             "name": "Basic",
             "pan": 0,
             "resolution": [
+                640,
+                480
+            ],
+            "saturation": 128,
+            "sharpness": 128,
+            "tilt": 0,
+            "uid": "c27eff4a-3b47-4e20-889d-939bf77cf9d3",
+            "zoom": 0
+        },
+        "2": {
+            "auto_exposure": 0,
+            "auto_focus": 1,
+            "brightness": 128,
+            "camera_type": "webcam_logi",
+            "contrast": 128,
+            "exposure": 1,
+            "focus": 30,
+            "gain": 0,
+            "name": "test",
+            "pan": 0,
+            "resolution": [
                 1920,
                 1080
             ],
             "saturation": 128,
             "sharpness": 128,
             "tilt": 0,
-            "uid": "c27eff4a-3b47-4e20-889d-939bf77cf9d3",
+            "uid": "8e6726c6-0471-4240-ac21-1ac1061c1a17",
             "zoom": 0
         }
     }

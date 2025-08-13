@@ -6,8 +6,8 @@ import time
 from serial import SerialException
 
 from repo.repositories import CncRepository, LocationRepository
-from services.cnc.cnc_machine_gerbil import CncMachineGerbil, ERROR_LIST_CNC as GRBL_ERROR_LIST
-from services.cnc.cnc_machine_marlin import CncMachineMarlin, ERROR_LIST_CNC as MARLIN_ERROR_LIST
+from services.cnc.cnc_machine_gerbil import CncMachineGerbil
+from services.cnc.cnc_machine_marlin import CncMachineMarlin
 from services.cnc.cnc_models import CncModel, LocationModel
 from services.cnc.cnc_error_handler import CncErrorHandler
 from src.metaclasses.singleton import Singleton
@@ -294,12 +294,18 @@ class CncService(metaclass=Singleton):
                 self.logger.error(f"Could not connect to {cnc_model.port} - {str(e)}")
                 self._callback(cnc_model.uid, ('connection_error', f"Could not connect to {cnc_model.port}: {str(e)}", False, cnc_model.uid))
             
+            # Store connection error
+            self._connection_errors[cnc_model.uid] = str(e)
+            
             # Remove failed CNC from objects but keep in callbacks for error reporting
             if cnc_model.uid in self._cnc_objects:
                 del self._cnc_objects[cnc_model.uid]
             
-            # Don't re-raise the exception - allow the save operation to continue for other CNCs
-            return
+            # Put a Mock object to indicate failed connection
+            self._cnc_objects[cnc_model.uid] = Mock()
+            
+            # Re-raise the exception so _init_cnc and create_cnc can handle it
+            raise
 
     def _init_cnc(self, uid):
         if uid not in self._cnc_objects.keys():
@@ -383,6 +389,10 @@ class CncService(metaclass=Singleton):
 
     def create_cnc(self, cnc_uid):
         self._init_cnc(cnc_uid)
+        # Check if connection failed and raise exception to inform the API
+        if cnc_uid in self._cnc_objects and isinstance(self._cnc_objects[cnc_uid], Mock):
+            connection_error = self._connection_errors.get(cnc_uid, 'Unknown connection error')
+            raise Exception(f"Failed to connect to CNC: {connection_error}")
 
     def update_cnc(self, cnc_uid):
         self._deinit_cnc(cnc_uid)

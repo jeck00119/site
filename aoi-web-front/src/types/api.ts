@@ -3,6 +3,13 @@
 export interface ApiResponse<T = any> {
   response: Response;
   responseData: T;
+  ok: boolean;
+  status: number;
+  data?: T;
+  _?: any;
+  _2?: any;
+  blob?: () => Promise<Blob>;
+  headers?: Headers;
 }
 
 export interface StandardApiResponse<T = any> {

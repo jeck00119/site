@@ -28,14 +28,14 @@
         @keyup.up="navigateHistory(-1)"
         @keyup.down="navigateHistory(1)"
         class="terminal-input"
-        placeholder="Enter command..."
-        :disabled="isSending"
+        :placeholder="isConnected ? 'Enter command...' : 'CNC not connected'"
+        :disabled="isSending || !isConnected"
       />
       
       <button
         @click="sendCommand"
         class="button-wide small-button"
-        :disabled="isSending || !commandLine.trim()"
+        :disabled="isSending || !commandLine.trim() || !isConnected"
       >
         <v-icon 
           :name="isSending ? 'fa-spinner' : 'io-send-sharp'" 
@@ -57,7 +57,7 @@
 
 <script>
 import { ref, nextTick, watch, onMounted, onUnmounted } from "vue";
-import { useStore } from "vuex";
+import { useCncStore } from '@/composables/useStore';
 
 export default {
   name: "TerminalConsole",
@@ -69,11 +69,15 @@ export default {
     terminalHistory: {
       type: String,
       default: ""
+    },
+    isConnected: {
+      type: Boolean,
+      default: false
     }
   },
   emits: ['command-sent', 'terminal-cleared'],
   setup(props, { emit }) {
-    const store = useStore();
+    const cncStore = useCncStore();
     
     const commandLine = ref("");
     const commandHistory = ref([]);
@@ -120,12 +124,12 @@ export default {
 
     function focusInput() {
       if (commandInput.value) {
-        commandInput.value.focus();
+        commandInput.value.focus({ preventScroll: true });
       }
     }
 
     async function sendCommand() {
-      if (isSending.value || !commandLine.value.trim()) return;
+      if (isSending.value || !commandLine.value.trim() || !props.isConnected) return;
       
       const command = commandLine.value.trim();
       
@@ -146,7 +150,7 @@ export default {
         }
         
         // Send command to store
-        await store.dispatch("cnc/api_terminal", {
+        await cncStore.terminalCommand({
           cncUid: props.axisUid,
           command: command,
         });

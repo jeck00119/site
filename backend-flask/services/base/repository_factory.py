@@ -2,43 +2,79 @@
 Repository Factory
 
 Centralizes repository creation and management to eliminate duplication.
+Progressive migration to GenericRepository while maintaining backward compatibility.
 """
 
 import logging
 from typing import Dict, Type, Any, Optional
+from repo.generic_repository import GenericRepository
+# Keep old imports for backward compatibility during migration
 from repo.repositories import (
     CameraRepository, CameraSettingsRepository,
     ComponentsRepository, CustomComponentsRepository,
     CncRepository, LocationRepository,
-    RobotRepository, AlgorithmsRepository,
-    ReferencesRepository, UsersRepository,
+    RobotRepository, RobotPositionsRepository,
+    AlgorithmsRepository, ReferencesRepository, UsersRepository,
     ConfigurationRepository, ImageSourceRepository,
-    CameraCalibrationRepository, ImageGeneratorRepository
+    CameraCalibrationRepository, ImageGeneratorRepository,
+    ProfilometerRepository, StereoCalibrationRepository
 )
 
 
 class RepositoryFactory:
     """
     Factory class for creating and managing repository instances.
+    Progressively migrating to GenericRepository to eliminate duplication.
     """
     
-    # Repository type mapping
+    # Repository type mapping - maps to both old classes and db_names
     REPOSITORY_TYPES = {
-        'camera': CameraRepository,
-        'camera_settings': CameraSettingsRepository,
-        'components': ComponentsRepository,
-        'custom_components': CustomComponentsRepository,
-        'cnc': CncRepository,
-        'location': LocationRepository,
-        'robot': RobotRepository,
-        'algorithms': AlgorithmsRepository,
-        'references': ReferencesRepository,
-        'users': UsersRepository,
-        'configuration': ConfigurationRepository,
-        'image_source': ImageSourceRepository,
-        'camera_calibration': CameraCalibrationRepository,
-        'image_generator': ImageGeneratorRepository,
+        'camera': {'class': CameraRepository, 'db_name': 'cameras'},
+        'camera_settings': {'class': CameraSettingsRepository, 'db_name': 'camera_settings'},
+        'components': {'class': ComponentsRepository, 'db_name': 'components'},
+        'custom_components': {'class': CustomComponentsRepository, 'db_name': 'custom_components'},
+        'cnc': {'class': CncRepository, 'db_name': 'cnc'},
+        'location': {'class': LocationRepository, 'db_name': 'locations'},
+        'robot': {'class': RobotRepository, 'db_name': 'robot'},
+        'robot_positions': {'class': RobotPositionsRepository, 'db_name': 'robot_positions'},
+        'algorithms': {'class': AlgorithmsRepository, 'db_name': 'algorithms'},
+        'references': {'class': ReferencesRepository, 'db_name': 'references'},
+        'users': {'class': UsersRepository, 'db_name': 'users'},
+        'configuration': {'class': ConfigurationRepository, 'db_name': 'configurations'},
+        'image_source': {'class': ImageSourceRepository, 'db_name': 'image_source'},
+        'camera_calibration': {'class': CameraCalibrationRepository, 'db_name': 'camera_calibration'},
+        'image_generator': {'class': ImageGeneratorRepository, 'db_name': 'image_generators'},
+        'profilometer': {'class': ProfilometerRepository, 'db_name': 'profilometer'},
+        'stereo_calibration': {'class': StereoCalibrationRepository, 'db_name': 'stereo_calibration'},
     }
+    
+    # List of repository types that have been migrated to GenericRepository
+    # Start with least critical and gradually add more
+    USE_GENERIC_FOR = [
+        # Already migrated and tested
+        'custom_components',     # Least critical - safe to migrate
+        'references',           # Simple CRUD operations
+        'image_generator',      # Rarely used
+        'camera_calibration',   # Isolated usage
+        'location',             # CNC positioning data - safe to migrate
+        'users',                # User management - test authentication carefully
+        'robot_positions',      # Robot waypoints - safe to migrate
+        
+        # NEW: Safe to migrate - pure CRUD repositories (no custom methods)
+        'components',           # Simple CRUD - used by ComponentsService (already migrated)
+        'cnc',                 # Simple CRUD - CNC settings
+        'robot',               # Simple CRUD - robot settings
+        'profilometer',        # Simple CRUD - profilometer settings
+        'image_source',        # Simple CRUD - image source configurations
+        'stereo_calibration',  # Simple CRUD - stereo calibration data
+        
+        # KEEP AS LEGACY (have custom methods - need special handling):
+        # 'camera_settings' - has read_all_by_type method
+        # 'camera' - has read_all_type method
+        # 'algorithms' - has get_type_from_uid method
+        # 'configuration' - has read_part_number method  
+        # 'inspections' - has complex custom logic
+    ]
     
     _instances: Dict[str, Any] = {}
     _logger = logging.getLogger(__name__)
@@ -65,11 +101,19 @@ class RepositoryFactory:
                 f"Available types: {available_types}"
             )
         
-        repository_class = cls.REPOSITORY_TYPES[repository_type]
+        repo_config = cls.REPOSITORY_TYPES[repository_type]
         
         try:
-            repository = repository_class(**kwargs)
-            cls._logger.debug(f"Created repository: {repository_type}")
+            # Use GenericRepository for migrated types
+            if repository_type in cls.USE_GENERIC_FOR:
+                repository = GenericRepository(repo_config['db_name'], **kwargs)
+                cls._logger.debug(f"Created GenericRepository for: {repository_type} (db: {repo_config['db_name']})")
+            else:
+                # Use old class for non-migrated types
+                repository_class = repo_config['class']
+                repository = repository_class(**kwargs)
+                cls._logger.debug(f"Created legacy repository: {repository_type}")
+            
             return repository
             
         except Exception as e:
@@ -136,6 +180,44 @@ class RepositoryFactory:
     def is_type_available(cls, repository_type: str) -> bool:
         """Check if a repository type is available."""
         return repository_type in cls.REPOSITORY_TYPES
+    
+    @classmethod
+    def is_using_generic(cls, repository_type: str) -> bool:
+        """Check if a repository type is using GenericRepository."""
+        return repository_type in cls.USE_GENERIC_FOR
+    
+    @classmethod
+    def migrate_to_generic(cls, repository_type: str) -> None:
+        """
+        Migrate a specific repository type to use GenericRepository.
+        
+        Args:
+            repository_type: Type to migrate
+        """
+        if repository_type not in cls.REPOSITORY_TYPES:
+            raise ValueError(f"Unknown repository type: {repository_type}")
+            
+        if repository_type not in cls.USE_GENERIC_FOR:
+            cls.USE_GENERIC_FOR.append(repository_type)
+            # Clear singleton instance to force recreation
+            if repository_type in cls._instances:
+                del cls._instances[repository_type]
+            cls._logger.info(f"Migrated {repository_type} to use GenericRepository")
+    
+    @classmethod
+    def rollback_from_generic(cls, repository_type: str) -> None:
+        """
+        Rollback a repository type to use legacy class.
+        
+        Args:
+            repository_type: Type to rollback
+        """
+        if repository_type in cls.USE_GENERIC_FOR:
+            cls.USE_GENERIC_FOR.remove(repository_type)
+            # Clear singleton instance to force recreation
+            if repository_type in cls._instances:
+                del cls._instances[repository_type]
+            cls._logger.info(f"Rolled back {repository_type} to use legacy repository")
 
 
 class ServiceRepositoryMixin:
@@ -152,22 +234,18 @@ class ServiceRepositoryMixin:
         Add a repository to the service.
         
         Args:
-            name: Name to store repository under
+            name: Name to use for the repository in this service
             repository_type: Type of repository to create
             singleton: Whether to use singleton pattern
             
         Returns:
-            Created repository instance
+            Repository instance
         """
         repository = self._repository_factory.get_repository(repository_type, singleton=singleton)
         self._repositories[name] = repository
-        
-        if hasattr(self, 'logger'):
-            self.logger.debug(f"Added repository '{name}' of type '{repository_type}'")
-        
         return repository
     
-    def get_repository(self, name: str) -> Optional[Any]:
+    def get_repository(self, name: str) -> Any:
         """
         Get a repository by name.
         
@@ -175,58 +253,13 @@ class ServiceRepositoryMixin:
             name: Repository name
             
         Returns:
-            Repository instance or None if not found
+            Repository instance or None
         """
         return self._repositories.get(name)
     
-    def has_repository(self, name: str) -> bool:
-        """
-        Check if a repository exists.
-        
-        Args:
-            name: Repository name
-            
-        Returns:
-            True if repository exists
-        """
-        return name in self._repositories
-    
-    def remove_repository(self, name: str) -> Optional[Any]:
-        """
-        Remove a repository.
-        
-        Args:
-            name: Repository name
-            
-        Returns:
-            Removed repository instance or None if not found
-        """
-        repository = self._repositories.pop(name, None)
-        
-        if hasattr(self, 'logger'):
-            if repository:
-                self.logger.debug(f"Removed repository '{name}'")
-            else:
-                self.logger.warning(f"Repository '{name}' not found for removal")
-        
-        return repository
-    
-    def get_all_repositories(self) -> Dict[str, Any]:
-        """
-        Get all repositories.
-        
-        Returns:
-            Dictionary of all repositories
-        """
-        return self._repositories.copy()
-    
-    def clear_repositories(self) -> None:
-        """Clear all repositories."""
-        count = len(self._repositories)
-        self._repositories.clear()
-        
-        if hasattr(self, 'logger'):
-            self.logger.info(f"Cleared {count} repositories")
+    def list_repositories(self) -> list:
+        """List all repository names in this service."""
+        return list(self._repositories.keys())
 
 
 # Convenience functions for common repository patterns
@@ -272,4 +305,3 @@ def get_repository_for_service(service_name: str, repository_type: str) -> Any:
         Repository instance
     """
     return RepositoryFactory.get_repository(repository_type, singleton=True)
-

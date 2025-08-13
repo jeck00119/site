@@ -16,6 +16,7 @@ from repo.repository_exceptions import UidNotFound, UidNotUnique
 from services.authorization.authorization import get_current_user
 from services.cnc.cnc_models import CncModel, LocationModel
 from services.cnc.cnc_service import CncService
+from services.configurations.configurations_service import ConfigurationService
 from services.port_manager.port_manager import PortManager
 
 router = APIRouter(
@@ -27,7 +28,13 @@ router = APIRouter(
 @router.get("")
 async def get_cncs(
         cnc_repository: CncRepository = Depends(get_service_by_type(CncRepository)),
+        configuration_service: ConfigurationService = Depends(get_service_by_type(ConfigurationService))
 ):
+    # Ensure repository has correct configuration context
+    current_config = configuration_service.get_current_configuration_name()
+    if current_config:
+        cnc_repository.set_db(current_config)
+    
     return RouteHelper.list_entities(cnc_repository, "CNC")
 
 

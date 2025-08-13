@@ -90,7 +90,7 @@
 
 <script>
 import { ref, computed } from 'vue';
-import { useStore } from 'vuex';
+import { useAlgorithmsStore } from '@/composables/useStore';
 
 import { uuid } from "vue3-uuid";
 
@@ -100,7 +100,7 @@ export default {
     setup(props) {
         const fileLoadMessage = ref('Drop File Here');
 
-        const store = useStore();
+        const algorithmsStore = useAlgorithmsStore();
 
         function getParameterDisplayName(parameter) {
             return parameter.split('_').map((value) => value[0].toUpperCase() + value.slice(1)).join(' ');
@@ -129,7 +129,7 @@ export default {
             if(props.type === 'custom_component')
             {
                 let idx = parseInt(props.algorithmIdx, 10);
-                store.dispatch("algorithms/updateCurrentBasicAlgorithmProperty", {
+                algorithmsStore.updateCurrentBasicAlgorithmProperty({
                     idx: idx,
                     name: name,
                     value: value
@@ -137,14 +137,14 @@ export default {
             }
             else if(props.type === 'reference')
             {
-                store.dispatch("algorithms/updateCurrentReferenceAlgorithmProperty", {
+                algorithmsStore.updateCurrentReferenceAlgorithmProperty({
                     name: name,
                     value: value
                 });
             }
             else
             {
-                store.dispatch("algorithms/updateCurrentAlgorithmProperty", {
+                algorithmsStore.updateCurrentAlgorithmProperty({
                     name: name,
                     value: value
                 });
@@ -162,14 +162,14 @@ export default {
             formData.append('path', path);
 
             try {
-                await store.dispatch("algorithms/uploadResource", formData);
+                await algorithmsStore.uploadResource(formData);
 
                 if(update)
                 {
                     if(props.type === 'custom_component')
                     {
                         let idx = parseInt(props.algorithmIdx, 10);
-                        store.dispatch("algorithms/updateCurrentBasicAlgorithmAttributes", {
+                        algorithmsStore.updateCurrentBasicAlgorithmAttributes({
                             idx: idx,
                             name: update,
                             value: file.name
@@ -177,14 +177,14 @@ export default {
                     }
                     else if(props.type === 'reference')
                     {
-                        store.dispatch("algorithms/updateCurrentReferenceAlgorithmAttributes", {
+                        algorithmsStore.updateCurrentReferenceAlgorithmAttributes({
                             name: update,
                             value: file.name
                         });
                     }
                     else
                     {
-                        store.dispatch("algorithms/updateCurrentAlgorithmAttributes", {
+                        algorithmsStore.updateCurrentAlgorithmAttributes({
                             name: update,
                             value: file.name
                         });

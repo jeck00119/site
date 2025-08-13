@@ -151,7 +151,7 @@
 
 <script>
 import { ref, computed, onMounted } from 'vue';
-import { useStore } from 'vuex';
+import { useAlgorithmsStore, useImageSourcesStore, useConfigurationsStore, useAuthStore, useAuditStore } from '@/composables/useStore';
 
 import useNotification from '../../hooks/notifications.js';
 
@@ -174,15 +174,31 @@ export default{
 
         const invalidName = ref(false);
 
-        const store = useStore();
+        // Use centralized composables instead of direct store access
+        const { loadAlgorithms, loadReferenceAlgorithms, loadConfiguredAlgorithms, loadBasicAlgorithms } = useAlgorithmsStore();
+        const { loadImageSources } = useImageSourcesStore();
+        const configStore = useConfigurationsStore();
+        const { 
+            configurations, 
+            currentConfiguration,
+            loadConfigurations,
+            setCurrentConfiguration,
+            resetAllDatabases,
+            removeConfiguration: removeConfig,
+            addConfiguration: addConfig,
+            copyConfiguration,
+            editConfiguration: editConfig,
+            getConfigurationById
+        } = configStore;
+        const authStore = useAuthStore();
+        const auditStore = useAuditStore();
 
-        const currentUser = computed(function() {
-            return store.getters["auth/getCurrentUser"];
-        });
+        // These are already computed refs from the composables
 
-        const isAuthenticated = computed(function() {
-            return store.getters["auth/isAuthenticated"];
-        });
+
+        const currentUser = authStore.currentUser;
+
+        const isAuthenticated = authStore.isAuthenticated;
 
         const isAuthorized = computed(function() {
             if (currentUser.value && (currentUser.value.level === 'admin' || currentUser.value.level === 'technician'))
@@ -191,29 +207,21 @@ export default{
             return false;
         });
 
-        const configurations = computed(function() {
-            return store.getters["configurations/getConfigurations"];
-        });
-
-        const currentConfiguration = computed(function() {
-            return store.getters["configurations/getCurrentConfiguration"];
-        });
-
         async function loadConfiguration(id) {
             setNotification(null, 'Loading configuration. Please wait.', 'fa-cog');
 
-            const configuration = store.getters["configurations/getConfigurationById"](id);
+            const configuration = configurations.value.find(config => config.uid === id);
 
             try {
-                await store.dispatch("configurations/loadConfiguration", configuration);
+                await configStore.loadConfiguration(configuration);
 
-                store.dispatch('algorithms/loadAlgorithms');
-                store.dispatch('algorithms/loadReferenceAlgorithms');
+                loadAlgorithms();
+                loadReferenceAlgorithms();
 
-                store.dispatch('imageSources/loadImageSources');
+                loadImageSources();
                 
-                store.dispatch('algorithms/loadConfiguredAlgorithms');
-                store.dispatch('algorithms/loadBasicAlgorithms');
+                loadConfiguredAlgorithms();
+                loadBasicAlgorithms();
             }catch(err) {
                 setNotification(5000, err, 'bi-exclamation-circle-fill');
             }
@@ -225,15 +233,15 @@ export default{
             if(currentConfiguration.value && currentConfiguration.value.uid === id)
             {
                 try {
-                    await store.dispatch("configurations/resetAllDatabases");
+                    await resetAllDatabases();
                     
-                    store.dispatch("configurations/setCurrentConfiguration", null);
+                    setCurrentConfiguration(null);
 
-                    store.dispatch("configurations/removeConfiguration", {
+                    await removeConfig({
                         uid: id
                     });
 
-                    store.dispatch("log/addEvent", {
+                    await auditStore.addEvent({
                         type: 'CONFIGURATIONS',
                         user: currentUser.value ? currentUser.value.username : 'Unknown',
                         title: 'Configuration Removed',
@@ -246,11 +254,11 @@ export default{
             else
             {
                 try {
-                    store.dispatch("configurations/removeConfiguration", {
+                    await removeConfig({
                         uid: id
                     });
 
-                    store.dispatch("log/addEvent", {
+                    await auditStore.addEvent({
                         type: 'CONFIGURATIONS',
                         user: currentUser.value ? currentUser.value.username : 'Unknown',
                         title: 'Configuration Removed',
@@ -283,13 +291,13 @@ export default{
             if (addConfigurationFlag.value)
             {
                 try {
-                    await store.dispatch("configurations/addConfiguration", {
+                    await addConfig({
                         name: newConfigName.value,
                         type: newComponentType.value,
                         part_number: newPartNumber.value
                     });
 
-                    store.dispatch("log/addEvent", {
+                    auditStore.addEvent({
                         type: 'CONFIGURATIONS',
                         user: currentUser.value ? currentUser.value.username : 'Unknown',
                         title: 'Configuration Added',
@@ -303,7 +311,7 @@ export default{
             if (copyConfigurationFlag.value)
             {
                 try {
-                    await store.dispatch("configurations/copyConfiguration", {
+                    await copyConfiguration({
                         config: {
                             name: newConfigName.value,
                             type: newComponentType.value,
@@ -312,7 +320,7 @@ export default{
                         originalConfigId: copyConfigurationId.value
                     });
 
-                    store.dispatch("log/addEvent", {
+                    auditStore.addEvent({
                         type: 'CONFIGURATIONS',
                         user: currentUser.value ? currentUser.value.username : 'Unknown',
                         title: 'Configuration Copied',
@@ -326,7 +334,7 @@ export default{
             closeAddDialog();
         }
 
-        function editConfiguration() {
+        async function editConfiguration() {
             invalidName.value = false;
 
             if(configurationSelected.value.name === '')
@@ -336,9 +344,9 @@ export default{
             }
 
             try {
-                store.dispatch("configurations/editConfiguration", configurationSelected.value);
+                await editConfig(configurationSelected.value);
 
-                store.dispatch("log/addEvent", {
+                await auditStore.addEvent({
                     type: 'CONFIGURATIONS',
                     user: currentUser.value ? currentUser.value.username : 'Unknown',
                     title: 'Configuration Modified',
@@ -352,13 +360,13 @@ export default{
         }
 
         function showDialog(id) {
-            const configuration = store.getters["configurations/getConfigurationById"](id);
+            const configuration = getConfigurationById(id);
             configurationSelected.value = configuration;
             showEditConfiguration.value = true;
         }
 
         function copyConfigDialog(id) {
-            const configuration = store.getters["configurations/getConfigurationById"](id);
+            const configuration = getConfigurationById(id);
 
             newConfigName.value = configuration.name;
             newComponentType.value = configuration.type;
@@ -397,7 +405,7 @@ export default{
         }
 
         onMounted(() => {
-            store.dispatch("configurations/loadConfigurations");
+            loadConfigurations();
         })
 
         return {

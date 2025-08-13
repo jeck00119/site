@@ -129,7 +129,7 @@
   
 <script>
 import { ref, watch, computed, onMounted } from 'vue';
-import { useStore } from 'vuex';
+import { useRobotsStore, useComponentsStore, useConfigurationsStore, useImageSourcesStore } from '@/composables/useStore';
 
 import CameraScene from '../../camera/CameraScene.vue';
 import VueMultiselect from 'vue-multiselect';
@@ -148,7 +148,10 @@ export default {
         const step = ref(0.03);
         const positionName = ref("");
 
-        const store = useStore();
+        const robotsStore = useRobotsStore();
+        const componentsStore = useComponentsStore();
+        const configurationsStore = useConfigurationsStore();
+        const imageSourcesStore = useImageSourcesStore();
 
         const currentRobot = ref(null);
         const selectedComponents = ref([]);
@@ -162,21 +165,11 @@ export default {
         let socket = null;
         let wsUid = null;
 
-        const currentConfiguration = computed(function() {
-            return store.getters["configurations/getCurrentConfiguration"];
-        });
-
-        const robotList = computed(function () {
-            return store.getters["robots/getRobots"];
-        });
-
-        const components = computed(function () {
-            return store.getters["components/getAllComponents"];
-        });
-
-        const currentAngles = computed(function () {
-            return store.getters["robots/getCurrentAngles"];
-        });
+        // These are already computed refs from the composables
+        const currentConfiguration = configurationsStore.currentConfiguration;
+        const robotList = robotsStore.robots;
+        const components = componentsStore.components;
+        const currentAngles = robotsStore.currentAngles;
 
         watch(currentAngles, (newVal, _) => {
             if (newVal) {
@@ -188,9 +181,7 @@ export default {
 
         watch(currentRobot, (newVal, _) => {
             if (newVal) {
-                store.dispatch("robots/loadCurrentRobotPositions", {
-                    uid: newVal.uid
-                });
+                robotsStore.loadCurrentRobotPositions(newVal.uid);
             }
         });
 
@@ -209,26 +200,33 @@ export default {
                     selectedComponents.value.push(components.value.find(comp => comp.uid === component));
                 }
 
-                store.dispatch("robots/moveRobotToPosition", {
-                    robotUid: currentRobot.value.uid,
-                    positionUid: newVal.uid
-                });
+                robotsStore.moveRobotToPosition(currentRobot.value.uid, newVal.uid);
             }
         });
 
-        const robotPositions = computed(function () {
-            return store.getters["robots/getCurrentRobotPositions"];
-        });
+        const robotPositions = robotsStore.currentRobotPositions;
 
-        const imageSources = computed(() => {
-            return store.getters['imageSources/getImageSources'];
-        });
+        const imageSources = imageSourcesStore.imageSources;
 
         watch(currentImageSource, (newValue) => {
             if(newValue)
             {
-                feedLocation.value = `ws://${ipAddress}:${port}/image_source/${newValue.uid}/ws`;
+                // Include FPS parameter for proper frame rate control
+                const fps = newValue.fps || 1; // Default to 1 FPS if not specified
+                let wsUrl;
+                
+                if (newValue.image_source_type === "static") {
+                    wsUrl = `ws://${ipAddress}:${port}/image_source/${newValue.uid}/${newValue.image_generator_uid}/${fps}/ws`;
+                } else if (newValue.image_source_type === "dynamic") {
+                    wsUrl = `ws://${ipAddress}:${port}/image_source/${newValue.uid}/${newValue.camera_uid}/${fps}/ws`;
+                } else {
+                    // Fallback to old format if type is unknown
+                    wsUrl = `ws://${ipAddress}:${port}/image_source/${newValue.uid}/ws`;
+                }
+                
+                feedLocation.value = wsUrl;
                 showCamera.value = true;
+                console.log('RobotControl - WebSocket URL with FPS:', wsUrl, 'FPS:', fps);
             }
             else
             {
@@ -236,49 +234,62 @@ export default {
             }
         });
 
+        // Watch for FPS changes in the current image source to trigger WebSocket reconnection
+        watch(() => currentImageSource.value?.fps, (newFps, oldFps) => {
+            if (newFps !== oldFps && newFps != null && currentImageSource.value) {
+                console.log('RobotControl - FPS changed, updating WebSocket URL', { newFps, oldFps });
+                
+                const fps = newFps;
+                let wsUrl;
+                
+                if (currentImageSource.value.image_source_type === "static") {
+                    wsUrl = `ws://${ipAddress}:${port}/image_source/${currentImageSource.value.uid}/${currentImageSource.value.image_generator_uid}/${fps}/ws`;
+                } else if (currentImageSource.value.image_source_type === "dynamic") {
+                    wsUrl = `ws://${ipAddress}:${port}/image_source/${currentImageSource.value.uid}/${currentImageSource.value.camera_uid}/${fps}/ws`;
+                } else {
+                    wsUrl = `ws://${ipAddress}:${port}/image_source/${currentImageSource.value.uid}/ws`;
+                }
+                
+                feedLocation.value = wsUrl;
+                console.log('RobotControl - Updated WebSocket URL for FPS change:', wsUrl);
+            }
+        });
+
         function refreshAngles(){
-            store.dispatch("robots/loadCurrentAngles", {
-                uid: currentRobot.value.uid
-            });
+            robotsStore.loadCurrentAngles(currentRobot.value.uid);
         }
 
         function moveRobotHome() {
-            store.dispatch("robots/moveRobotHome", {
-                uid: currentRobot.value.uid
-            });
+            robotsStore.moveRobotHome(currentRobot.value.uid);
         }
 
         function releaseServos() {
-            store.dispatch("robots/releaseServos", {
-                uid: currentRobot.value.uid
-            });
+            robotsStore.releaseServos(currentRobot.value.uid);
         }
 
         function powerServos() {
-            store.dispatch("robots/powerServos", {
-                uid: currentRobot.value.uid
-            });
+            robotsStore.powerServos(currentRobot.value.uid);
         }
 
         function saveCurrentPosition() {
             if(currentPosition.value)
             {
-                store.dispatch("robots/updateCurrentPosition", {
-                    positionUid: currentPosition.value.uid,
-                    robotUid: currentRobot.value.uid,
-                    speed: speed.value,
-                    components: selectedComponents.value.map(component => component.uid),
-                    name: positionName.value
-                });
+                robotsStore.updateCurrentPosition(
+                    currentPosition.value.uid,
+                    currentRobot.value.uid,
+                    speed.value,
+                    selectedComponents.value.map(component => component.uid),
+                    positionName.value
+                );
             }
             else
             {
-                store.dispatch("robots/saveCurrentPosition", {
-                    uid: currentRobot.value.uid,
-                    speed: speed.value,
-                    components: selectedComponents.value.map(component => component.uid),
-                    name: positionName.value
-                });
+                robotsStore.saveCurrentPosition(
+                    currentRobot.value.uid,
+                    speed.value,
+                    selectedComponents.value.map(component => component.uid),
+                    positionName.value
+                );
             }
         }
 
@@ -288,20 +299,18 @@ export default {
         }
 
         function setRobotJointAngle(jointNumber, angle, speed) {
-            store.dispatch("robots/setRobotJointAngle", {
-                uid: currentRobot.value.uid,
-                jointNumber: jointNumber,
-                angle: angle,
-                speed: speed,
-                name: positionName.value
-            });
+            robotsStore.setRobotJointAngle(
+                currentRobot.value.uid,
+                jointNumber,
+                angle,
+                speed,
+                positionName.value
+            );
         }
 
         function deleteCurrentPosition() {
             if (currentPosition.value) {
-                store.dispatch("robots/deleteRobotPosition", {
-                    uid: currentPosition.value.uid
-                }).then(() => {
+                robotsStore.deleteRobotPosition(currentPosition.value.uid).then(() => {
                     currentPosition.value = null;
                     selectedComponents.value = [];
                 }).catch();
@@ -311,14 +320,9 @@ export default {
         onMounted(()=>{
             if(currentConfiguration.value)
             {
-                store.dispatch("robots/loadRobots");
-                store.dispatch("components/loadComponents", {
-                    type: 'component'
-                });
-
-                store.dispatch("components/loadComponents", {
-                    type: 'reference'
-                });
+                robotsStore.loadRobots();
+                componentsStore.loadComponents({ type: 'component' });
+                componentsStore.loadComponents({ type: 'reference' });
             }
         })
 

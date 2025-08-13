@@ -12,7 +12,7 @@ from starlette.websockets import WebSocketDisconnect, WebSocket
 from wsproto.utilities import LocalProtocolError
 
 from api.dependencies.services import get_service_by_type
-from api.error_handlers import create_error_response
+from api.error_handlers import create_error_response, handle_route_errors, handle_websocket_errors, create_crud_error_handlers
 from api.route_utils import RouteHelper, require_authentication
 from api.ws_connection_manager import ConnectionManager
 from repo.repositories import AlgorithmsRepository, CustomComponentsRepository
@@ -27,7 +27,6 @@ from services.custom_components.custom_components_model import CustomComponentMo
 from services.image_source.image_source_service import ImageSourceService
 from services.image_source.load_image_service import LoadImageService
 from services.services_exceptions import NoLiveAlgSet, NoLiveFrameSet
-from security.validators import SecurityValidator
 from src.utils import frame_to_base64
 
 router = APIRouter(
@@ -78,155 +77,107 @@ class Field(BaseModel):
 
 
 @router.get("")
+@handle_route_errors("list", "Algorithm")
 async def list_configured_algorithms(
         algorithms_repository: AlgorithmsRepository = Depends(get_service_by_type(AlgorithmsRepository))
-) -> List[Dict[str, str]]:
-    try:
-        algorithms = RouteHelper.list_entities(algorithms_repository, "Algorithm")
-        return RouteHelper.transform_list_to_uid_name(algorithms)
-    except Exception as e:
-        raise create_error_response(
-            operation="list",
-            entity_type="Algorithm",
-            exception=e
-        )
+) -> List[AlgorithmModel]:
+    algorithms = RouteHelper.list_entities(algorithms_repository, "Algorithm")
+    # Return full algorithm models instead of just uid/name to include type and parameters
+    return [AlgorithmModel(**algorithm) for algorithm in algorithms]
 
 
 @router.get("/types")
+@handle_route_errors("list types", "Algorithm")
 async def list_algorithms_types(
         algorithm_service: AlgorithmsService = Depends(get_service_by_type(AlgorithmsService))
 ) -> List[str]:
-    try:
-        result = algorithm_service.list_algorithms_types()
-        return RouteHelper.create_success_response(result)
-    except Exception as e:
-        raise create_error_response(
-            operation="list types",
-            entity_type="Algorithm",
-            exception=e
-        )
+    result = algorithm_service.list_algorithms_types()
+    return RouteHelper.create_success_response(result)
 
 
 @router.get("/basic/types")
+@handle_route_errors("list basic types", "Algorithm")
 async def list_basic_algorithm_types(
         basic_algorithms_service: BasicAlgorithmsService = Depends(get_service_by_type(BasicAlgorithmsService))
 ) -> Dict[str, Any]:
-    try:
-        result = basic_algorithms_service.list_algorithm_types_and_params()
-        return RouteHelper.create_success_response(result)
-    except Exception as e:
-        raise create_error_response(
-            operation="list basic types",
-            entity_type="Algorithm",
-            exception=e
-        )
+    result = basic_algorithms_service.list_algorithm_types_and_params()
+    return RouteHelper.create_success_response(result)
 
 
 @router.get("/reference/types")
+@handle_route_errors("list reference types", "Algorithm")
 async def list_reference_algorithm_types(
         algorithm_service: AlgorithmsService = Depends(get_service_by_type(AlgorithmsService))
 ) -> Dict[str, Any]:
-    try:
-        result = algorithm_service.list_reference_algorithms_types()
-        return RouteHelper.create_success_response(result)
-    except Exception as e:
-        raise create_error_response(
-            operation="list reference types",
-            entity_type="Algorithm",
-            exception=e
-        )
+    result = algorithm_service.list_reference_algorithms_types()
+    return RouteHelper.create_success_response(result)
 
 
 @router.get("/types/{algorithm_type}")
+@handle_route_errors("get parameter UI", "Algorithm", "algorithm_type")
 async def get_alg_param_ui(
         algorithm_type: str,
         algorithm_service: AlgorithmsService = Depends(get_service_by_type(AlgorithmsService))
 ) -> Dict[str, Any]:
-    try:
-        base_alg_type = {
-            'parameters': algorithm_service.get_ui_from_type(algorithm_type),
-        }
-        return RouteHelper.create_success_response(base_alg_type)
-    except Exception as e:
-        raise create_error_response(
-            operation="get parameter UI",
-            entity_type="Algorithm",
-            exception=e
-        )
+    base_alg_type = {
+        'parameters': algorithm_service.get_ui_from_type(algorithm_type),
+    }
+    return RouteHelper.create_success_response(base_alg_type)
 
 
 @router.get("/basic/types/{algorithm_type}")
+@handle_route_errors("get basic parameter UI", "Algorithm", "algorithm_type")
 async def get_basic_alg_param_ui(
         algorithm_type: str,
         basic_algorithm_service: BasicAlgorithmsService = Depends(get_service_by_type(BasicAlgorithmsService))
 ) -> Dict[str, Any]:
-    try:
-        base_alg_type = {
-            'parameters': basic_algorithm_service.get_ui_from_type(algorithm_type),
-        }
-        return RouteHelper.create_success_response(base_alg_type)
-    except Exception as e:
-        raise create_error_response(
-            operation="get basic parameter UI",
-            entity_type="Algorithm",
-            exception=e
-        )
+    base_alg_type = {
+        'parameters': basic_algorithm_service.get_ui_from_type(algorithm_type),
+    }
+    return RouteHelper.create_success_response(base_alg_type)
 
 
 @router.get("/reference/types/{algorithm_type}")
+@handle_route_errors("get reference parameter UI", "Algorithm", "algorithm_type")
 async def get_ref_alg_param_ui(
         algorithm_type: str,
         algorithm_service: AlgorithmsService = Depends(get_service_by_type(AlgorithmsService))
 ) -> Dict[str, Any]:
-    try:
-        # Handle both single and comma-separated algorithm types
-        if ',' in algorithm_type:
-            # Multiple algorithm types - return parameters for the first valid one
-            # or combine them as needed
-            algorithm_types = [t.strip() for t in algorithm_type.split(',')]
-            for algo_type in algorithm_types:
-                try:
-                    result = {
-                        'parameters': algorithm_service.get_ui_from_reference_type(algo_type)
-                    }
-                    return RouteHelper.create_success_response(result)
-                except:
-                    continue
-            # If none worked, return empty parameters
-            return RouteHelper.create_success_response({'parameters': []})
-        else:
-            # Single algorithm type
-            result = {
-                'parameters': algorithm_service.get_ui_from_reference_type(algorithm_type)
-            }
-            return RouteHelper.create_success_response(result)
-    except Exception as e:
-        raise create_error_response(
-            operation="get reference parameter UI",
-            entity_type="Algorithm",
-            exception=e
-        )
+    # Handle both single and comma-separated algorithm types
+    if ',' in algorithm_type:
+        # Multiple algorithm types - return parameters for the first valid one
+        # or combine them as needed
+        algorithm_types = [t.strip() for t in algorithm_type.split(',')]
+        for algo_type in algorithm_types:
+            try:
+                result = {
+                    'parameters': algorithm_service.get_ui_from_reference_type(algo_type)
+                }
+                return RouteHelper.create_success_response(result)
+            except:
+                continue
+        # If none worked, return empty parameters
+        return RouteHelper.create_success_response({'parameters': []})
+    else:
+        # Single algorithm type
+        result = {
+            'parameters': algorithm_service.get_ui_from_reference_type(algorithm_type)
+        }
+        return RouteHelper.create_success_response(result)
 
 
 @router.get("/{algorithm_uid}")
+@handle_route_errors("retrieve", "Algorithm", "algorithm_uid")
 async def get_algorithm(
         algorithm_uid: str,
         algorithms_repository: AlgorithmsRepository = Depends(get_service_by_type(AlgorithmsRepository))
 ) -> AlgorithmModel:
-    try:
-        return RouteHelper.get_entity_by_id(
-            algorithms_repository,
-            algorithm_uid,
-            "Algorithm",
-            AlgorithmModel
-        )
-    except Exception as e:
-        raise create_error_response(
-            operation="retrieve",
-            entity_type="Algorithm",
-            entity_id=algorithm_uid,
-            exception=e
-        )
+    entity_data = RouteHelper.get_entity_by_id(
+        algorithms_repository,
+        algorithm_uid,
+        "Algorithm"
+    )
+    return AlgorithmModel(**entity_data)
 
 
 @router.post("")
@@ -250,348 +201,169 @@ async def post_algorithm(
 
 
 @router.put("/{algorithm_uid}")
+@handle_route_errors("update", "Algorithm", "algorithm_uid")
 async def put_algorithm(
         algorithm_uid: str,
         algorithm: AlgorithmModel,
         _: dict = Depends(require_authentication),
         algorithms_repository: AlgorithmsRepository = Depends(get_service_by_type(AlgorithmsRepository))
 ) -> Dict[str, str]:
-    try:
-        return RouteHelper.update_entity(
-            algorithms_repository,
-            algorithm,
-            "Algorithm"
-        )
-    except Exception as e:
-        raise create_error_response(
-            operation="update",
-            entity_type="Algorithm",
-            entity_id=algorithm_uid,
-            exception=e
-        )
+    return RouteHelper.update_entity(
+        algorithms_repository,
+        algorithm,
+        "Algorithm"
+    )
 
 
 @router.delete("/{algorithm_uid}")
+@handle_route_errors("delete", "Algorithm", "algorithm_uid")
 async def delete_algorithm(
         algorithm_uid: str,
         _: dict = Depends(require_authentication),
         algorithms_repository: AlgorithmsRepository = Depends(get_service_by_type(AlgorithmsRepository))
 ) -> Dict[str, str]:
-    try:
-        return RouteHelper.delete_entity(
-            algorithms_repository,
-            algorithm_uid,
-            "Algorithm"
-        )
-    except Exception as e:
-        raise create_error_response(
-            operation="delete",
-            entity_type="Algorithm",
-            entity_id=algorithm_uid,
-            exception=e
-        )
+    return RouteHelper.delete_entity(
+        algorithms_repository,
+        algorithm_uid,
+        "Algorithm"
+    )
 
 
 @router.get("/__API__/set_live_algorithm/{algorithm_type}")
+@handle_route_errors("set live algorithm", "Algorithm", "algorithm_type")
 async def set_live_algorithm(
         algorithm_type: str,
         algorithm_service: AlgorithmsService = Depends(get_service_by_type(AlgorithmsService))
 ) -> Dict[str, Any]:
-    try:
-        algorithm_service.set_live_algorithm(algorithm_type)
-        base_alg_type = {
-            'parameters': algorithm_service.get_ui_from_type(algorithm_type),
-            'alg_model': algorithm_service.get_model_from_type(algorithm_type).model_dump()
-        }
-        return RouteHelper.create_success_response(base_alg_type)
-    except Exception as e:
-        raise create_error_response(
-            operation="set live algorithm",
-            entity_type="Algorithm",
-            exception=e
-        )
+    algorithm_service.set_live_algorithm(algorithm_type)
+    base_alg_type = {
+        'parameters': algorithm_service.get_ui_from_type(algorithm_type),
+        'alg_model': algorithm_service.get_model_from_type(algorithm_type).model_dump()
+    }
+    return RouteHelper.create_success_response(base_alg_type)
 
 
 @router.get("/__API__/set_live_algorithm_reference/{reference_uid}")
+@handle_route_errors("set live algorithm reference", "Algorithm", "reference_uid")
 async def set_live_algorithm_reference_repository(
         reference_uid: str,
         algorithm_service: AlgorithmsService = Depends(get_service_by_type(AlgorithmsService))
 ) -> Dict[str, str]:
-    try:
-        algorithm_service.set_live_algorithm_reference_repo(reference_uid)
-        return RouteHelper.create_success_response("Live algorithm reference set successfully")
-    except Exception as e:
-        raise create_error_response(
-            operation="set live algorithm reference",
-            entity_type="Algorithm",
-            entity_id=reference_uid,
-            exception=e
-        )
+    algorithm_service.set_live_algorithm_reference_repo(reference_uid)
+    return RouteHelper.create_success_response("Live algorithm reference set successfully")
 
 
 @router.post("/__API__/set_live_algorithm_reference_dict")
+@handle_route_errors("set live algorithm reference dictionary", "Algorithm")
 async def set_live_algorithm_reference_dict(
         reference_algorithm: Reference,
         algorithm_service: AlgorithmsService = Depends(get_service_by_type(AlgorithmsService))
 ) -> Dict[str, str]:
-    try:
-        algorithm_service.set_live_algorithm_reference_dict(
-            reference_algorithm.alg_type,
-            reference_algorithm.alg_parameters
-        )
-        return RouteHelper.create_success_response("Live algorithm reference dictionary set successfully")
-    except Exception as e:
-        raise create_error_response(
-            operation="set live algorithm reference dictionary",
-            entity_type="Algorithm",
-            exception=e
-        )
+    algorithm_service.set_live_algorithm_reference_dict(
+        reference_algorithm.alg_type,
+        reference_algorithm.alg_parameters
+    )
+    return RouteHelper.create_success_response("Live algorithm reference dictionary set successfully")
 
 
 @router.get("/__API__/set_reference_algorithm/{algorithm_type}")
+@handle_route_errors("set reference algorithm", "Algorithm", "algorithm_type")
 async def set_reference_algorithm(
         algorithm_type: str,
         algorithm_service: AlgorithmsService = Depends(get_service_by_type(AlgorithmsService))
 ) -> Dict[str, str]:
-    try:
-        algorithm_service.set_reference_algorithm(algorithm_type)
-        return RouteHelper.create_success_response("Reference algorithm set successfully")
-    except Exception as e:
-        raise create_error_response(
-            operation="set reference algorithm",
-            entity_type="Algorithm",
-            exception=e
-        )
+    algorithm_service.set_reference_algorithm(algorithm_type)
+    return RouteHelper.create_success_response("Reference algorithm set successfully")
 
 
 @router.get("/__API__/set_live_algorithm_reference")
+@handle_route_errors("set live algorithm reference", "Algorithm")
 async def set_live_algorithm_reference(
         algorithm_service: AlgorithmsService = Depends(get_service_by_type(AlgorithmsService))
 ) -> Dict[str, str]:
-    try:
-        algorithm_service.set_live_algorithm_reference()
-        return RouteHelper.create_success_response("Live algorithm reference set successfully")
-    except Exception as e:
-        raise create_error_response(
-            operation="set live algorithm reference",
-            entity_type="Algorithm",
-            exception=e
-        )
+    algorithm_service.set_live_algorithm_reference()
+    return RouteHelper.create_success_response("Live algorithm reference set successfully")
 
 
 @router.get("/__API__/reset_live_algorithm_reference")
+@handle_route_errors("reset live algorithm reference", "Algorithm")
 async def reset_live_algorithm_reference(
         algorithm_service: AlgorithmsService = Depends(get_service_by_type(AlgorithmsService))
 ) -> Dict[str, str]:
-    try:
-        algorithm_service.reset_reference_algorithm()
-        return RouteHelper.create_success_response("Live algorithm reference reset successfully")
-    except Exception as e:
-        raise create_error_response(
-            operation="reset live algorithm reference",
-            entity_type="Algorithm",
-            exception=e
-        )
+    algorithm_service.reset_reference_algorithm()
+    return RouteHelper.create_success_response("Live algorithm reference reset successfully")
 
 
 @router.post("/__API__/basic/edit_live_algorithm_field")
+@handle_route_errors("edit basic live algorithm field", "Algorithm")
 async def set_basic_live_algorithm(
         data: BasicAttribute,
         basic_algorithm_service: BasicAlgorithmsService = Depends(get_service_by_type(BasicAlgorithmsService))
 ) -> Dict[str, str]:
-    try:
-        basic_algorithm_service.edit_live_algorithm_field(data.idx, data.name, data.value)
-        return RouteHelper.create_success_response("Basic live algorithm field edited successfully")
-    except IndexError as e:
-        raise create_error_response(
-            operation="edit basic live algorithm field",
-            entity_type="Algorithm",
-            exception=e
-        )
-    except Exception as e:
-        raise create_error_response(
-            operation="edit basic live algorithm field",
-            entity_type="Algorithm",
-            exception=e
-        )
+    basic_algorithm_service.edit_live_algorithm_field(data.idx, data.name, data.value)
+    return RouteHelper.create_success_response("Basic live algorithm field edited successfully")
 
 
 @router.get("/__API__/basic/edit_live_algorithm/{custom_component_uid}")
+@handle_route_errors("set basic live algorithm repository", "Algorithm", "custom_component_uid")
 async def set_basic_live_algorithm_repository(
         custom_component_uid: str,
         custom_components_repository: CustomComponentsRepository = Depends(get_service_by_type(CustomComponentsRepository)),
         basic_algorithm_service: BasicAlgorithmsService = Depends(get_service_by_type(BasicAlgorithmsService))
 ) -> Dict[str, str]:
-    try:
-        component_dict = custom_components_repository.read_id(custom_component_uid)
-        component = CustomComponentModel(**component_dict)
+    component_dict = custom_components_repository.read_id(custom_component_uid)
+    component = CustomComponentModel(**component_dict)
 
-        if component:
-            for idx, algorithm in enumerate(component.algorithms):
-                basic_algorithm_service.edit_live_algorithm(idx, algorithm['parameters'])
-        
-        return RouteHelper.create_success_response("Basic live algorithm repository updated successfully")
-    except IndexError as e:
-        raise create_error_response(
-            operation="set basic live algorithm repository",
-            entity_type="Algorithm",
-            entity_id=custom_component_uid,
-            exception=e
-        )
-    except NoLiveAlgSet as e:
-        raise create_error_response(
-            operation="set basic live algorithm repository",
-            entity_type="Algorithm",
-            entity_id=custom_component_uid,
-            exception=e
-        )
-    except Exception as e:
-        raise create_error_response(
-            operation="set basic live algorithm repository",
-            entity_type="Algorithm",
-            entity_id=custom_component_uid,
-            exception=e
-        )
+    if component:
+        for idx, algorithm in enumerate(component.algorithms):
+            basic_algorithm_service.edit_live_algorithm(idx, algorithm['parameters'])
+    
+    return RouteHelper.create_success_response("Basic live algorithm repository updated successfully")
 
 
 @router.post("/__API__/basic/edit_live_algorithm")
+@handle_route_errors("set basic live algorithm from dict", "Algorithm")
 async def set_basic_live_algorithm_from_dict(
         data: List[Dict[str, Any]],
         basic_algorithm_service: BasicAlgorithmsService = Depends(get_service_by_type(BasicAlgorithmsService))
 ) -> Dict[str, str]:
-    try:
-        for idx, algorithm in enumerate(data):
-            basic_algorithm_service.edit_live_algorithm(idx, algorithm)
-        return RouteHelper.create_success_response("Basic live algorithm updated from dictionary successfully")
-    except IndexError as e:
-        raise create_error_response(
-            operation="set basic live algorithm from dictionary",
-            entity_type="Algorithm",
-            exception=e
-        )
-    except NoLiveAlgSet as e:
-        raise create_error_response(
-            operation="set basic live algorithm from dictionary",
-            entity_type="Algorithm",
-            exception=e
-        )
-    except Exception as e:
-        raise create_error_response(
-            operation="set basic live algorithm from dictionary",
-            entity_type="Algorithm",
-            exception=e
-        )
+    for idx, algorithm in enumerate(data):
+        basic_algorithm_service.edit_live_algorithm(idx, algorithm)
+    return RouteHelper.create_success_response("Basic live algorithm updated from dictionary successfully")
 
 
 @router.post("/__API__/basic/set_live_algorithm")
+@handle_route_errors("set live compound algorithm", "Algorithm")
 async def set_live_compound_algorithm(
         blocks: AlgorithmBlocks,
         basic_algorithm_service: BasicAlgorithmsService = Depends(get_service_by_type(BasicAlgorithmsService))
 ) -> Dict[str, str]:
-    try:
-        basic_algorithm_service.set_algorithm_types(blocks.types)
-        basic_algorithm_service.set_blocks(blocks.data_blocks)
-        basic_algorithm_service.set_live_algorithm()
-        return RouteHelper.create_success_response("Live compound algorithm set successfully")
-    except Exception as e:
-        raise create_error_response(
-            operation="set live compound algorithm",
-            entity_type="Algorithm",
-            exception=e
-        )
+    basic_algorithm_service.set_algorithm_types(blocks.types)
+    basic_algorithm_service.set_blocks(blocks.data_blocks)
+    basic_algorithm_service.set_live_algorithm()
+    return RouteHelper.create_success_response("Live compound algorithm set successfully")
 
 
 @router.post("/__API__/edit_live_algorithm")
+@handle_route_errors("edit live algorithm", "Algorithm")
 async def edit_live_algorithm(
         algorithm: Field,
         algorithm_service: AlgorithmsService = Depends(get_service_by_type(AlgorithmsService))
 ) -> Dict[str, str]:
-    try:
-        print(f"DEBUG: Editing live algorithm with key='{algorithm.key}', value type='{type(algorithm.value)}'")
-        
-        # Centralized validation
-        validator = SecurityValidator()
-        validation_result = validator.validate_algorithm_property(algorithm.key, algorithm.value)
-        
-        if not validation_result['valid']:
-            print(f"DEBUG: Validation failed: {validation_result['error_message']}")
-            raise HTTPException(
-                status_code=422,
-                detail={
-                    "error": True,
-                    "message": f"Invalid value for property '{algorithm.key}': {validation_result['error_message']}",
-                    "property": algorithm.key,
-                    "value_type": type(algorithm.value).__name__,
-                    "status_code": 422
-                }
-            )
-        
-        # Use sanitized value if available
-        final_value = validation_result['sanitized_value'] if validation_result['sanitized_value'] is not None else algorithm.value
-        
-        algorithm_service.edit_live_algorithm(algorithm.key, final_value)
-        return RouteHelper.create_success_response("Live algorithm edited successfully")
-        
-    except HTTPException:
-        # Re-raise HTTP exceptions (validation errors)
-        raise
-    except NoLiveAlgSet as e:
-        raise create_error_response(
-            operation="edit live algorithm",
-            entity_type="Algorithm",
-            exception=e
-        )
-    except Exception as e:
-        raise create_error_response(
-            operation="edit live algorithm",
-            entity_type="Algorithm",
-            exception=e
-        )
+    algorithm_service.edit_live_algorithm(algorithm.key, algorithm.value)
+    return RouteHelper.create_success_response("Live algorithm edited successfully")
 
 
 @router.post("/__API__/edit_reference_algorithm")
+@handle_route_errors("edit reference algorithm", "Algorithm")
 async def edit_reference_algorithm(
         field: Field,
         algorithm_service: AlgorithmsService = Depends(get_service_by_type(AlgorithmsService))
 ) -> Dict[str, str]:
     try:
-        print(f"DEBUG: Editing reference algorithm with key='{field.key}', value type='{type(field.value)}'")
-        
-        # Centralized validation
-        validator = SecurityValidator()
-        validation_result = validator.validate_algorithm_property(field.key, field.value)
-        
-        if not validation_result['valid']:
-            print(f"DEBUG: Validation failed: {validation_result['error_message']}")
-            raise HTTPException(
-                status_code=422,
-                detail={
-                    "error": True,
-                    "message": f"Invalid value for property '{field.key}': {validation_result['error_message']}",
-                    "property": field.key,
-                    "value_type": type(field.value).__name__,
-                    "status_code": 422
-                }
-            )
-        
-        # Use sanitized value if available
-        final_value = validation_result['sanitized_value'] if validation_result['sanitized_value'] is not None else field.value
-        
-        algorithm_service.edit_reference_algorithm(field.key, final_value)
+        algorithm_service.edit_reference_algorithm(field.key, field.value)
         return RouteHelper.create_success_response("Reference algorithm edited successfully")
-        
-    except HTTPException:
-        # Re-raise HTTP exceptions (validation errors)
-        raise
-    except NoLiveAlgSet as e:
-        print(f"DEBUG: NoLiveAlgSet error: {e}")
-        raise create_error_response(
-            operation="edit reference algorithm",
-            entity_type="Algorithm",
-            exception=e
-        )
     except Exception as e:
-        print(f"DEBUG: Exception in edit_reference_algorithm: {type(e).__name__}: {e}")
         raise create_error_response(
             operation="edit reference algorithm",
             entity_type="Algorithm",
@@ -637,7 +409,7 @@ async def process_live_component_image(
         
         proc_frames = []
         for image in alg_result.debugImages:
-            proc_frames.append(frame_to_base64(image))
+            proc_frames.append(frame_to_base64(image, quality=80).decode('utf-8'))
         
         result = {
             'frame': proc_frames,
@@ -670,7 +442,7 @@ async def process_reference_algorithm_image(
         
         proc_frames = []
         for image in alg_result.debugImages:
-            proc_frames.append(frame_to_base64(image).decode('utf-8'))
+            proc_frames.append(frame_to_base64(image, quality=80).decode('utf-8'))
         
         result = {
             'frame': proc_frames,
@@ -711,7 +483,7 @@ async def process_live_component(
         
         proc_frames = []
         for image in alg_result.debugImages:
-            proc_frames.append(frame_to_base64(image))
+            proc_frames.append(frame_to_base64(image, quality=80).decode('utf-8'))
         
         result = {
             'frame': proc_frames,
@@ -761,7 +533,7 @@ async def process_reference_algorithm_img_src(
         
         proc_frames = []
         for image in alg_result.debugImages:
-            proc_frames.append(frame_to_base64(image).decode('utf-8'))
+            proc_frames.append(frame_to_base64(image, quality=80).decode('utf-8'))
         
         result = {
             'frame': proc_frames,
@@ -818,7 +590,7 @@ async def process_live_compound_algorithm(
             out_image = np.zeros(shape=(128, 128), dtype=np.uint8)
         
         result = {
-            'frame': frame_to_base64(out_image),
+            'frame': frame_to_base64(out_image, quality=80),
             'results': results,
             'data': ''
         }
@@ -909,7 +681,7 @@ async def websocket_algorithm_img_src(
             proc_frames = []
 
             for image in alg_result.debugImages:
-                proc_frames.append(frame_to_base64(image).decode('utf-8'))
+                proc_frames.append(frame_to_base64(image, quality=80).decode('utf-8'))
 
             ret = {'frame': proc_frames,
                    'placeholder': ''}
@@ -959,7 +731,7 @@ async def websocket_algorithm_static(
             proc_frames = []
 
             for image in alg_result.debugImages:
-                proc_frames.append(frame_to_base64(image).decode('utf-8'))
+                proc_frames.append(frame_to_base64(image, quality=80).decode('utf-8'))
 
             ret = {
                 'frame': proc_frames,
@@ -1019,7 +791,7 @@ async def websocket_reference_img_src(
             proc_frames = []
 
             for image in alg_result.debugImages:
-                proc_frames.append(frame_to_base64(image).decode('utf-8'))
+                proc_frames.append(frame_to_base64(image, quality=80).decode('utf-8'))
 
             ret = {
                 'frame': proc_frames,
@@ -1072,7 +844,7 @@ async def websocket_reference_static(
             proc_frames = []
 
             for image in alg_result.debugImages:
-                proc_frames.append(frame_to_base64(image).decode('utf-8'))
+                proc_frames.append(frame_to_base64(image, quality=80).decode('utf-8'))
 
             ret = {
                 'frame': proc_frames,
@@ -1138,7 +910,7 @@ async def websocket_basic_algorithm_img_src(
                 raise HTTPException(status_code=500, detail=f'{e}')
 
             ret = {
-                'frame': frame_to_base64(out_image).decode('utf-8'),
+                'frame': frame_to_base64(out_image, quality=80).decode('utf-8'),
                 'results': results,
                 'data': ''
             }

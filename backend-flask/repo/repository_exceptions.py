@@ -4,8 +4,8 @@ class UidNotUnique(Exception):
 
 
 class UidNotFound(Exception):
-    def __init__(self):
-        super().__init__()
+    def __init__(self, message=None):
+        super().__init__(message or "Entity not found")
 
 
 class NoConfigurationChosen(Exception):

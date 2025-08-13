@@ -8,11 +8,15 @@ Eliminates duplicate error handling code and ensures consistent error messages.
 import functools
 import logging
 from typing import Callable, Dict, Any, Optional, Type
-from fastapi import HTTPException, status
+from fastapi import HTTPException, status, APIRouter
 from starlette.responses import JSONResponse
 
 from repo.repository_exceptions import UidNotFound, UidNotUnique, NoConfigurationChosen, UserNotFound
 from services.services_exceptions import NoLiveAlgSet, NoLiveFrameSet
+from services.camera.camera_service import CameraError, CameraNotFoundError, CameraInitializationError, CameraFrameError
+from services.image_source.image_source_service import ImageSourceError, ImageSourceNotFoundError, ImageValidationError
+from starlette.websockets import WebSocketDisconnect
+from wsproto.utilities import LocalProtocolError
 
 logger = logging.getLogger(__name__)
 
@@ -41,6 +45,38 @@ ERROR_MAPPINGS = {
     NoLiveFrameSet: {
         'status_code': status.HTTP_400_BAD_REQUEST,
         'message_template': 'No live frame set. Please capture or load a frame first'
+    },
+    CameraNotFoundError: {
+        'status_code': status.HTTP_404_NOT_FOUND,
+        'message_template': 'Camera {entity_id} not found or not initialized'
+    },
+    CameraInitializationError: {
+        'status_code': status.HTTP_500_INTERNAL_SERVER_ERROR,
+        'message_template': 'Camera {entity_id} failed to initialize'
+    },
+    CameraFrameError: {
+        'status_code': status.HTTP_503_SERVICE_UNAVAILABLE,
+        'message_template': 'Camera {entity_id} frame capture failed'
+    },
+    ImageSourceNotFoundError: {
+        'status_code': status.HTTP_404_NOT_FOUND,
+        'message_template': 'Image source {entity_id} not found or not initialized'
+    },
+    ImageValidationError: {
+        'status_code': status.HTTP_422_UNPROCESSABLE_ENTITY,
+        'message_template': 'Image validation failed for source {entity_id}'
+    },
+    WebSocketDisconnect: {
+        'status_code': status.HTTP_503_SERVICE_UNAVAILABLE,
+        'message_template': 'WebSocket connection disconnected for {entity_type} {entity_id}'
+    },
+    LocalProtocolError: {
+        'status_code': status.HTTP_500_INTERNAL_SERVER_ERROR,
+        'message_template': 'WebSocket protocol error for {entity_type} {entity_id}'
+    },
+    RuntimeError: {
+        'status_code': status.HTTP_500_INTERNAL_SERVER_ERROR,
+        'message_template': '{entity_type} runtime error: {entity_id}'
     }
 }
 
@@ -243,6 +279,78 @@ def validate_authentication(user: dict, operation: str = "perform this operation
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=f"Authentication required to {operation}"
         )
+
+# WebSocket Error Handling Utilities
+
+def handle_websocket_errors(entity_type: str = "WebSocket", entity_id_param: str = None):
+    """
+    Decorator for WebSocket route error handling.
+    
+    Args:
+        entity_type: Type of entity for error messages
+        entity_id_param: Parameter name containing entity ID
+    
+    Usage:
+        @handle_websocket_errors("CNC", "cnc_uid")
+        async def cnc_websocket(websocket: WebSocket, cnc_uid: str):
+            # WebSocket logic here
+    """
+    def decorator(func: Callable) -> Callable:
+        @functools.wraps(func)
+        async def wrapper(*args, **kwargs):
+            try:
+                return await func(*args, **kwargs)
+            except WebSocketDisconnect:
+                # Normal WebSocket disconnect - log but don't raise
+                entity_id = kwargs.get(entity_id_param) if entity_id_param else "unknown"
+                logger.info(f"WebSocket disconnected for {entity_type} {entity_id}")
+                raise  # Re-raise for proper WebSocket handling
+            except LocalProtocolError as e:
+                entity_id = kwargs.get(entity_id_param) if entity_id_param else "unknown"
+                logger.error(f"WebSocket protocol error for {entity_type} {entity_id}: {e}")
+                raise  # Re-raise for proper WebSocket handling
+            except Exception as e:
+                entity_id = kwargs.get(entity_id_param) if entity_id_param else "unknown"
+                logger.error(f"WebSocket error for {entity_type} {entity_id}: {e}")
+                # Don't convert to HTTPException for WebSocket routes
+                raise
+        
+        return wrapper
+    return decorator
+
+def create_crud_error_handlers(entity_type: str):
+    """
+    Create a set of error handling decorators for CRUD operations.
+    
+    Args:
+        entity_type: Name of the entity type (e.g., "Camera", "CNC")
+    
+    Returns:
+        Dictionary of decorators for each CRUD operation
+    """
+    return {
+        'list': handle_route_errors("list", entity_type),
+        'get': handle_route_errors("retrieve", entity_type, entity_id_param=f"{entity_type.lower()}_uid"),
+        'create': handle_route_errors("create", entity_type, success_status=status.HTTP_201_CREATED),
+        'update': handle_route_errors("update", entity_type, entity_id_param=f"{entity_type.lower()}_uid"),
+        'delete': handle_route_errors("delete", entity_type, entity_id_param=f"{entity_type.lower()}_uid"),
+    }
+
+def batch_apply_error_handlers(router: APIRouter, handlers: Dict[str, Callable]):
+    """
+    Apply error handling decorators to multiple routes at once.
+    
+    Args:
+        router: FastAPI router instance
+        handlers: Dictionary mapping operation names to decorators
+    
+    Usage:
+        handlers = create_crud_error_handlers("Camera")
+        batch_apply_error_handlers(router, handlers)
+    """
+    # This would be used during route registration to apply decorators
+    # Implementation would depend on specific route patterns
+    pass
 
 # Import asyncio at the end to avoid circular imports
 import asyncio

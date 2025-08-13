@@ -8,7 +8,7 @@
         <button
           class="button-wide command-button"
           @click="executeCommand('home')"
-          :disabled="isExecuting"
+          :disabled="isExecuting || !isConnected"
         >
           <div class="button-container">
             <div class="button-icon">
@@ -23,7 +23,7 @@
         <button
           class="button-wide command-button"
           @click="executeCommand('soft_reset')"
-          :disabled="isExecuting"
+          :disabled="isExecuting || !isConnected"
         >
           <div class="button-container">
             <div class="button-icon">
@@ -38,7 +38,7 @@
         <button
           class="button-wide command-button"
           @click="executeCommand('unlock')"
-          :disabled="isExecuting"
+          :disabled="isExecuting || !isConnected"
         >
           <div class="button-container">
             <div class="button-icon">
@@ -55,7 +55,7 @@
         <button
           class="button-wide command-button"
           @click="executeCommand('abort')"
-          :disabled="isExecuting"
+          :disabled="isExecuting || !isConnected"
         >
           <div class="button-container">
             <div class="button-icon">
@@ -70,7 +70,7 @@
         <button
           class="button-wide command-button"
           @click="executeCommand('zero_reset')"
-          :disabled="isExecuting"
+          :disabled="isExecuting || !isConnected"
         >
           <div class="button-container">
             <div class="button-icon">
@@ -85,7 +85,7 @@
         <button
           class="button-wide command-button"
           @click="executeCommand('return_to_zero')"
-          :disabled="isExecuting"
+          :disabled="isExecuting || !isConnected"
         >
           <div class="button-container">
             <div class="button-icon">
@@ -103,7 +103,7 @@
 
 <script>
 import { ref } from "vue";
-import { useStore } from "vuex";
+import { useCncStore } from '@/composables/useStore';
 
 export default {
   name: "GeneralCommands",
@@ -111,11 +111,15 @@ export default {
     axisUid: {
       type: String,
       required: true
+    },
+    isConnected: {
+      type: Boolean,
+      default: false
     }
   },
   emits: ['command-executed'],
   setup(props, { emit }) {
-    const store = useStore();
+    const cncStore = useCncStore();
     const isExecuting = ref(false);
 
     async function executeCommand(command) {
@@ -124,7 +128,7 @@ export default {
       try {
         isExecuting.value = true;
         
-        await store.dispatch("cnc/api_command", {
+        await cncStore.apiCommand({
           cncUid: props.axisUid,
           command: command,
         });

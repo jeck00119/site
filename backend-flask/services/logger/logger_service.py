@@ -29,6 +29,7 @@ class Logger(metaclass=Singleton):
 class AppLogger(Logger):
     def __init__(self):
         super(AppLogger, self).__init__()
+        self.create_handler()
 
     def create_handler(self):
         self.handler = FileHandler(file_path="app.log")

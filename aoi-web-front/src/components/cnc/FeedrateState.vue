@@ -48,8 +48,9 @@
 </template>
 
 <script>
-import { ref, computed, watch } from "vue";
-import { useStore } from "vuex";
+import { ref, computed, watch, onMounted } from "vue";
+import { useCncStore } from '@/composables/useStore';
+import { createLogger } from '@/utils/logger';
 
 export default {
   name: "FeedrateState",
@@ -65,8 +66,12 @@ export default {
   },
   emits: ['connect-requested', 'disconnect-requested'],
   setup(props, { emit }) {
-    const store = useStore();
+    const logger = createLogger('FeedrateState');
     const isConnecting = ref(false);
+    
+    // Use centralized CNC store composable
+    const { cncState, dispatch } = useCncStore(props.axisUid);
+    const { store } = useCncStore(); // For remaining getters
 
     const isConnected = computed(() => {
       return props.connectionStatus.toLowerCase() === 'connected';
@@ -98,7 +103,7 @@ export default {
     });
 
     const displayState = computed(() => {
-      const state = store.getters["cnc/cncState"](props.axisUid);
+      const state = cncState?.value;
       return state ? state.toUpperCase() : 'UNKNOWN';
     });
 
@@ -139,7 +144,11 @@ export default {
 
     // Watch for firmware changes or updates
     watch(firmwareType, (newType) => {
-      console.log(`CNC ${props.axisUid} firmware: ${newType}`);
+      logger.info('Firmware type changed', { axisUid: props.axisUid, firmwareType: newType });
+    });
+    
+    watch(displayState, (newState) => {
+      logger.debug('CNC state changed', { axisUid: props.axisUid, state: newState });
     });
 
 
@@ -150,20 +159,26 @@ export default {
         isConnecting.value = true;
         
         if (isConnected.value) {
-          // Disconnect
+          logger.debug('Disconnecting CNC', { axisUid: props.axisUid });
           emit('disconnect-requested');
         } else {
-          // Connect
+          logger.debug('Connecting CNC', { axisUid: props.axisUid });
           emit('connect-requested');
         }
         
         // Add a delay to show the connecting state
         await new Promise(resolve => setTimeout(resolve, 1000));
         
+      } catch (error) {
+        logger.error('Connection toggle failed', error);
       } finally {
         isConnecting.value = false;
       }
     }
+    
+    onMounted(() => {
+      logger.lifecycle('mounted', 'FeedrateState component mounted', { axisUid: props.axisUid });
+    });
 
     return {
       displayState,
@@ -182,45 +197,48 @@ export default {
 
 <style scoped>
 .feedrate-grid {
-  color: white;
+  color: var(--color-text-secondary);
   justify-content: space-around;
   align-items: center;
   display: flex;
   flex-direction: column;
   width: 100%;
-  border-radius: 8px;
-  padding: 0.5rem;
+  border-radius: var(--border-radius-lg);
+  padding: var(--space-2);
+  background-color: var(--cnc-position-bg);
+  border: var(--border-width-1) solid var(--cnc-position-border);
 }
 
 
 .state {
-  font-size: 1.3rem;
-  font-weight: bold;
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-bold);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   text-align: center;
+  color: var(--color-text-secondary);
 }
 
 .state-section {
   display: flex;
   justify-content: center;
   width: 100%;
-  padding: 0.5rem;
+  padding: var(--space-2);
 }
 
 .connection-section {
   display: flex;
   justify-content: center;
   width: 100%;
-  padding: 0.5rem;
+  padding: var(--space-2);
 }
 
 .section-divider {
-  border: none;
-  height: 1px;
-  background-color: rgba(255, 255, 255, 0.2);
-  margin: 0.5rem 0;
+  border: var(--border-width-0);
+  height: var(--border-width-1);
+  background-color: var(--color-border-secondary);
+  margin: var(--space-2) var(--space-0);
   width: 100%;
 }
 
@@ -228,137 +246,143 @@ export default {
   display: flex;
   justify-content: center;
   align-items: center;
+  gap: var(--space-2);
 }
 
 
 
 
 .button-connect {
-  background-color: rgb(61, 61, 61);
-  color: white;
-  border: 1px solid rgb(81, 81, 81);
-  border-radius: 8px;
-  padding: 0.8rem 1.5rem;
+  background-color: var(--color-bg-tertiary);
+  color: var(--color-text-secondary);
+  border: var(--border-width-1) solid var(--color-border-secondary);
+  border-radius: var(--border-radius-lg);
+  padding: var(--space-3) var(--space-6);
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: var(--transition-button);
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 0.5rem;
-  font-size: 1.1rem;
-  font-weight: bold;
+  gap: var(--space-2);
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-bold);
   min-width: 120px;
-  height: 45px;
+  min-height: var(--touch-target-min);
 }
 
 .button-connect:hover:not(:disabled) {
-  background-color: rgb(71, 71, 71);
+  background-color: var(--color-bg-secondary);
   transform: translateY(-1px);
+  box-shadow: var(--shadow-button-hover);
 }
 
 .button-connect.connected {
-  background-color: #F44336;
-  border-color: #d32f2f;
+  background-color: var(--color-error);
+  border-color: var(--color-error-dark);
 }
 
 .button-connect.connected:hover:not(:disabled) {
-  background-color: #d32f2f;
+  background-color: var(--color-error-dark);
 }
 
 .button-connect:not(.connected):hover:not(:disabled) {
-  background-color: #4CAF50;
-  border-color: #45a049;
+  background-color: var(--color-success);
+  border-color: var(--color-success-dark);
 }
 
 .button-connect:disabled {
   opacity: 0.6;
   cursor: not-allowed;
   transform: none;
+  background-color: var(--color-bg-tertiary);
+  color: var(--color-text-disabled);
 }
 
 .firmware-section {
   display: flex;
   flex-direction: column;
   width: 100%;
-  gap: 0.5rem;
+  gap: var(--space-2);
 }
 
 .firmware-info {
   display: flex;
   align-items: center;
-  padding: 0 0.5rem;
-  gap: 0.5rem;
+  padding: var(--space-0) var(--space-2);
+  gap: var(--space-2);
 }
 
 .firmware-version {
   display: flex;
   align-items: center;
-  padding: 0 0.5rem;
-  gap: 0.5rem;
+  padding: var(--space-0) var(--space-2);
+  gap: var(--space-2);
 }
 
 .firmware-label {
-  font-weight: bold;
-  font-size: 1rem;
+  font-weight: var(--font-weight-bold);
+  font-size: var(--font-size-base);
   white-space: nowrap;
+  color: var(--color-text-secondary);
 }
 
 .firmware-value {
-  font-weight: bold;
-  color: rgb(224, 181, 102);
-  font-size: 1.1rem;
+  font-weight: var(--font-weight-bold);
+  color: var(--color-primary-light);
+  font-size: var(--font-size-lg);
 }
 
 .version-label {
-  font-size: 0.9rem;
+  font-size: var(--font-size-sm);
   white-space: nowrap;
+  color: var(--color-text-secondary);
 }
 
 .version-value {
-  font-weight: bold;
-  color: rgb(204, 161, 82);
-  font-size: 0.9rem;
+  font-weight: var(--font-weight-bold);
+  color: var(--color-primary);
+  font-size: var(--font-size-sm);
 }
 
-/* CNC State Colors */
+/* CNC State Colors using design tokens */
 .state-idle {
-  color: #4CAF50 !important; /* Green - Ready */
+  color: var(--color-success) !important;
 }
 
 .state-running {
-  color: #2196F3 !important; /* Blue - Active */
+  color: var(--color-info) !important;
 }
 
 .state-hold {
-  color: #FF9800 !important; /* Orange - Paused */
+  color: var(--color-warning) !important;
 }
 
 .state-jog {
-  color: #9C27B0 !important; /* Purple - Manual movement */
+  color: var(--color-primary) !important;
 }
 
 .state-alarm {
-  color: #F44336 !important; /* Red - Error/Alarm */
+  color: var(--color-error) !important;
 }
 
 .state-door {
-  color: #FF5722 !important; /* Deep Orange - Safety door */
+  color: var(--color-error-light) !important;
 }
 
 .state-check {
-  color: #FFEB3B !important; /* Yellow - Check mode */
+  color: var(--color-warning-light) !important;
 }
 
 .state-home {
-  color: #00BCD4 !important; /* Cyan - Homing */
+  color: var(--color-info-light) !important;
 }
 
 .state-sleep {
-  color: #9E9E9E !important; /* Gray - Sleep mode */
+  color: var(--color-text-muted) !important;
 }
 
 .state-unknown {
-  color: #795548 !important; /* Brown - Unknown state */
+  color: var(--color-text-tertiary) !important;
 }
 
 
@@ -367,6 +391,10 @@ export default {
   0% { opacity: 1; }
   50% { opacity: 0.5; }
   100% { opacity: 1; }
+}
+
+.button-connect.connecting {
+  animation: pulse 2s infinite;
 }
 </style>
 

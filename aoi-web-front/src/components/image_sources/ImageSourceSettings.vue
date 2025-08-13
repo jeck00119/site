@@ -59,7 +59,7 @@
                                 Add Camera
                             </button>
                             <button class="submenu-button" @click="deleteCamera">
-                                <font-awesome-icon icon="fa-trash" size="l"/>
+                                <font-awesome-icon icon="fa-trash" size="lg"/>
                                 Delete
                             </button>
                             <base-dialog :show="showAddCamDialog" :title="'Add Camera'" @close="closeDialog">
@@ -144,8 +144,9 @@
                                     </div>
                                     <div class="cs-wrapper" v-if="setting.type === 'dropdown'">
                                         <div class="cs-container">
-                                            <base-dropdown id="camera-type" name="resolution" :values="setting.values"
-                                                :current="currentCameraSettings[setting.name]"
+                                            <base-dropdown id="camera-type" :name="setting.name" 
+                                                :values="getDropdownValues(setting.name, setting.values)"
+                                                :current="getDropdownCurrentValue(setting.name, currentCameraSettings[setting.name], setting.values)"
                                                 @update-value="updateCurrentValue">
                                             </base-dropdown>
                                         </div>
@@ -167,7 +168,7 @@
                                     </div>
                                     <div class="cs-wrapper" v-else-if="setting.type === 'bool'">
                                         <div class="cs-container">
-                                            <base-checkbox :current="getCheckBoxValue(currentCameraSettings[setting.name])"
+                                            <base-checkbox :current="getCheckBoxValue(getDropdownCurrentValue(setting.name, currentCameraSettings[setting.name]))"
                                                 :name="setting.name.toUpperCase()"
                                                 @update-value="updateCheckBoxValue"></base-checkbox>
                                         </div>
@@ -262,7 +263,7 @@
                                     FPS:
                                 </label>
                                 <div class="input-container">
-                                    <input type="number" class="number-input" v-model="fps">
+                                    <input type="number" class="number-input" v-model="fps" @input="onFpsInputChange" @change="onFpsInputChange">
                                 </div>
                             </div>
                         </div>
@@ -297,8 +298,8 @@
 
 <script>
 import { computed, onMounted, ref, toRef, watch } from 'vue';
-import { useStore } from 'vuex';
 
+import { useCameraStore, useImageSourcesStore, useCncStore } from '@/composables/useStore';
 import useNotification from '../../hooks/notifications.js';
 
 
@@ -309,6 +310,11 @@ export default {
     emits: ['generator-updated', 'camera-updated', 'camera-settings-updated', 'fps-updated', 'show-camera', 'save-photo', 'save-src-status', 'save-settings-status'],
 
     setup(props, context) {
+        // Initialize centralized store composables
+        const cameraStore = useCameraStore();
+        const imageSourcesStore = useImageSourcesStore();
+        const cncStore = useCncStore();
+        const { store } = cameraStore; // Keep raw store access for missing methods
 
         const cameraSettings = ref({
             resolution: '',
@@ -341,8 +347,6 @@ export default {
         const {showNotification, notificationMessage, notificationIcon, notificationTimeout, 
             setNotification, clearNotification} = useNotification();
 
-        const store = useStore();
-
         const selectedCameraUid = ref("")
         const currentCameraSettingsUid = ref("");
 
@@ -354,6 +358,10 @@ export default {
         const selectedDirectory = ref("");
 
         const currentImageSource = toRef(props, 'currentImageSource');
+        
+        watch(() => props.type, (newValue) => {
+            // Handle type changes
+        }, { immediate: true });
 
         const folderExistsFlag = ref(false);
         const newFolderFlag = ref(false);
@@ -380,25 +388,18 @@ export default {
             auto_focus: "fa-wand-magic-sparkles"
         };
 
-        const imageGeneratorsList = computed(function () {
-            return store.getters["imageSources/getImageGenerators"];
-        })
+        // These are already computed refs from the composables
 
-        const camerasList = computed(function () {
-            return store.getters["cameraSettings/allCameras"];
-        });
 
-        const cameraSettingsList = computed(function () {
-            return store.getters["cameraSettings/allCameraSettings"];
-        });
+        const imageGeneratorsList = imageSourcesStore.imageSources;
 
-        const currentCameraSettings = computed(function () {
-            return store.getters["cameraSettings/getCurrentCameraSettings"];
-        });
+        const camerasList = cameraStore.cameras;
 
-        const currentCamera = computed(function() {
-            return store.getters["cameraSettings/getCurrentCamera"];
-        });
+        const cameraSettingsList = cameraStore.cameraSettings;
+
+        const currentCameraSettings = cameraStore.currentCameraSettings;
+
+        const currentCamera = cameraStore.selectedCamera;
 
         function getCheckBoxValue(value) {
             if(value)
@@ -407,13 +408,53 @@ export default {
                 return false;
         }
 
+        function getDropdownValues(settingName, values) {
+            // Convert resolution arrays to strings for the dropdown
+            if (settingName === 'resolution' && Array.isArray(values)) {
+                return values.map(val => {
+                    if (Array.isArray(val) && val.length === 2) {
+                        return `${val[0]}x${val[1]}`;
+                    }
+                    return val;
+                });
+            }
+            return values;
+        }
+
+        function getDropdownCurrentValue(settingName, currentValue, availableValues) {
+            // Handle resolution array - convert to string format
+            if (settingName === 'resolution' && Array.isArray(currentValue)) {
+                // Current value is [640, 480], convert to "640x480"
+                if (currentValue.length === 2) {
+                    const resolutionString = `${currentValue[0]}x${currentValue[1]}`;
+                    console.log(`ImageSourceSettings - Converting resolution ${JSON.stringify(currentValue)} to "${resolutionString}"`);
+                    return resolutionString;
+                }
+            }
+            
+            // Handle field name mapping for auto_exposure -> autoExposure, auto_focus -> autoFocus
+            if (settingName === 'auto_exposure' && currentValue === undefined) {
+                const mappedValue = currentCameraSettings.value?.autoExposure;
+                console.log(`ImageSourceSettings - mapping auto_exposure to autoExposure: ${mappedValue}`);
+                return mappedValue;
+            }
+            
+            if (settingName === 'auto_focus' && currentValue === undefined) {
+                const mappedValue = currentCameraSettings.value?.autoFocus;
+                console.log(`ImageSourceSettings - mapping auto_focus to autoFocus: ${mappedValue}`);
+                return mappedValue;
+            }
+            
+            return currentValue;
+        }
+
         function addCamera() {
-            store.dispatch("cameraSettings/addCamera", newCamera.value);
+            cameraStore.addCamera(newCamera.value);
             closeDialog();
         }
 
         function deleteCamera() {
-            store.dispatch("cameraSettings/removeCamera", selectedCamera.value);
+            cameraStore.removeCamera(selectedCamera.value);
         }
 
         function setCameraSettingsVisibility() {
@@ -424,20 +465,27 @@ export default {
 
                 const defaultSettings = store.getters["cameraSettings/getCurrentCameraDefaultSettings"];
 
-                store.dispatch("cameraSettings/setCurrentCameraConfig", defaultSettings);
+                cameraStore.setCurrentCameraConfig(defaultSettings);
 
-                store.dispatch("cameraSettings/loadCameraSettingsFromObject", {
+                cameraStore.loadCameraSettingsFromObject({
                     cameraUid: selectedCameraUid.value,
                     settings: defaultSettings
                 });
 
-                store.dispatch("cameraSettings/setCurrentCameraConfigName", newCameraSettingsName.value);
-                store.dispatch("cameraSettings/setCurrentCameraConfigCameraType", currentCamera.value.cameraType);
+                cameraStore.setCurrentCameraConfigName(newCameraSettingsName.value);
+                cameraStore.setCurrentCameraConfigCameraType(currentCamera.value.cameraType);
             }
         }
 
         async function loadCameraSettings(cameraUid) {
-            await store.dispatch("cameraSettings/fetchCameraSettingsList", cameraUid);
+            try {
+                console.log('ImageSourceSettings - loadCameraSettings called with cameraUid:', cameraUid);
+                await cameraStore.fetchCameraSettingsList(cameraUid);
+                console.log('ImageSourceSettings - fetchCameraSettingsList completed successfully');
+            } catch (error) {
+                console.error('ImageSourceSettings - loadCameraSettings error:', error);
+                throw error;
+            }
         }
 
         function loadSettingsToCamera() {
@@ -445,11 +493,125 @@ export default {
                 cameraUid: selectedCameraUid.value,
                 cameraSettingUid: currentCameraSettingsUid.value
             }
-            store.dispatch("cameraSettings/loadCameraSettingsToCamera", payload)
+            cameraStore.loadCameraSettingsToCamera(payload)
         }
 
         function toggleSetting(setting) {
+            console.log('🚀 ImageSourceSettings - toggleSetting called with:', setting);
+            console.log('ImageSourceSettings - current props.type:', props.type);
+            console.log('ImageSourceSettings - current selectedSetting before:', selectedSetting.value);
             selectedSetting.value = setting;
+            console.log('ImageSourceSettings - current selectedSetting after:', selectedSetting.value);
+            
+            // Debug camera data when Camera button is clicked
+            if (setting === 'Camera') {
+                console.log('ImageSourceSettings - DEBUG Camera button clicked:');
+                console.log('ImageSourceSettings - camerasList:', camerasList.value);
+                console.log('ImageSourceSettings - camerasList length:', camerasList.value?.length);
+                console.log('ImageSourceSettings - selectedCameraUid:', selectedCameraUid.value);
+            }
+            
+            // Debug camera settings data when Camera Settings button is clicked
+            if (setting === 'Camera Settings') {
+                console.log('ImageSourceSettings - DEBUG Camera Settings button clicked:');
+                console.log('ImageSourceSettings - currentCameraSettings:', currentCameraSettings.value);
+                console.log('ImageSourceSettings - cameraControls:', computed(() => store.getters["cameraSettings/getcameraControls"]).value);
+                
+                // Debug individual setting values AND their processed values
+                const controls = computed(() => store.getters["cameraSettings/getcameraControls"]).value;
+                if (controls && currentCameraSettings.value) {
+                    console.log('ImageSourceSettings - Analyzing all fields:');
+                    console.log('-------------------------------------------');
+                    controls.forEach(control => {
+                        const rawValue = currentCameraSettings.value[control.name];
+                        const processedValue = control.type === 'dropdown' 
+                            ? getDropdownCurrentValue(control.name, rawValue)
+                            : control.type === 'bool'
+                            ? getCheckBoxValue(getDropdownCurrentValue(control.name, rawValue))
+                            : rawValue;
+                        
+                        console.log(`Field: ${control.name}`);
+                        console.log(`  Type: ${control.type}`);
+                        console.log(`  Raw Value: ${JSON.stringify(rawValue)} (${typeof rawValue})`);
+                        console.log(`  Processed Value: ${JSON.stringify(processedValue)} (${typeof processedValue})`);
+                        console.log(`  Control Values/Range: ${JSON.stringify(control.values)}`);
+                        
+                        // Check for issues
+                        if (rawValue === undefined) {
+                            console.log(`  ⚠️ WARNING: Value is undefined!`);
+                        }
+                        if (Array.isArray(rawValue) && control.type === 'dropdown') {
+                            console.log(`  ⚠️ WARNING: Array value for dropdown!`);
+                        }
+                        if (control.type === 'dropdown' && control.values) {
+                            const isValidOption = control.values.some(opt => {
+                                if (Array.isArray(opt) && opt.length === 2) {
+                                    // Option is [value, label] format
+                                    return opt[0] === processedValue;
+                                }
+                                return opt === processedValue;
+                            });
+                            if (!isValidOption && processedValue !== undefined) {
+                                console.log(`  ⚠️ WARNING: Processed value "${processedValue}" not in options!`);
+                            }
+                        }
+                        console.log('---');
+                    });
+                }
+            }
+            
+            // Debug CNC locations when CNC Locations button is clicked
+            if (setting === 'CNC Locations') {
+                console.log('ImageSourceSettings - DEBUG CNC Locations button clicked:');
+                console.log('ImageSourceSettings - locationsList:', cncStore.locations.value);
+                console.log('ImageSourceSettings - locationsList length:', cncStore.locations.value?.length);
+                console.log('ImageSourceSettings - current location.value:', location.value);
+                console.log('ImageSourceSettings - current settleTime.value:', settleTime.value);
+                console.log('ImageSourceSettings - current activateLocation.value:', activateLocation.value);
+                console.log('ImageSourceSettings - cnc store state:', store.state.cnc);
+                console.log('ImageSourceSettings - cnc store raw locations:', store.state.cnc?.locations);
+                
+                // Check if locations need to be loaded
+                if (!cncStore.locations.value || cncStore.locations.value.length === 0) {
+                    console.log('ImageSourceSettings - ℹ️ INFO: Locations list is empty - this may be normal if no CNC locations have been configured');
+                    console.log('ImageSourceSettings - Attempting to reload locations to double-check...');
+                    // Try to reload locations when clicking the button
+                    try {
+                        cncStore.loadLocations().then(() => {
+                            console.log('ImageSourceSettings - loadLocations() completed successfully');
+                            console.log('ImageSourceSettings - reloaded locations:', cncStore.locations.value);
+                            console.log('ImageSourceSettings - reloaded locations length:', cncStore.locations.value?.length);
+                            
+                            if (!cncStore.locations.value || cncStore.locations.value.length === 0) {
+                                console.log('ImageSourceSettings - ✅ CONFIRMED: No CNC locations are configured in this system');
+                                console.log('ImageSourceSettings - 💡 TIP: CNC locations would be created in the CNC/Tools section of the application');
+                                console.log('ImageSourceSettings - The dropdown will remain empty until locations are added');
+                            }
+                        }).catch(error => {
+                            console.error('ImageSourceSettings - error in loadLocations() promise:', error);
+                        });
+                        console.log('ImageSourceSettings - loadLocations() called successfully');
+                    } catch (error) {
+                        console.error('ImageSourceSettings - error calling loadLocations():', error);
+                    }
+                } else {
+                    console.log('ImageSourceSettings - Locations loaded successfully:');
+                    cncStore.locations.value.forEach((loc, index) => {
+                        console.log(`  Location ${index}: name="${loc.name}" uid="${loc.uid}"`);
+                        
+                        // Check if current location value matches any of the available locations
+                        if (location.value === loc.name) {
+                            console.log(`  ✓ Current location "${location.value}" matches this entry`);
+                        }
+                    });
+                    
+                    // Verify the current location value exists in the list
+                    const locationExists = cncStore.locations.value.some(loc => loc.name === location.value);
+                    if (location.value && !locationExists) {
+                        console.log(`ImageSourceSettings - ⚠️ WARNING: Current location "${location.value}" not found in locations list`);
+                    }
+                }
+            }
         }
 
         function closeDialog() {
@@ -482,7 +644,7 @@ export default {
                         if (file.type.startsWith("image")) {
                             const formData = new FormData();
                             formData.append('file', file);
-                            await store.dispatch("imageSources/uploadImagesFromGenerator", formData);
+                            await imageSourcesStore.uploadImagesFromGenerator(formData);
                         }
                         else {
                             setNotification(3000, `${file.name} is not an image.`, 'bi-exclamation-circle-fill');
@@ -494,9 +656,9 @@ export default {
                     const gen = imageGeneratorsList.value[foundIdx];
                     generatorChanged(gen.uid);
 
-                    store.dispatch("imageSources/setCurrentImageGenerator", gen);
+                    imageSourcesStore.setCurrentImageGenerator(gen);
 
-                    store.dispatch("imageSources/setCurrentImageGeneratorProp", {
+                    imageSourcesStore.setCurrentImageGeneratorProp({
                         key: "dir_path",
                         value: gen.dir_path
                     });
@@ -504,8 +666,8 @@ export default {
                     folderExistsFlag.value = false;
                 }
                 else {
-                    await store.dispatch("imageSources/addImageGenerator");
-                    store.dispatch("imageSources/loadImageGeneratorAsCurrent", props.currentImageGenerator.uid);
+                    await imageSourcesStore.addImageGenerator();
+                    imageSourcesStore.loadImageGeneratorAsCurrent(props.currentImageGenerator.uid);
                     newFolderFlag.value = !newFolderFlag.value;
                 }
             }
@@ -515,44 +677,106 @@ export default {
             generatorChanged(props.currentImageGenerator.uid);
         });
 
+        // Watch currentCameraSettingsUid for all changes
+        watch(currentCameraSettingsUid, (newValue, oldValue) => {
+            // Handle camera settings UID changes
+        }, { immediate: true });
+
         watch(currentImageSource, async (newValue) => {
+            console.log('ImageSourceSettings - currentImageSource changed:', newValue);
             if(newValue)
             {
-                fps.value = newValue.fps;
-                location.value = newValue.locationName;
-                settleTime.value = newValue.settleTime;
-                activateLocation.value = newValue.activateLocation;
+                console.log('ImageSourceSettings - setting values from:', newValue);
+                console.log('ImageSourceSettings - setting fps.value to:', newValue.fps, 'current fps.value:', fps.value);
+                fps.value = newValue.fps || 1;
+                location.value = newValue.location_name;
+                settleTime.value = newValue.settle_time;
+                activateLocation.value = newValue.activate_location;
 
-                if (newValue.imageSourceType === "dynamic") {
-                    selectedCameraUid.value = newValue.cameraUid;
-
-                    if (newValue.cameraSettingsUid != "" && newValue.cameraUid != "") {
-                        await loadCameraSettings(newValue.cameraUid);
-
-                        selectedCameraUid.value = newValue.cameraUid;
-                        currentCameraSettingsUid.value = newValue.cameraSettingsUid;
+                if (newValue.image_source_type === "dynamic" && newValue.camera_uid) {
+                    console.log('ImageSourceSettings - dynamic source, camera_uid:', newValue.camera_uid);
+                    
+                    if (newValue.camera_settings_uid && newValue.camera_settings_uid !== "") {
+                        console.log('ImageSourceSettings - loading camera settings for camera:', newValue.camera_uid);
+                        console.log('ImageSourceSettings - setting camera_settings_uid to:', newValue.camera_settings_uid);
+                        try {
+                            await loadCameraSettings(newValue.camera_uid);
+                            console.log('ImageSourceSettings - About to set currentCameraSettingsUid to:', newValue.camera_settings_uid);
+                            
+                            // Set currentCameraSettingsUid BEFORE setting selectedCameraUid to avoid race condition
+                            currentCameraSettingsUid.value = newValue.camera_settings_uid;
+                            console.log('ImageSourceSettings - currentCameraSettingsUid.value is now:', currentCameraSettingsUid.value);
+                        } catch (error) {
+                            console.error('ImageSourceSettings - error in loadCameraSettings:', error);
+                            // Continue execution but log the error
+                        }
                     }
+                    
+                    // Set selectedCameraUid AFTER setting currentCameraSettingsUid
+                    selectedCameraUid.value = newValue.camera_uid;
+                    console.log('ImageSourceSettings - selectedCameraUid set to:', newValue.camera_uid);
                 }
             }
         });
 
         watch(fps, (newValue) => {
+            console.log('ImageSourceSettings - FPS changed, updating store immediately:', { newValue, currentImageSource: props.currentImageSource });
+            
+            // Immediately update the image source in the store with the new FPS
+            if (props.currentImageSource && newValue != null) {
+                const updatedImageSource = {
+                    ...props.currentImageSource,
+                    fps: newValue
+                };
+                
+                // Update the store immediately
+                imageSourcesStore.setCurrentImageSource(updatedImageSource);
+                imageSourcesStore.updateImageSource(updatedImageSource);
+                
+                console.log('ImageSourceSettings - Store updated with new FPS:', newValue);
+            }
+            
             fpsChanged(newValue);
         });
 
-        watch(selectedCameraUid, (newValue) => {
-            store.dispatch("cameraSettings/fetchCameraSettingsList", newValue);
-            store.dispatch('cameraSettings/fetchCamera', newValue);
+        watch(selectedCameraUid, async (newValue) => {
+            console.log('ImageSourceSettings - selectedCameraUid watcher fired with:', newValue);
+            if (newValue && newValue !== "") {
+                // Ensure cameras list is loaded
+                if (camerasList.value.length === 0) {
+                    console.log('ImageSourceSettings - cameras list is empty, fetching...');
+                    try {
+                        await cameraStore.fetchCamerasList();
+                        console.log('ImageSourceSettings - cameras list fetched in watcher:', camerasList.value.length);
+                        console.log('ImageSourceSettings - cameras list content:', camerasList.value);
+                        console.log('ImageSourceSettings - store state after fetch:', store.state.cameraSettings);
+                    } catch (error) {
+                        console.error('ImageSourceSettings - error fetching cameras list in watcher:', error);
+                    }
+                }
+                
+                cameraStore.fetchCameraSettingsList(newValue);
+                cameraStore.fetchCamera(newValue);
+                cameraChanged(newValue);
+            }
             showCameraControls.value = false;
-            currentCameraSettingsUid.value = "";
-            cameraChanged(newValue);
+            // Don't reset currentCameraSettingsUid here - it should be managed by the currentImageSource watcher
+            console.log('ImageSourceSettings - selectedCameraUid watcher complete, currentCameraSettingsUid:', currentCameraSettingsUid.value);
         });
 
         watch(currentCameraSettingsUid, async (newValue) => {
+            console.log('ImageSourceSettings - currentCameraSettingsUid watcher fired with:', newValue);
+            console.log('ImageSourceSettings - ignoreSettingsChange.value:', ignoreSettingsChange.value);
             if (newValue != "" && !ignoreSettingsChange.value) {
-                await store.dispatch("cameraSettings/fetchCameraSettings", newValue)
-                await store.dispatch("cameraSettings/loadCameraSettingsToCamera", { 'cameraUid': selectedCameraUid.value, 'cameraSettingUid': newValue });
+                console.log('ImageSourceSettings - fetching camera settings for UID:', newValue);
+                await cameraStore.fetchCameraSettings(newValue);
+                console.log('ImageSourceSettings - loading camera settings to camera');
+                await cameraStore.loadCameraSettingsToCamera({ 'cameraUid': selectedCameraUid.value, 'cameraSettingUid': newValue });
                 showCameraControls.value = true;
+                console.log('ImageSourceSettings - camera settings loaded successfully');
+                console.log('ImageSourceSettings - currentCameraSettings after load:', currentCameraSettings.value);
+                console.log('ImageSourceSettings - typeof currentCameraSettings:', typeof currentCameraSettings.value);
+                console.log('ImageSourceSettings - Object.keys(currentCameraSettings):', Object.keys(currentCameraSettings.value || {}));
             }
             ignoreSettingsChange.value = false;
         });
@@ -563,26 +787,52 @@ export default {
         };
 
         async function saveCameraSettings(settings) {
+            console.log('ImageSourceSettings - saveCameraSettings called with:', settings);
+            console.log('ImageSourceSettings - newCameraSettingsFlag.value:', newCameraSettingsFlag.value);
+            console.log('ImageSourceSettings - currentCameraSettingsUid.value:', currentCameraSettingsUid.value);
+            
             cameraSettings.value = settings;
+            
+            // Ensure we have the correct UID for existing settings
+            if (!newCameraSettingsFlag.value && currentCameraSettingsUid.value) {
+                cameraSettings.value.uid = currentCameraSettingsUid.value;
+                console.log('ImageSourceSettings - using current settings UID:', currentCameraSettingsUid.value);
+            }
+            
+            console.log('ImageSourceSettings - final settings to save:', cameraSettings.value);
+            
             if (newCameraSettingsFlag.value) {
-                store.dispatch('cameraSettings/postCameraSettings', cameraSettings.value).then(() => {
+                // Creating new camera settings
+                try {
+                    const result = await cameraStore.postCameraSettings(cameraSettings.value);
+                    console.log('ImageSourceSettings - new camera settings created:', result);
                     currentCameraSettingsUid.value = cameraSettings.value.uid;
                     ignoreSettingsChange.value = true;
                     newCameraSettingsFlag.value = false;
                     newCameraSettingsName.value = '';
                     context.emit('save-settings-status', true);
-                }).catch(() => {
+                } catch (error) {
+                    console.error('ImageSourceSettings - error creating camera settings:', error);
                     context.emit('save-settings-status', false);
-                });
+                }
             }
             else {
-                await store.dispatch('cameraSettings/putCameraSettings', cameraSettings.value).then(() => {
-                    context.emit('save-settings-status', true);
-                }).catch(() => {
+                // Updating existing camera settings
+                if (!cameraSettings.value.uid || cameraSettings.value.uid === '') {
+                    console.error('ImageSourceSettings - cannot update camera settings: missing or invalid UID');
                     context.emit('save-settings-status', false);
-                });
+                    return;
+                }
+                
+                try {
+                    const result = await cameraStore.putCameraSettings(cameraSettings.value);
+                    console.log('ImageSourceSettings - camera settings updated:', result);
+                    context.emit('save-settings-status', true);
+                } catch (error) {
+                    console.error('ImageSourceSettings - error updating camera settings:', error);
+                    context.emit('save-settings-status', false);
+                }
             }
-
         }
 
         async function deleteCameraSettings(settings) {
@@ -593,7 +843,7 @@ export default {
                 currentCameraSettingsUid.value = '';
             }
             else {
-                store.dispatch('cameraSettings/removeCameraSettings', cameraSettings.value.uid);
+                cameraStore.removeCameraSettings(cameraSettings.value.uid);
                 showCameraControls.value = false;
                 newCameraSettingsFlag.value = false;
             }
@@ -617,7 +867,7 @@ export default {
                     uid: props.currentImageSource.uid,
                     fps: fps.value
                 };
-                store.dispatch("imageSources/updateImageSource", newStaticConfig).then(() => {
+                imageSourcesStore.updateImageSource(newStaticConfig).then(() => {
                     context.emit('save-src-status', true);
                 }).catch(() => {
                     context.emit('save-src-status', false);
@@ -637,11 +887,19 @@ export default {
                     activate_location: activateLocation.value,
                 };
 
-                store.dispatch("imageSources/updateImageSource", newDynamicConfig).then(() => {
+                imageSourcesStore.updateImageSource(newDynamicConfig).then(() => {
                     context.emit('save-src-status', true);
                 }).catch(() => {
                     context.emit('save-src-status', false);
                 });
+            }
+        }
+
+        function onFpsInputChange(event) {
+            const newFps = parseInt(event.target.value);
+            console.log('ImageSourceSettings - FPS input changed directly:', { newFps, inputValue: event.target.value });
+            if (!isNaN(newFps) && newFps > 0) {
+                fps.value = newFps;
             }
         }
 
@@ -667,33 +925,69 @@ export default {
         }
 
         async function updateCurrentValue(name, newVal) {
-            await store.dispatch("cameraSettings/patchCameraSetting", {
-                name: name.toLowerCase(),
-                value: newVal,
-                cameraUid: selectedCameraUid.value
-            });
+            console.log('ImageSourceSettings - updateCurrentValue called with:', name, newVal);
+            
+            let processedValue = newVal;
+            
+            // Handle resolution: convert "640x480" back to [640, 480] for backend
+            if (name.toLowerCase() === 'resolution' && typeof newVal === 'string' && newVal.includes('x')) {
+                const parts = newVal.split('x');
+                if (parts.length === 2) {
+                    processedValue = [parseInt(parts[0]), parseInt(parts[1])];
+                    console.log('ImageSourceSettings - converted resolution from', newVal, 'to', processedValue);
+                }
+            }
+            
+            console.log('ImageSourceSettings - sending to backend:', { name: name.toLowerCase(), value: processedValue });
+            
+            try {
+                await cameraStore.patchCameraSetting({
+                    name: name.toLowerCase(),
+                    value: processedValue,
+                    cameraUid: selectedCameraUid.value
+                });
+                console.log('ImageSourceSettings - camera setting updated successfully');
+            } catch (error) {
+                console.error('ImageSourceSettings - error updating camera setting:', error);
+            }
         }
 
         async function updateCheckBoxValue(name, newVal) {
-            await store.dispatch("cameraSettings/patchCameraSetting", {
+            await cameraStore.patchCameraSetting({
                 name: name.toLowerCase(),
                 value: newVal? 1 : 0,
                 cameraUid: selectedCameraUid.value
             });
         }
 
-        onMounted(() => {
-            store.dispatch("imageSources/getAllImageGenerators", null);
-            store.dispatch("cameraSettings/fetchCamerasList", null);
-            store.dispatch("cameraSettings/readCameraTypes", null);
-            store.dispatch("cnc/loadLocations", null);
+        onMounted(async () => {
+            imageSourcesStore.getAllImageGenerators();
+            
+            // Load cameras
+            cameraStore.fetchCamerasList().catch(error => {
+                console.error('ImageSourceSettings - error loading cameras:', error);
+            });
+            
+            cameraStore.readCameraTypes();
+            
+            // Load CNC locations with timeout to prevent hanging
+            const timeoutPromise = new Promise((_, reject) => {
+                setTimeout(() => reject(new Error('loadLocations timeout after 5 seconds')), 5000);
+            });
+            
+            Promise.race([cncStore.loadLocations(), timeoutPromise])
+                .catch((error) => {
+                    if (!error.message.includes('timeout')) {
+                        console.error('ImageSourceSettings - error loading CNC locations:', error);
+                    }
+                });
         });
 
         return {
             camerasList,
             cameraTypesList: computed(() => store.getters["cameraSettings/getCameraTypes"]),
             cameraSettingsList,
-            locationsList: computed(() => store.getters["cnc/locations"]),
+            locationsList: cncStore.locations,
             cameraControls: computed(() => store.getters["cameraSettings/getcameraControls"]),
             currentCameraSettings,
             selectedCameraUid,
@@ -727,6 +1021,8 @@ export default {
             addCamera,
             deleteCamera,
             getCheckBoxValue,
+            getDropdownValues,
+            getDropdownCurrentValue,
             loadSettingsToCamera,
             onFolderSelected,
             saveConfig,
@@ -736,6 +1032,7 @@ export default {
             cameraChanged,
             cameraSettingsChanged,
             fpsChanged,
+            onFpsInputChange,
             updateCurrentValue,
             updateCheckBoxValue,
             saveCameraSettings,

@@ -29,7 +29,7 @@
             </div>
             <div class="settings-container">
                 <image-source-settings
-                    :type="currentSourceType"
+                    :type="debugCurrentSourceType"
                     :current-image-source="currentImageSource"
                     :current-image-generator="currentImageGenerator"
                     @generator-updated="imageGeneratorChanged"
@@ -63,10 +63,10 @@
 </template>
 
 <script>
-import { computed, onMounted, onUnmounted, ref, toRef, watch } from 'vue';
-import { useStore } from 'vuex';
+import { computed, nextTick, onMounted, onUnmounted, ref, toRef, watch } from 'vue';
+import { useImageSourcesStore, useConfigurationsStore } from '@/composables/useStore';
 import { ipAddress, port } from '../../../url.js';
-import useNotification from '../../../hooks/notifications.js';
+import useNotification from '../../../hooks/notifications';
 
 import ImageSourcesList from '../../image_sources/ImageSourcesList.vue';
 import ImageSourceSettings from '../../image_sources/ImageSourceSettings.vue';
@@ -82,10 +82,11 @@ export default{
     setup(){
         const currentSourceId = ref('');
         const currentSourceType = ref('');
-
+        
         const error = ref('');
 
-        const store = useStore();
+        const imageSourcesStore = useImageSourcesStore();
+        const configurationsStore = useConfigurationsStore();
 
         const {showNotification, notificationMessage, notificationIcon, notificationTimeout, 
             setNotification, clearNotification} = useNotification();
@@ -97,39 +98,60 @@ export default{
 
         const imageFileName = ref(null);
 
-        const currentConfiguration = computed(function() {
-            return store.getters["configurations/getCurrentConfiguration"];
+        // These are already computed refs from the composables
+
+
+        const currentConfiguration = configurationsStore.currentConfiguration;
+
+        const currentImageSource = imageSourcesStore.currentImageSource;
+
+        const currentImageGenerator = imageSourcesStore.currentImageGenerator;
+
+        const imageGeneratorsList = imageSourcesStore.imageGenerators;
+
+        const sources = computed(() => {
+            const result = imageSourcesStore.imageSources.value || [];
+            console.log('ImageSources - sources computed, result:', result);
+            return result;
         });
 
-        const currentImageSource = computed(function() {
-            return store.getters["imageSources/getCurrentImageSource"];
-        });
+        // Debug reactive updates - moved after variable declarations
+        watch(currentSourceType, (newValue, oldValue) => {
+            console.log('ImageSources - currentSourceType watcher fired - old:', oldValue, 'new:', newValue);
+        }, { immediate: true });
 
-        const currentImageGenerator = computed(function() {
-            return store.getters["imageSources/getCurrentImageGenerator"];
-        });
+        // Also watch currentImageSource for debugging
+        watch(currentImageSource, (newValue, oldValue) => {
+            console.log('ImageSources - currentImageSource watcher fired');
+            console.log('ImageSources - currentImageSource changed from:', oldValue);
+            console.log('ImageSources - currentImageSource changed to:', newValue);
+            if (newValue && newValue.image_source_type) {
+                console.log('ImageSources - newValue.image_source_type:', newValue.image_source_type);
+            }
+        }, { immediate: true });
 
-        const imageGeneratorsList = computed(function() {
-            return store.getters["imageSources/getImageGenerators"];
-        });
-
-        const sources = computed(function() {
-            const s = store.getters["imageSources/getImageSources"];
-            return s;
+        // Debug computed to trace template binding
+        const debugCurrentSourceType = computed(() => {
+            console.log('ImageSources - debugCurrentSourceType computed - currentSourceType.value:', currentSourceType.value);
+            return currentSourceType.value;
         });
 
         function fpsChanged(newFps){
-            store.dispatch("imageSources/setCurrentImageSourceProp", {
-                key: "fps",
-                value: newFps
-            });
+            console.log('ImageSources - fpsChanged called with:', newFps);
+            imageSourcesStore.setCurrentImageSourceProp("fps", newFps);
 
             if(newFps != null && newFps != 0){
-                if( currentImageSource.value.imageSourceType === "static"){
-                    feedLocation.value = `ws://${ipAddress}:${port}/image_source/` + currentImageSource.value.uid + '/' +  currentImageSource.value.imageGeneratorUid + '/' + String(newFps) + `/ws`;
-                }else if( currentImageSource.value.imageSourceType === "dynamic"){
-                    feedLocation.value = `ws://${ipAddress}:${port}/image_source/` + currentImageSource.value.uid + '/' +  currentImageSource.value.cameraUid + '/' + String(newFps) + `/ws`;
+                let newFeedLocation;
+                if( currentImageSource.value.image_source_type === "static"){
+                    newFeedLocation = `ws://${ipAddress}:${port}/image_source/` + currentImageSource.value.uid + '/' +  currentImageSource.value.image_generator_uid + '/' + String(newFps) + `/ws`;
+                }else if( currentImageSource.value.image_source_type === "dynamic"){
+                    newFeedLocation = `ws://${ipAddress}:${port}/image_source/` + currentImageSource.value.uid + '/' +  currentImageSource.value.camera_uid + '/' + String(newFps) + `/ws`;
                 }
+                
+                console.log('ImageSources - updating feedLocation from:', feedLocation.value);
+                console.log('ImageSources - updating feedLocation to:', newFeedLocation);
+                feedLocation.value = newFeedLocation;
+                console.log('ImageSources - feedLocation.value is now:', feedLocation.value);
             }
         }
         
@@ -150,31 +172,60 @@ export default{
         }
 
         async function loadCurrentImageSource(id) {
+            console.log('loadCurrentImageSource called with id:', id);
             try{
                 if(id)
                 {
-                    await store.dispatch("imageSources/loadCurrentImageSource", {
-                        uid: id
-                    });
+                    console.log('Loading image source:', id);
+                    await imageSourcesStore.loadCurrentImageSource(id);
+                    console.log('Image source loaded, currentImageSource:', currentImageSource.value);
+                    
+                    // TEST: Add a simple log to see if we reach this point
+                    console.log('CHECKPOINT 1: Before getImageGeneratorById');
+                    console.log('ImageSources - image_generator_uid:', currentImageSource.value.image_generator_uid);
+                    
+                    // Only try to get image generator if UID is not empty
+                    let gen = null;
+                    if (currentImageSource.value.image_generator_uid && currentImageSource.value.image_generator_uid !== '') {
+                        try {
+                            gen = imageSourcesStore.getImageGeneratorById(currentImageSource.value.image_generator_uid);
+                            console.log('ImageSources - found image generator:', gen);
+                        } catch (error) {
+                            console.error('ImageSources - error getting image generator:', error);
+                            gen = null;
+                        }
+                    } else {
+                        console.log('ImageSources - image_generator_uid is empty, skipping');
+                    }
+                    imageSourcesStore.setCurrentImageGenerator(gen);
 
-                    const gen = store.getters["imageSources/getImageGeneratorById"](currentImageSource.value.imageGeneratorUid);
-                    store.dispatch("imageSources/setCurrentImageGenerator", gen);
-
+                    console.log('CHECKPOINT 2: Before currentSourceType assignment');
+                    console.log('ImageSources - currentImageSource.value.image_source_type:', currentImageSource.value.image_source_type);
+                    console.log('ImageSources - currentSourceType.value before:', currentSourceType.value);
+                    
                     currentSourceId.value = currentImageSource.value.uid;
-                    currentSourceType.value = currentImageSource.value.imageSourceType;
+                    console.log('CHECKPOINT 3: After currentSourceId assignment');
+                    
+                    currentSourceType.value = currentImageSource.value.image_source_type;
+                    console.log('CHECKPOINT 4: After currentSourceType assignment');
+                    console.log('ImageSources - currentSourceType.value after:', currentSourceType.value);
+                    
+                    // Ensure Vue's reactivity system processes the change
+                    await nextTick();
+                    console.log('CHECKPOINT 5: After nextTick, currentSourceType.value:', currentSourceType.value);
 
-                    if(currentImageSource.value.imageSourceType === "static"){
-                        feedLocation.value = `ws://${ipAddress}:${port}/image_source/` + currentSourceId.value + '/' +  currentImageSource.value.imageGeneratorUid + '/' + currentImageSource.value.fps + `/ws`;
-                    }else if( currentImageSource.value.imageSourceType === "dynamic"){
-                        feedLocation.value = `ws://${ipAddress}:${port}/image_source/` + currentSourceId.value + '/' +  currentImageSource.value.cameraUid + '/' + currentImageSource.value.fps + `/ws`;
+                    if(currentImageSource.value.image_source_type === "static"){
+                        feedLocation.value = `ws://${ipAddress}:${port}/image_source/` + currentSourceId.value + '/' +  currentImageSource.value.image_generator_uid + '/' + currentImageSource.value.fps + `/ws`;
+                    }else if( currentImageSource.value.image_source_type === "dynamic"){
+                        feedLocation.value = `ws://${ipAddress}:${port}/image_source/` + currentSourceId.value + '/' +  currentImageSource.value.camera_uid + '/' + currentImageSource.value.fps + `/ws`;
                     }
                 }
                 else
                 {
                     showCamera.value = false;
 
-                    store.dispatch("imageSources/setCurrentImageSource", null);
-                    store.dispatch("imageSources/setCurrentImageGenerator", null);
+                    imageSourcesStore.setCurrentImageSource(null);
+                    imageSourcesStore.setCurrentImageGenerator(null);
                 }
             }
             catch(err) {
@@ -183,12 +234,11 @@ export default{
         }
 
         function deleteSource(source) {
-            if(currentImageSource.value.uid === source.uid)
+            if(currentImageSource.value && currentImageSource.value.uid === source.uid)
             {
-                store.dispatch("imageSources/setCurrentImageSource", null);
+                imageSourcesStore.setCurrentImageSource(null);
             }
-
-            store.dispatch("imageSources/removeImageSource", source);
+            imageSourcesStore.removeImageSource(source);
         }
 
         function changeCameraStatus(value) {
@@ -197,27 +247,18 @@ export default{
         }
 
         function cameraChanged(camera){
-            store.dispatch("imageSources/setCurrentImageSourceProp", {
-                key: "cameraUid",
-                value: camera
-            });
+            imageSourcesStore.setCurrentImageSourceProp("camera_uid", camera);
             feedLocation.value = `ws://${ipAddress}:${port}/image_source/` + currentImageSource.value.uid + '/' + camera + '/' + currentImageSource.value.fps + `/ws`;
         }
 
         async function imageGeneratorChanged(uid){
-            store.dispatch("imageSources/setCurrentImageSourceProp", {
-                key: "imageGeneratorUid",
-                value: uid
-            });
+            imageSourcesStore.setCurrentImageSourceProp("image_generator_uid", uid);
 
-            feedLocation.value = `ws://${ipAddress}:${port}/image_source/` + currentImageSource.value.uid + `/` + currentImageSource.value.imageGeneratorUid + `/` + currentImageSource.value.fps + `/ws`;
+            feedLocation.value = `ws://${ipAddress}:${port}/image_source/` + currentImageSource.value.uid + `/` + currentImageSource.value.image_generator_uid + `/` + currentImageSource.value.fps + `/ws`;
         }
 
         function cameraSettingsChanged(uid){
-            store.dispatch("imageSources/setCurrentImageSourceProp", {
-                key: "cameraSettingsUid",
-                value: uid
-            });
+            imageSourcesStore.setCurrentImageSourceProp("camera_settings_uid", uid);
         }
 
         function onSaveSrcStatus(status){
@@ -236,12 +277,22 @@ export default{
             }
         }
 
+        onMounted(async () => {
+            console.log('ImageSources - component mounted, loading image sources');
+            try {
+                await imageSourcesStore.loadImageSources();
+                console.log('ImageSources - image sources loaded');
+            } catch (error) {
+                console.error('ImageSources - error loading image sources:', error);
+            }
+        });
+
         onUnmounted(() => {
             try {
                 showCamera.value = false;
 
-                store.dispatch("imageSources/setCurrentImageSource", null);
-                store.dispatch("imageSources/setCurrentImageGenerator", null);
+                imageSourcesStore.setCurrentImageSource(null);
+                imageSourcesStore.setCurrentImageGenerator(null);
             } catch (error) {
                 console.warn('Error during ImageSources component unmounting:', error);
             }
@@ -251,6 +302,7 @@ export default{
             currentImageSource,
             currentSourceId,
             currentSourceType,
+            debugCurrentSourceType,
             currentImageGenerator,
             error,
             sources,

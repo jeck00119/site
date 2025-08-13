@@ -228,13 +228,15 @@ import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { useStore } from 'vuex';
 import { uuid } from "vue3-uuid";
 
-import useNotification from '../../../hooks/notifications.js';
+import useNotification from '../../../hooks/notifications';
 
 import 'vue3-carousel/dist/carousel.css';
 import { Carousel, Slide, Pagination, Navigation } from 'vue3-carousel';
 
 import PinsResultTable from '../../layout/PinsResultTable.vue';
 import { ipAddress, port } from '../../../url';
+import { useWebSocket } from '@/composables/useStore';
+import { DEFAULT_IMAGE_DATA_URI_PREFIX, ImageDataUtils } from '../../../utils/imageConstants';
 
 
 
@@ -251,17 +253,16 @@ export default {
         const store = useStore();
         const processRunning = ref(false);
         const processRunningOffline = ref(false);
-        let wsProcess = null;
         let processId = null;
-
-        let cognexStateSocket = null;
         let cognexStateSocketId = null;
-
-        const cognexConnected = ref(false);
-
-        let cameraStateSocket = null;
         let cameraStateSocketId = null;
 
+        // WebSocket instances
+        let wsProcessInstance = null;
+        let cognexStateSocketInstance = null;
+        let cameraStateSocketInstance = null;
+
+        const cognexConnected = ref(false);
         const cameraConnected = ref(false);
 
         const firstRun = ref(false);
@@ -305,19 +306,19 @@ export default {
                 await closeCognexSocket();
                 await closeCameraSocket();
 
-                if (wsProcess) {
-                    wsProcess.close();
-                    wsProcess = null;
+                if (wsProcessInstance) {
+                    wsProcessInstance.disconnect();
+                    wsProcessInstance = null;
                 }
 
-                if (cognexStateSocket) {
-                    cognexStateSocket.close();
-                    cognexStateSocket = null;
+                if (cognexStateSocketInstance) {
+                    cognexStateSocketInstance.disconnect();
+                    cognexStateSocketInstance = null;
                 }
 
-                if(cameraStateSocket) {
-                    cameraStateSocket.close();
-                    cameraStateSocket = null;
+                if (cameraStateSocketInstance) {
+                    cameraStateSocketInstance.disconnect();
+                    cameraStateSocketInstance = null;
                 }
             } catch (error) {
                 console.warn('Error during ResultsList component unmounting:', error);
@@ -328,48 +329,64 @@ export default {
             await store.dispatch("process/closeProcessStateSocket", {
                 uid: processId
             });
-            wsProcess.removeEventListener("open", onStateSocketOpen);
-            wsProcess.removeEventListener("message", onStateSocketMsgRecv);
+            if (wsProcessInstance) {
+                wsProcessInstance.disconnect();
+                wsProcessInstance = null;
+            }
         }
 
         async function closeCognexSocket() {
             await store.dispatch("peripherals/closeDeviceStateSocket", {
                 uid: cognexStateSocketId
             });
-            cognexStateSocket.removeEventListener("message", onCognexStateSocketMsgRecv);
+            if (cognexStateSocketInstance) {
+                cognexStateSocketInstance.disconnect();
+                cognexStateSocketInstance = null;
+            }
         }
 
         async function closeCameraSocket() {
             await store.dispatch("peripherals/closeDeviceStateSocket", {
                 uid: cameraStateSocketId
             });
-            cameraStateSocket.removeEventListener("message", onCameraStateSocketMsgRecv);
+            if (cameraStateSocketInstance) {
+                cameraStateSocketInstance.disconnect();
+                cameraStateSocketInstance = null;
+            }
         }
 
         function connectToStateSocket() {
-            wsProcess = new WebSocket(`ws://${ipAddress}:${port}/processing/${processId}/process`);
-
-            wsProcess.addEventListener("open", onStateSocketOpen);
-            wsProcess.addEventListener("message", onStateSocketMsgRecv);
+            const wsUrl = `ws://${ipAddress}:${port}/processing/${processId}/process`;
+            wsProcessInstance = useWebSocket(wsUrl, {
+                autoConnect: true,
+                onOpen: onStateSocketOpen,
+                onMessage: onStateSocketMsgRecv
+            });
         }
 
         function connectToCognexStateSocket() {
-            cognexStateSocket = new WebSocket(`ws://${ipAddress}:${port}/peripheral/${cognexStateSocketId}/cognex_status/ws`);
-            cognexStateSocket.addEventListener("message", onCognexStateSocketMsgRecv);
+            const wsUrl = `ws://${ipAddress}:${port}/peripheral/${cognexStateSocketId}/cognex_status/ws`;
+            cognexStateSocketInstance = useWebSocket(wsUrl, {
+                autoConnect: true,
+                onMessage: onCognexStateSocketMsgRecv
+            });
         }
 
         function connectToCameraStateSocket() {
-            cameraStateSocket = new WebSocket(`ws://${ipAddress}:${port}/peripheral/${cameraStateSocketId}/camera_status/ws`);
-            cameraStateSocket.addEventListener("message", onCameraStateSocketMsgRecv);
+            const wsUrl = `ws://${ipAddress}:${port}/peripheral/${cameraStateSocketId}/camera_status/ws`;
+            cameraStateSocketInstance = useWebSocket(wsUrl, {
+                autoConnect: true,
+                onMessage: onCameraStateSocketMsgRecv
+            });
         }
 
         function onStateSocketOpen() {
-            if (wsProcess) wsProcess.send("eses");
+            if (wsProcessInstance) wsProcessInstance.send("eses");
         }
 
         function onStateSocketMsgRecv(event) {
             const data = JSON.parse(event.data);
-            wsProcess.send("pong");
+            wsProcessInstance.send("pong");
 
             if(processRunning.value || processRunningOffline.value)
             {
@@ -600,7 +617,7 @@ export default {
         });
 
         const resultImage = computed(function () {
-            return 'data:image/png;base64,' + currentInspectionResult.value.image;
+            return ImageDataUtils.createJpegDataURI(currentInspectionResult.value.image);
         });
 
         const statusIcon = computed(function () {
@@ -617,7 +634,7 @@ export default {
 
         function getResultImage(result) {
             if (result.image) {
-                return 'data:image/png;base64,' + result.image;
+                return ImageDataUtils.createJpegDataURI(result.image);
             }
 
             return null;

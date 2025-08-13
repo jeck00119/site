@@ -1,50 +1,74 @@
 import numpy as np
 
-from repo.repositories import CustomComponentsRepository
 from services.algorithms.basic.basic_algorithms_service import BasicAlgorithmsService
 from services.algorithms.basic.models.data_representation import NumpyType
+from services.base.enhanced_base_service import EnhancedBaseService
 from services.custom_components.custom_components_model import CustomComponentModel
 from services.image_source.image_source_service import ImageSourceService
 from services.services_exceptions import NoLiveAlgSet, NoLiveFrameSet
-from src.metaclasses.singleton import Singleton
 from src.utils import frame_to_base64
 
 
-class CustomComponentsService(metaclass=Singleton):
+class CustomComponentsService(EnhancedBaseService):
     def __init__(self):
-        self.components: dict[str:CustomComponentModel] = {}
-        self.components_repository = CustomComponentsRepository()
-        self.image_source_service = ImageSourceService()
-        self.algorithm_service = BasicAlgorithmsService()
+        # Initialize EnhancedBaseService (combines BaseService + EntityManagerMixin)
+        super().__init__(entity_type='custom_components', model_class=CustomComponentModel)
+    
+    def _load_service_dependencies(self) -> None:
+        """Load service dependencies - called automatically by EnhancedBaseService."""
+        if not self.get_service_dependency('image_source'):
+            self.add_service_dependency('image_source', ImageSourceService())
+        if not self.get_service_dependency('algorithms'):
+            self.add_service_dependency('algorithms', BasicAlgorithmsService())
+    
+    # Properties for backward compatibility
+    @property
+    def image_source_service(self):
+        """Legacy property for backward compatibility."""
+        return self.get_service_dependency('image_source')
+    
+    @property
+    def algorithm_service(self):
+        """Legacy property for backward compatibility."""
+        return self.get_service_dependency('algorithms')
+    
+    @property
+    def components(self) -> dict[str, CustomComponentModel]:
+        """Legacy property for backward compatibility."""
+        return self._entities
 
+    # Use EnhancedBaseService methods with backward-compatible wrappers
     def post_component(self, component: CustomComponentModel):
-        self._init_component(component.uid)
+        """Legacy method - use enhanced base service functionality."""
+        self.post_entity(component)
 
     def patch_component(self, component: CustomComponentModel):
-        self._deinit_component(component.uid)
-        self._init_component(component.uid)
+        """Legacy method - use enhanced base service functionality."""
+        self.patch_entity(component)
 
-    def delete_component(self, uid):
-        self._deinit_component(uid)
+    def delete_component(self, uid: str):
+        """Legacy method - use enhanced base service functionality."""
+        self.delete_entity_by_uid(uid)
 
-    def start_service(self):
-        for component in self.components_repository.read_all():
-            self._init_component(component['uid'])
-
-    def _init_component(self, uid):
-        if uid not in self.components.keys():
-            component_model = CustomComponentModel(**self.components_repository.read_id(uid))
-            self.components[uid] = component_model
-
-    def _deinit_component(self, uid):
-        if uid not in self.components.keys():
-            return
-        self.components.pop(uid)
+    # EnhancedBaseService handles all initialization automatically
 
     def process_component(self, uid):
-        alg = self.algorithm_service.get_live_algorithm()
-        frame = self.image_source_service.grab_from_image_source(self.components[uid].image_source_uid)
-        alg.execute(frame)
+        """Process a custom component using EntityManagerMixin methods."""
+        component = self.get_entity(uid)
+        if not component:
+            self.logger.error(f"Custom component {uid} not found for processing")
+            raise ValueError(f"Custom component {uid} not found")
+            
+        try:
+            alg = self.algorithm_service.get_live_algorithm()
+            frame = self.image_source_service.grab_from_image_source(component.image_source_uid)
+            result = alg.execute(frame)
+            
+            self.logger.debug(f"Processed custom component {uid} successfully")
+            return result
+        except Exception as e:
+            self.logger.error(f"Failed to process custom component {uid}: {e}")
+            raise
 
     def process_live_component(self, image_source_uid):
         if self.algorithm_service.live_algorithm is None:

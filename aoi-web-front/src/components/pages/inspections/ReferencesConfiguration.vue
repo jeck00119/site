@@ -130,7 +130,14 @@
 <script>
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue';
 import { useStore } from 'vuex';
+// // import { useAlgorithmsStore } from '../../../hooks/algorithms.js';
+// // import { useComponentsStore } from '../../../hooks/components.js';
+// // import { useGraphicsStore } from '../../../hooks/graphics.js';
+import { useConfigurationsStore, useAlgorithmsStore, useComponentsStore, useGraphicsStore, useAuthStore, useLogStore } from '@/composables/useStore';
+// // import { useAuthStore } from '../../../hooks/auth.js';
+// // import { useLogStore } from '../../../hooks/log.js';
 import { uuid } from "vue3-uuid";
+import { createLogger } from '@/utils/logger';
 
 import graphic from '../../../utils/graphics.js';
 
@@ -141,7 +148,9 @@ import AlgorithmResultTable from '../../layout/AlgorithmResultTable.vue';
 import MaskScene from '../../layout/MaskScene.vue';
 import JsonDataContainer from '../../layout/JsonDataRenderer.vue';
 import { ipAddress, port } from '../../../url';
-import useNotification from '../../../hooks/notifications.js';
+import useNotification from '../../../hooks/notifications.ts';
+import { useWebSocket } from '@/composables/useStore';
+import { DEFAULT_IMAGE_DATA_URI_PREFIX, ImageDataUtils } from '../../../utils/imageConstants';
 
 export default{
     components: {
@@ -154,6 +163,7 @@ export default{
     },
 
     setup() {
+        const logger = createLogger('ReferencesConfiguration');
         const moduleName = 'reference';
 
         const showMasks = ref(false);
@@ -189,59 +199,68 @@ export default{
         const selectedGraphic = ref(null);
         const selectedRect = ref(null);
 
-        let liveProcessSocket = null;
+        // WebSocket state
+        let liveProcessSocketInstance = null;
 
         const {showNotification, notificationMessage, notificationIcon, notificationTimeout, 
             setNotification, clearNotification} = useNotification();
 
         const store = useStore();
+        const algorithmsStore = useAlgorithmsStore();
+        const componentsStore = useComponentsStore();
+        const graphicsStore = useGraphicsStore();
+        const configurationsStore = useConfigurationsStore();
+        const authStore = useAuthStore();
+        const logStore = useLogStore();
 
-        const currentConfiguration = computed(function() {
-            return store.getters["configurations/getCurrentConfiguration"];
-        });
+        // These are already computed refs from the composables
 
-        const currentUser = computed(function() {
-            return store.getters["auth/getCurrentUser"];
-        });
 
-        const algorithms = computed(function() {
-            return store.getters["algorithms/getReferenceAlgorithms"];
-        });
+        const currentConfiguration = configurationsStore.currentConfiguration;
+
+        const currentUser = authStore.currentUser;
+
+        const algorithms = algorithmsStore.referenceAlgorithms;
 
         const components = computed(function() {
-            const c = store.getters["components/getReferences"];
+            const c = componentsStore.references;
             componentsRetrieving.value = false;
-            return c;
+            return Array.isArray(c) ? c : [];
         });
 
         const resultImage = computed(function() {
             const result = store.getters["algorithms/getAlgorithmResult"];
-            if(result)
+            if(result && result.frame)
             {
-                if(result.frame.length === 0)
+                if(Array.isArray(result.frame) && result.frame.length === 0)
                 {
                     return '';
                 }
-                else
+                else if(Array.isArray(result.frame))
                 {
                     return result.frame[0];
+                }
+                else
+                {
+                    // Handle single frame case
+                    return result.frame;
                 }
             }
             return '';
         });
 
         const outputImages = computed(function() {
-            const result = store.getters["algorithms/getAlgorithmResult"];
+            const result = algorithmsStore.algorithmResult;
             let outputImages = [];
-            if(result)
+            if(result && result.frame)
             {
-                outputImages = result.frame;
+                outputImages = Array.isArray(result.frame) ? result.frame : [result.frame];
             }
             return outputImages;
         });
 
         const data = computed(function() {
-            const result = store.getters["algorithms/getAlgorithmResult"];
+            const result = algorithmsStore.algorithmResult;
             return result ? result.data : null;
         });
 
@@ -358,6 +377,7 @@ export default{
         async function loadComponent(id) {
             componentLoading.value = true;
             try{
+                logger.debug('Loading reference component', { id });
                 if(id)
                 {
                     await store.dispatch("components/loadComponent", {
@@ -392,9 +412,12 @@ export default{
                     {
                         algorithmId.value = '';
                     }
+                    
+                    logger.info('Reference component loaded successfully', { id, algorithmType: current.algorithmType });
                 }
                 else
                 {
+                    logger.debug('Resetting reference component state');
                     store.dispatch("algorithms/setCurrentReferenceAlgorithm", null);
                     store.dispatch("algorithms/setAlgorithmResult", null);
                     store.dispatch("components/setCurrentComponent", null);
@@ -404,6 +427,7 @@ export default{
                 }
             }
             catch(err) {
+                logger.error('Failed to load reference component', err);
                 setNotification(3000, "Error while trying to load component.", 'bi-exclamation-circle-fill');
             }
         };
@@ -500,22 +524,19 @@ export default{
                 let id = uuid.v4();
                 let url = `ws://${ipAddress}:${port}/algorithm/live_reference/${currentImageSourceId.value}/${id}/ws`;
 
-                liveProcessSocket = new WebSocket(url);
-
-                liveProcessSocket.addEventListener('open', onSocketOpen);
-                liveProcessSocket.addEventListener('message', liveResultMsgRecv);
+                liveProcessSocketInstance = useWebSocket(url, {
+                    autoConnect: true,
+                    onOpen: onSocketOpen,
+                    onMessage: liveResultMsgRecv
+                });
             }
             else
             {
-                if(liveProcessSocket)
+                if(liveProcessSocketInstance)
                 {
-                    liveProcessSocket.send(JSON.stringify({command: "disconnect"}));
-
-                    liveProcessSocket.removeEventListener('open', onSocketOpen);
-                    liveProcessSocket.removeEventListener('message', liveResultMsgRecv);
-
-                    liveProcessSocket.close();
-                    liveProcessSocket = null;
+                    liveProcessSocketInstance.send(JSON.stringify({command: "disconnect"}));
+                    liveProcessSocketInstance.disconnect();
+                    liveProcessSocketInstance = null;
                 }
             }
         }
@@ -530,9 +551,9 @@ export default{
         }
 
         function onSocketOpen() {
-            if(liveProcessSocket)
+            if(liveProcessSocketInstance)
             {
-                liveProcessSocket.send(JSON.stringify({
+                liveProcessSocketInstance.send(JSON.stringify({
                     command: ''
                 }));
             }
@@ -542,17 +563,22 @@ export default{
             let recvData = JSON.parse(event.data);
 
             let outputImages = [];
-            for(const frame of responseData.frame)
-            {
-                outputImages.push('data:image/png;base64,' + frame);
+            if (recvData.frame && Array.isArray(recvData.frame)) {
+                for(const frame of recvData.frame)
+                {
+                    outputImages.push(ImageDataUtils.createJpegDataURI(frame));
+                }
+                recvData.frame = outputImages;
+            } else {
+                // Handle single frame or undefined case
+                recvData.frame = recvData.frame ? [ImageDataUtils.createJpegDataURI(recvData.frame)] : [];
             }
-            recvData.frame = outputImages;
 
             store.dispatch("algorithms/setAlgorithmResult", recvData);
 
             if(graphicsObject)
             {
-                liveProcessSocket.send(JSON.stringify({
+                liveProcessSocketInstance.send(JSON.stringify({
                     command: 'set',
                     key: 'graphics',
                     value: graphicsObject
@@ -561,7 +587,7 @@ export default{
             }
             else
             {
-                liveProcessSocket.send(JSON.stringify({command: ''}));
+                liveProcessSocketInstance.send(JSON.stringify({command: ''}));
             }
         }
 
@@ -682,9 +708,17 @@ export default{
             const data = graphic.getGraphicsProps(graphicItems, canvas);
 
             store.dispatch("algorithms/updateCurrentReferenceAlgorithmGraphics", data);
+            
+            // Ensure we have a valid golden_position value
+            const goldenPositionValue = (referenceToSave.value && 
+                                       currentReferencePointIdx.value >= 0 && 
+                                       currentReferencePointIdx.value < referenceToSave.value.length) 
+                                       ? referenceToSave.value[currentReferencePointIdx.value] 
+                                       : [0, 0];
+            
             await store.dispatch("algorithms/updateCurrentReferenceAlgorithmProperty", {
                     name: 'golden_position',
-                    value: referenceToSave.value[currentReferencePointIdx.value]
+                    value: goldenPositionValue
             });
 
             const currentAlgorithm = store.getters["algorithms/getCurrentReferenceAlgorithm"];

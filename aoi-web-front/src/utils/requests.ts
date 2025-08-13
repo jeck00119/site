@@ -4,16 +4,24 @@ type Headers = Record<string, string>;
 interface RequestResponse<T = any> {
     response: Response;
     responseData: T;
+    ok: boolean;
+    status: number;
+    data?: T;
+    _?: any;
+    _2?: any;
+    blob?: () => Promise<Blob>;
+    headers?: Headers;
 }
 
 // Global 401 handler
 function handle401Unauthorized(url: string) {
     // Don't handle 401 for login/auth endpoints
-    if (url.includes('/auth/login') || url.includes('/auth/users') || url.includes('/auth/create_user')) {
+    if (url.includes('/auth/login') || url.includes('/auth/users') || url.includes('/auth/create_user') || url.includes('/authentication/')) {
         return false; // Let the auth flow handle these
     }
     
-    console.warn('401 Unauthorized - Token expired, logging out automatically');
+    console.warn('401 Unauthorized for URL:', url);
+    console.warn('Token expired or invalid, logging out automatically');
     
     // Clear session immediately
     sessionStorage.removeItem('auth-token');
@@ -48,7 +56,14 @@ async function handleResponse<T>(response: Response, url: string): Promise<Reque
     
     return {
         response,
-        responseData
+        responseData,
+        ok: response.ok,
+        status: response.status,
+        data: responseData,
+        _: responseData,
+        _2: responseData,
+        blob: () => response.blob(),
+        headers: response.headers as any
     };
 }
 
@@ -66,7 +81,7 @@ async function get<T = any>(url: string, headers?: Headers): Promise<RequestResp
     return handleResponse<T>(response, url);
 }
 
-async function post<T = any>(url: string, payload?: any, headers?: Headers): Promise<RequestResponse<T>> {
+async function post<T = any>(url: string, payload?: any, headers?: Headers, timeout?: number): Promise<RequestResponse<T>> {
     headers = headers ? headers : {
         'content-type': 'application/json'
     };
@@ -75,7 +90,7 @@ async function post<T = any>(url: string, payload?: any, headers?: Headers): Pro
         method: 'POST',
         headers: headers,
         body: JSON.stringify(payload),
-        signal: AbortSignal.timeout(15000) // 15 second timeout for POST requests
+        signal: AbortSignal.timeout(timeout || 15000) // Custom timeout or default 15 seconds
     });
 
     return handleResponse<T>(response, url);

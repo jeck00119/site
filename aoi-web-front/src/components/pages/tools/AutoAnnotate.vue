@@ -57,7 +57,7 @@
   
 <script>
 import { ref, watch, computed, onMounted } from 'vue';
-import { useStore } from 'vuex';
+// import { useAnnotationStore } from '../../../hooks/annotation.js';
 
 import CameraScene from '../../camera/CameraScene.vue';
 import VueMultiselect from 'vue-multiselect';
@@ -80,11 +80,12 @@ export default {
         const showSpinner = ref(false);
         const uploadModelMsg = ref("Upload Model");
 
-        const store = useStore();
+        const annotationStore = useAnnotationStore();
 
-        const modelOptions = computed(() => {
-            return store.getters["annotate/getModels"];
-        });
+        // These are already computed refs from the composables
+
+
+        const modelOptions = annotationStore.models;
 
         const disableAnnotateButton = computed(() => {
             return showSpinner.value || currentModel.value === null || currentTask.value === null || imageFiles.value.length === 0;
@@ -123,10 +124,10 @@ export default {
 
             uploadModelMsg.value = "Uploading Model..."
 
-            store.dispatch('annotate/uploadModel', formData).then(() => {
+            annotationStore.uploadModel(formData).then(() => {
                 uploadModelMsg.value = "Model Uploaded!";
 
-                store.dispatch("annotate/addModel", file.name);
+                annotationStore.addModel(file.name);
 
                 setTimeout(() => {
                     uploadModelMsg.value = "Upload Model";
@@ -280,7 +281,7 @@ export default {
 
             showSpinner.value = true;
             
-            store.dispatch('annotate/annotate', formData).then(() => {
+            annotationStore.annotate(formData).then(() => {
                 console.log("returned");
                 showSpinner.value = false;
             }).catch((err) => {
@@ -290,7 +291,7 @@ export default {
         }
 
         onMounted(() => {
-            store.dispatch('annotate/loadAvailableModels');
+            annotationStore.loadAvailableModels();
         });
 
         return {
@@ -300,7 +301,7 @@ export default {
             currentFrame,
             currentIdx,
             imageFiles,
-            frames,
+            // frames,
             filenames,
             showSpinner,
             disableAnnotateButton,

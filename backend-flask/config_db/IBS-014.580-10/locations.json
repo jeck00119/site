@@ -1,0 +1,14 @@
+{
+    "locations": {
+        "1": {
+            "axis_uid": "8a84a38d-1587-4705-b6f5-801abafa330d",
+            "degree_in_step": "deg",
+            "feedrate": 1500,
+            "name": "Home_Zero",
+            "uid": "cae08b94-e07d-4eef-b7dc-a009498a9e97",
+            "x": 0,
+            "y": 0,
+            "z": 0
+        }
+    }
+}

@@ -6,6 +6,7 @@ class BaseCncMachine:
     
     def __init__(self):
         self._port = None
+        self._abort_requested = False
     
     def get_port(self):
         """Get the CNC machine port"""
@@ -36,17 +37,45 @@ class BaseCncMachine:
         return self.is_at(x, y, z)
 
     def parse_coordinates(self, x, y, z, feed_rate):
-        """Parse coordinates into G-code parameter string"""
-        line = ""
+        """Parse coordinates into G-code parameter string with proper formatting"""
+        parts = []
         if x is not None:
-            line += f"X{x}"
+            parts.append(f"X{x:.1f}")
         if y is not None:
-            line += f"Y{y}"
+            parts.append(f"Y{y:.1f}")
         if z is not None:
-            line += f"Z{z}"
+            parts.append(f"Z{z:.1f}")
         if feed_rate is not None:
-            line += f"F{int(feed_rate)}"
-        return line
+            parts.append(f"F{int(feed_rate)}")
+        return " ".join(parts)
+
+    def create_location_model(self, pos_tuple):
+        """Create LocationModel from position tuple - centralized pattern"""
+        if not pos_tuple:
+            return None
+        return LocationModel(
+            uid=None, 
+            axis_uid=None, 
+            degree_in_step=None, 
+            feedrate=None, 
+            name=None, 
+            x=pos_tuple[0],
+            y=pos_tuple[1], 
+            z=pos_tuple[2]
+        )
+
+    def standard_disconnect_cleanup(self, connection_obj_name):
+        """Standard disconnect cleanup pattern"""
+        connection_obj = getattr(self, connection_obj_name)
+        if connection_obj:
+            try:
+                self._abort_requested = False
+                connection_obj.soft_reset()
+                connection_obj.disconnect()
+                setattr(self, connection_obj_name, None)
+            except Exception as e:
+                setattr(self, connection_obj_name, None)
+                raise e
 
     # Abstract methods that must be implemented by subclasses
     def current_pos(self):

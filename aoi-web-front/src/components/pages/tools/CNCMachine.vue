@@ -7,13 +7,20 @@
           :axisUid="cnc.uid">
         </cnc>
       </div>
+      <!-- Debug info -->
+      <div v-if="!cncList || cncList.length === 0" style="color: white; padding: 20px;">
+        <p>No CNCs available.</p>
+        <p>CNC List: {{ cncList }}</p>
+        <p>Is Array: {{ Array.isArray(cncList) }}</p>
+        <p>Length: {{ cncList?.length }}</p>
+      </div>
     </div>
   </div>
 </template>
 
 <script>
 import { computed, onMounted, onUnmounted, watch } from 'vue';
-import { useStore } from 'vuex';
+import { useCncStore, useConfigurationsStore } from '@/composables/useStore';
 
 import cnc from "../../cnc/CNCRefactored.vue";
 
@@ -23,26 +30,37 @@ export default {
   },
 
   setup(props, context) {
-    const store = useStore();
+    const cncStore = useCncStore();
+    const configurationsStore = useConfigurationsStore();
 
-    const currentConfiguration = computed(function() {
-        return store.getters["configurations/getCurrentConfiguration"];
-    });
+    // These are already computed refs from the composables
+
+
+    const currentConfiguration = configurationsStore.currentConfiguration;
 
     // Watch for configuration changes and load CNCs when available
-    watch(currentConfiguration, (newConfig) => {
+    watch(currentConfiguration, async (newConfig) => {
       if (newConfig) {
         try {
-          store.dispatch("cnc/loadCNCs");
+          console.log("CNCMachine: Loading CNCs for configuration", newConfig);
+          await cncStore.loadCNCs();
+          console.log("CNCMachine: CNCs loaded, count:", cncStore.cncs.value?.length || 0);
         } catch (error) {
-          console.error("Failed to load CNCs:", error);
+          console.error("CNCMachine: Failed to load CNCs:", error);
         }
       }
     }, { immediate: true });
 
+    // Watch the CNCs for changes
+    watch(cncStore.cncs, (newCncs) => {
+      console.log("CNCMachine: CNCs changed:", newCncs);
+    });
+
     onMounted(() => {
       // Configuration should be loaded by the parent component
       // We'll rely on the watcher to trigger CNC loading
+      console.log("CNCMachine: Component mounted, current config:", currentConfiguration.value);
+      console.log("CNCMachine: Current CNCs:", cncStore.cncs.value);
     });
 
     onUnmounted(() => {
@@ -55,7 +73,7 @@ export default {
     });
 
     return {
-      cncList: computed(()=>store.getters["cnc/getCNCs"])
+      cncList: cncStore.cncs
     };
   },
 };
