@@ -1,25 +1,25 @@
-# AOI Platform
+# 🔍 AOI Platform
 
 A modern AOI (Automated Optical Inspection) platform for industrial automation with multi-module support and real-time monitoring.
 
-## Features
+## ✨ Features
 
-- **Multi-Module Platform**: Camera systems, robots, CNC, profilometer integration
-- **Real-time Monitoring**: Live updates from connected industrial modules  
-- **Industrial Configurations**: Support for multiple production setups
-- **Inspection Analytics**: YOLO detection, OCR, and quality control algorithms
-- **Cross-Platform**: Windows and Linux support with automated setup
-- **Computer Vision**: OpenCV, pre-trained ML models, fabric.js canvas
+- **🏭 Multi-Module Platform**: Camera systems, robots, CNC, profilometer integration
+- **📊 Real-time Monitoring**: Live updates from connected industrial modules  
+- **⚙️ Industrial Configurations**: Support for multiple production setups
+- **🤖 Inspection Analytics**: YOLO detection, OCR, and quality control algorithms
+- **💻 Cross-Platform**: Windows and Linux support with automated setup
+- **👁️ Computer Vision**: OpenCV, pre-trained ML models, fabric.js canvas
 
-## Quick Start
+## 🚀 Quick Start
 
-### Prerequisites
+### 📋 Prerequisites
 
-- **Python 3.8-3.13** (automatically detected, latest preferred)
-- **Node.js 16+** (LTS recommended)
-- **Git** (for cloning)
+- **🐍 Python 3.8-3.13** (automatically detected, latest preferred)
+- **📦 Node.js 16+** (LTS recommended)
+- **🔗 Git** (for cloning)
 
-### Installation
+### 💾 Installation
 
 1. **Clone and setup**:
 ```bash
@@ -47,11 +47,11 @@ start_frontend.bat     # Frontend only
 ./start_frontend.sh    # Frontend only
 ```
 
-3. **Access**: 
+3. **🌐 Access**: 
    - Frontend UI: http://localhost:5173
    - Backend API: http://localhost:8000
 
-## Project Structure
+## 📁 Project Structure
 
 ```
 site/
@@ -73,9 +73,9 @@ site/
 └── start_*.bat/sh        # Launch scripts
 ```
 
-## Configuration
+## ⚙️ Configuration
 
-**No manual configuration required!** The platform uses intelligent defaults:
+**✅ No manual configuration required!** The platform uses intelligent defaults:
 
 - **Database**: TinyDB (JSON-based, no setup needed)
 - **Security**: Auto-generated JWT keys
@@ -83,17 +83,17 @@ site/
 - **Python Environment**: Automatically created virtual environment
 - **Dependencies**: Auto-installed on first run
 
-## Hardware Integration
+## 🔧 Hardware Integration
 
 The platform supports various industrial hardware:
 
-- **Cameras**: Real-time image capture and processing
-- **Robots**: xArm integration for automated handling
-- **CNC Controllers**: GRBL and Marlin firmware support with safety controls  
-- **Profilometers**: Gocator 3D measurement systems
-- **OCR Systems**: Tesseract text recognition (cross-platform)
+- **📷 Cameras**: Real-time image capture and processing
+- **🦾 Robots**: xArm integration for automated handling
+- **🔩 CNC Controllers**: GRBL and Marlin firmware support with safety controls  
+- **📏 Profilometers**: Gocator 3D measurement systems
+- **📝 OCR Systems**: Tesseract text recognition (cross-platform)
 
-## Usage
+## 🎯 Usage
 
 1. **Launch Platform**: Run startup script - automatically handles setup and dependencies
    - Windows: `start_aoi_system.bat`  
@@ -106,11 +106,11 @@ The platform supports various industrial hardware:
 
 **Note**: First run automatically creates virtual environment and installs all dependencies.
 
-## Development
+## 👨‍💻 Development
 
 The platform automatically handles environment setup. For manual development:
 
-**Backend Development**:
+**🔧 Backend Development**:
 ```bash
 # Activate the auto-created venv
 source venv/bin/activate  # Linux/macOS
@@ -121,20 +121,20 @@ cd backend-flask
 python main.py
 ```
 
-**Frontend Development**:
+**💻 Frontend Development**:
 ```bash
 cd aoi-web-front
 npm run dev
 ```
 
-## Technology Stack
+## 🛠️ Technology Stack
 
-- **Backend**: Python FastAPI, Pydantic, TinyDB, OpenCV, YOLOv8
-- **Frontend**: Vue 3, TypeScript, Vite, CoreUI, Fabric.js
-- **Hardware**: Cross-platform driver integration
-- **Vision**: Pre-trained ML models, real-time processing
+- **🐍 Backend**: Python FastAPI, Pydantic, TinyDB, OpenCV, YOLOv8
+- **🖼️ Frontend**: Vue 3, TypeScript, Vite, CoreUI, Fabric.js
+- **⚡ Hardware**: Cross-platform driver integration
+- **👁️ Vision**: Pre-trained ML models, real-time processing
 
-## Troubleshooting
+## 🚨 Troubleshooting
 
 **Setup Issues**:
 - **Python not found**: Install Python 3.8-3.13 from python.org
@@ -146,7 +146,7 @@ npm run dev
 - **Frontend fails**: Delete `node_modules`, run `npm install`
 - **Hardware not detected**: Verify USB connections and driver installation
 
-## Scripts Reference
+## 📜 Scripts Reference
 
 - `setup.py` - Manual setup (creates venv, installs dependencies)
 - `start_aoi_system.bat/.sh` - Launch complete platform (includes auto-setup)
