@@ -38,8 +38,13 @@ start_aoi_system.bat
 ./start_aoi_system.sh
 
 # Or start components individually
-# Backend only: start_backend.bat/sh
-# Frontend only: start_frontend.bat/sh
+# Windows
+start_backend.bat      # Backend only
+start_frontend.bat     # Frontend only
+
+# Linux/macOS
+./start_backend.sh     # Backend only  
+./start_frontend.sh    # Frontend only
 ```
 
 3. **Access**: 
@@ -90,11 +95,16 @@ The platform supports various industrial hardware:
 
 ## Usage
 
-1. **First Time**: Run `python setup.py` - creates environment and installs everything
-2. **Launch Platform**: Use `start_aoi_system.bat/sh` for complete system
-3. **Configure Hardware**: Connect cameras, robots, and measurement devices
-4. **Set Inspection Parameters**: Configure detection algorithms and quality thresholds
-5. **Run Inspection**: Execute automated optical inspection workflows
+1. **Launch Platform**: Run startup script - automatically handles setup and dependencies
+   - Windows: `start_aoi_system.bat`  
+   - Linux/macOS: `./start_aoi_system.sh`
+2. **Wait for Initialization**: ~30 seconds for full platform startup
+3. **Access Interface**: Open http://localhost:5173 in your browser
+4. **Configure Hardware**: Connect cameras, robots, and measurement devices
+5. **Set Inspection Parameters**: Configure detection algorithms and quality thresholds
+6. **Run Inspection**: Execute automated optical inspection workflows
+
+**Note**: First run automatically creates virtual environment and installs all dependencies.
 
 ## Development
 
@@ -138,10 +148,10 @@ npm run dev
 
 ## Scripts Reference
 
-- `setup.py` - Initial setup (creates venv, installs dependencies)
-- `start_aoi_system.bat/sh` - Launch complete platform
-- `start_backend.bat/sh` - Backend API only
-- `start_frontend.bat/sh` - Frontend UI only
+- `setup.py` - Manual setup (creates venv, installs dependencies)
+- `start_aoi_system.bat/.sh` - Launch complete platform (includes auto-setup)
+- `start_backend.bat/.sh` - Backend API only (includes auto-setup)
+- `start_frontend.bat/.sh` - Frontend UI only (includes auto-setup)
 
 ## License
 
