@@ -23,7 +23,7 @@ A modern AOI (Automated Optical Inspection) platform for industrial automation w
 
 1. **Clone and setup**:
 ```bash
-git clone https://github.com/jeck00119/site.git -b site-manus
+git clone https://github.com/jeck00119/site.git -b AOI-V1
 cd site
 python setup.py
 ```
@@ -65,11 +65,8 @@ site/
 ├── config_db/             # Product-specific configurations
 ├── venv/                  # Python virtual environment (auto-created)
 ├── setup.py              # Cross-platform setup script
-├── PROJECT_STRUCTURE.md  # Detailed architecture documentation
 └── start_*.bat/sh        # Launch scripts
 ```
-
-For detailed architecture and module information, see [PROJECT_STRUCTURE.md](PROJECT_STRUCTURE.md).
 
 ## Configuration
 
@@ -87,7 +84,7 @@ The platform supports various industrial hardware:
 
 - **Cameras**: Real-time image capture and processing
 - **Robots**: xArm integration for automated handling
-- **CNC Controllers**: Manufacturing process integration  
+- **CNC Controllers**: GRBL and Marlin firmware support with safety controls  
 - **Profilometers**: Gocator 3D measurement systems
 - **OCR Systems**: Tesseract text recognition (cross-platform)
 
