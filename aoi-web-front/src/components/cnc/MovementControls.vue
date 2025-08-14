@@ -148,18 +148,18 @@ export default {
   display: grid;
   flex: 1;
   border-radius: 8px;
-  padding: 1rem;
+  padding: 0.7rem;
 }
 
 .axis-control {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.5rem;
+  gap: 1rem;
 }
 
 .axis-control label {
-  font-size: 1.2rem;
+  font-size: 1rem;
   font-weight: bold;
   color: white;
 }
@@ -168,14 +168,14 @@ export default {
 .button-up {
   background: rgb(41, 41, 41);
   color: #ffffff;
-  width: 60px;
-  height: 60px;
+  width: 50px;
+  height: 50px;
   border-radius: 8px;
   box-shadow: rgb(41, 41, 41) 0 3px 5px -3px;
   box-sizing: border-box;
   cursor: pointer;
   border: 0;
-  font-size: 1.2rem;
+  font-size: 1.1rem;
   margin: 1%;
   transition: all 0.2s ease;
   display: flex;

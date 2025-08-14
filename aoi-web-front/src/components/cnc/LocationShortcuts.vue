@@ -1,8 +1,5 @@
 <template>
   <div class="locations-grid">
-    <div class="title">
-      Shortcuts
-    </div>
     <div class="actions-container">
       <div class="flex-row" v-for="row in 3" :key="row">
         <button
@@ -321,30 +318,26 @@ export default {
 <style scoped>
 .locations-grid {
   color: white;
-  justify-content: center;
-  align-items: center;
   display: flex;
   flex-direction: column;
-  justify-content: space-around;
+  height: 237px;
+  width: 320px;
   border-radius: 8px;
   padding: 0.5rem;
+  overflow: hidden;
+  box-sizing: border-box;
 }
 
-.title {
-  background-color: rgb(41, 41, 41);
-  border-radius: 20px;
-  font-size: 1.5rem;
-  width: 100%;
-  padding: 0.5rem;
-  text-align: center;
-  margin-bottom: 1rem;
-}
 
 .actions-container {
   display: flex;
   flex-direction: column;
   width: 100%;
   gap: 0.5rem;
+  flex: 1;
+  justify-content: center;
+  margin-top: 1rem;
+  margin-bottom: 1rem;
 }
 
 .flex-row {

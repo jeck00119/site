@@ -40,14 +40,20 @@
         />
       </div>
 
-      <!-- Location Shortcuts -->
-      <div class="shortcuts-section">
-        <LocationShortcuts
-          :axis-uid="axisUid"
-          :is-connected="isConnected"
-          @shortcut-executed="onShortcutExecuted"
-          @shortcut-configured="onShortcutConfigured"
-        />
+      <!-- Location Tabs (Shortcuts & Sequence) -->
+      <div class="location-tabs-section">
+        <div class="tabs-inner-container">
+          <LocationTabs
+            :axis-uid="axisUid"
+            :is-connected="isConnected"
+            @shortcut-executed="onShortcutExecuted"
+            @shortcut-configured="onShortcutConfigured"
+            @sequence-executed="onSequenceExecuted"
+            @sequence-paused="onSequencePaused"
+            @sequence-stopped="onSequenceStopped"
+            @tab-changed="onTabChanged"
+          />
+        </div>
       </div>
 
       <!-- Feedrate and State -->
@@ -69,7 +75,6 @@
           :is-connected="isConnected"
           @steps-changed="onStepsChanged"
           @feedrate-changed="onFeedrateChanged"
-          @keyboard-move="onKeyboardMove"
         />
       </div>
 
@@ -132,7 +137,7 @@ import PositionDisplay from "./PositionDisplay.vue";
 import LocationManagement from "./LocationManagement.vue";
 import MovementControls from "./MovementControls.vue";
 import GeneralCommands from "./GeneralCommands.vue";
-import LocationShortcuts from "./LocationShortcuts.vue";
+import LocationTabs from "./LocationTabs.vue";
 import FeedrateState from "./FeedrateState.vue";
 import StepsControl from "./StepsControl.vue";
 import TerminalConsole from "./TerminalConsole.vue";
@@ -144,7 +149,7 @@ export default {
     LocationManagement,
     MovementControls,
     GeneralCommands,
-    LocationShortcuts,
+    LocationTabs,
     FeedrateState,
     StepsControl,
     TerminalConsole
@@ -174,6 +179,9 @@ export default {
     // Cross-platform port error dialog state
     const showPortErrorDialog = ref(false);
     const portErrorData = ref({});
+    
+    // Tab state tracking
+    const isSequenceTabActive = ref(false);
 
     // WebSocket connection
     let socketInstance = null;
@@ -417,6 +425,22 @@ export default {
       console.log("Shortcut configured:", data);
     }
 
+    function onSequenceExecuted(data) {
+      if (data.completed) {
+        addToConsole(`Sequence completed: ${data.steps} positions executed`);
+      } else {
+        addToConsole(`Sequence execution started`);
+      }
+    }
+
+    function onSequencePaused(data) {
+      addToConsole(`Sequence paused at step ${data.currentStep + 1}`);
+    }
+
+    function onSequenceStopped() {
+      addToConsole(`Sequence stopped`);
+    }
+
     function onLocationSaved(data) {
       addToConsole(`Location saved: ${data.name} (${data.type})`);
     }
@@ -433,29 +457,10 @@ export default {
       terminalMessages.value = [];
     }
     
-    // Keyboard control handler
-    async function onKeyboardMove(moveData) {
-      try {
-        if (moveData.direction === 'plus') {
-          await cncStore.dispatch('cnc/api_increaseAxis', {
-            cncUid: moveData.cncUid,
-            axis: moveData.axis,
-            step: moveData.step,
-            feedrate: moveData.feedrate
-          });
-        } else {
-          await cncStore.dispatch('cnc/api_decreaseAxis', {
-            cncUid: moveData.cncUid,
-            axis: moveData.axis,
-            step: moveData.step,
-            feedrate: moveData.feedrate
-          });
-        }
-        addToConsole(`Keyboard move: ${moveData.axis.toUpperCase()}${moveData.direction === 'plus' ? '+' : '-'} ${moveData.step} @ ${moveData.feedrate}`);
-      } catch (error) {
-        addToConsole(`Keyboard move failed: ${error.message}`);
-      }
+    function onTabChanged(tabIndex) {
+      isSequenceTabActive.value = tabIndex === 1; // 1 is the sequence tab
     }
+    
 
     // Connection handling methods
     async function handleConnect() {
@@ -508,6 +513,7 @@ export default {
       showPortErrorDialog,
       portErrorData,
       isLoading,
+      isSequenceTabActive,
       
       // Computed from CNC store
       pos,
@@ -535,11 +541,14 @@ export default {
       onCommandExecuted,
       onShortcutExecuted,
       onShortcutConfigured,
+      onSequenceExecuted,
+      onSequencePaused,
+      onSequenceStopped,
       onLocationSaved,
       onLocationDeleted,
       onTerminalCommand,
       onTerminalCleared,
-      onKeyboardMove
+      onTabChanged,
     };
   }
 };
@@ -606,15 +615,24 @@ export default {
   padding: 0.5rem;
 }
 
-.shortcuts-section {
+.location-tabs-section {
   grid-column: 10/15;
   grid-row: 5/8;
   color: white;
   background-color: #161616;
   border-radius: 8px;
-  overflow: hidden;
+  overflow: visible; /* Allow inner container to potentially expand */
   padding: 0.5rem;
+  position: relative; /* Allow absolute positioning of inner container */
 }
+
+.tabs-inner-container {
+  width: 320px;
+  height: 280px;
+  /* This is where we can easily adjust size for sequence expansion */
+}
+
+
 
 .feedrate-section {
   grid-column: 10/15;

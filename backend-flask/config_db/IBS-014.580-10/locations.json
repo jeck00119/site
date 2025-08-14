@@ -19,6 +19,26 @@
             "x": 100,
             "y": 100,
             "z": 5
+        },
+        "3": {
+            "axis_uid": "8a84a38d-1587-4705-b6f5-801abafa330d",
+            "degree_in_step": "deg",
+            "feedrate": 1500,
+            "name": "test1",
+            "uid": "4264366a-6ecb-4b45-a5ee-6faaa1dd4359",
+            "x": 0,
+            "y": 0,
+            "z": 0
+        },
+        "4": {
+            "axis_uid": "8a84a38d-1587-4705-b6f5-801abafa330d",
+            "degree_in_step": "deg",
+            "feedrate": 1500,
+            "name": "test2",
+            "uid": "056586b4-4bc2-4ee2-8ba0-91a2a785b504",
+            "x": 0,
+            "y": 0,
+            "z": 0
         }
     }
 }

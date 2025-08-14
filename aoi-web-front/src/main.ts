@@ -18,7 +18,8 @@ import { faHouse, faMagnifyingGlassChart, faScrewdriverWrench, faGear, faGears, 
     faLocationDot, faClock, faArrowsUpDownLeftRight, faSun, faCircleHalfStroke, faDroplet,
     faGem, faChartLine, faPlusMinus, faWandMagicSparkles, faCameraRotate, faArrowsLeftRight,
     faExpand, faCrop, faSignature, faFlagCheckered, faNetworkWired, faPlayCircle, faImage,
-    faSdCard, faArrowsRotate, faArrowRotateLeft, faArrowRotateRight, faLockOpen, faCubesStacked } from '@fortawesome/free-solid-svg-icons';
+    faSdCard, faArrowsRotate, faArrowRotateLeft, faArrowRotateRight, faLockOpen, faCubesStacked,
+    faChevronLeft, faChevronRight, faChevronUp, faChevronDown, faList, faPause } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome';
 
 import { OhVueIcon, addIcons } from 'oh-vue-icons';
@@ -138,6 +139,12 @@ library.add(faArrowRotateLeft);
 library.add(faArrowRotateRight);
 library.add(faLockOpen);
 library.add(faCubesStacked);
+library.add(faChevronLeft);
+library.add(faChevronRight);
+library.add(faChevronUp);
+library.add(faChevronDown);
+library.add(faList);
+library.add(faPause);
 
 
 
