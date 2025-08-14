@@ -277,7 +277,9 @@ export default {
         try {
             const { response, responseData } = await api.post(`/cnc/${payload.cncUid}/initialize`);
             if (!response.ok) {
-                const error = new Error(responseData.detail || `Failed to initialize CNC ${payload.cncUid}`);
+                // Extract detailed error message from backend response
+                const errorMessage = responseData?.detail || responseData?.message || `Failed to initialize CNC ${payload.cncUid}`;
+                const error = new Error(errorMessage);
                 console.error('CNC Initialize Error:', (error as Error).message);
                 throw error;
             }

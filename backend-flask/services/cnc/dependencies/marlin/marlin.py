@@ -611,7 +611,9 @@ class Marlin:
         if self._iface:
             # Add line numbering and checksum for Marlin protocol
             formatted_line = self._format_line_with_checksum(line.strip())
-            print(f"[MARLIN DEBUG] Sending: {repr(formatted_line)}")
+            # Only log non-polling commands to reduce spam
+            if not line.strip().startswith('M114'):
+                print(f"[MARLIN] Sending: {line.strip()}")
             self._iface.write(formatted_line)
             # Add configurable delay to prevent buffer overflow and command fragmentation
             import time
@@ -655,8 +657,6 @@ class Marlin:
                         self.callback("on_stateupdate", self.current_mode, self.current_position,
                                       self.current_work_position)
                     elif re.search(r'X:(-?[\d.]+) Y:(-?[\d.]+) Z:(-?[\d.]+)', line):
-                        print(f"[MARLIN PARSE] Position line regex matched: {line}")
-                        self.logger.debug(f"[MARLIN QUEUE] M114 regex matched, calling _update_state_from_m114")
                         self._update_state_from_m114(line)
                     elif line.startswith("echo:"):
                         self._parse_settings(line)
@@ -766,7 +766,6 @@ class Marlin:
 
     def _update_state_from_m114(self, line):
         try:
-            self.logger.debug(f"[MARLIN PARSE] Processing M114 line: {line}")
             x_match = re.search(r'X:(-?[\d.]+)', line)
             y_match = re.search(r'Y:(-?[\d.]+)', line)
             z_match = re.search(r'Z:(-?[\d.]+)', line)
@@ -778,7 +777,6 @@ class Marlin:
 
                 self.current_work_position = (w_pos_x, w_pos_y, w_pos_z)
                 self.current_position = self.current_work_position
-                print(f"[MARLIN PARSE] Updated position to: {self.current_position}")
 
                 # Handle position change detection
                 if self._last_position is None:
@@ -805,8 +803,6 @@ class Marlin:
                 if (self.current_mode != self._last_mode or
                         self.current_position != self._last_position or
                         self.current_work_position != self._last_work_position):
-                    self.logger.debug(f"[MARLIN POSITION] Sending on_stateupdate: mode={self.current_mode}, pos={self.current_position}, wpos={self.current_work_position}")
-                    print(f"[MARLIN CALLBACK] Sending on_stateupdate: mode={self.current_mode}, pos={self.current_position}, wpos={self.current_work_position}")
                     self.callback("on_stateupdate", self.current_mode, self.current_position,
                                   self.current_work_position)
 

@@ -96,5 +96,33 @@ class ServiceManager:
                     
         except Exception as e:
             logger.warning(f"Error during service cleanup: {e}")
+        
+        # Final cleanup: Force terminate any remaining threads
+        cls._force_cleanup_threads()
             
         logger.info("Service cleanup completed")
+    
+    @classmethod
+    def _force_cleanup_threads(cls):
+        """Force cleanup any remaining threads that might prevent proper shutdown"""
+        import threading
+        import time
+        
+        try:
+            # Give services a moment to clean up
+            time.sleep(0.5)
+            
+            active_threads = [t for t in threading.enumerate() if t != threading.current_thread()]
+            if len(active_threads) > 1:  # Main thread + current thread
+                logger.warning(f"Found {len(active_threads)} active threads during shutdown:")
+                for thread in active_threads:
+                    logger.warning(f"  - {thread.name}: {'daemon' if thread.daemon else 'non-daemon'}, alive: {thread.is_alive()}")
+                
+                # Set remaining threads as daemon so they don't prevent shutdown
+                for thread in active_threads:
+                    if thread.is_alive() and not thread.daemon:
+                        thread.daemon = True
+                        logger.info(f"  Set thread {thread.name} as daemon for cleanup")
+        
+        except Exception as e:
+            logger.warning(f"Error during thread cleanup: {e}")

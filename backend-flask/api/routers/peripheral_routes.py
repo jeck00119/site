@@ -3,16 +3,18 @@ import subprocess
 from asyncio import sleep
 from typing import Dict, Any
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from starlette import status
 from starlette.responses import JSONResponse
 from starlette.websockets import WebSocket, WebSocketDisconnect
 from wsproto.utilities import LocalProtocolError
 
+from api.dependencies.services import get_service_by_type
 from api.error_handlers import create_error_response
 from api.route_utils import RouteHelper
 from api.ws_connection_manager import ConnectionManager
-from src.platform_utils import is_windows, is_linux, CommandExecutor
+from services.port_manager.port_manager import UnifiedUSBManager
+from src.platform_utils import CommandExecutor
 
 router = APIRouter(
     tags=['peripheral'],
@@ -25,7 +27,8 @@ manager = ConnectionManager()
 @router.websocket("/{ws_uid}/cognex_status/ws")
 async def websocket_get_cognex_status(
         ws_uid: str,
-        websocket: WebSocket
+        websocket: WebSocket,
+        port_manager: UnifiedUSBManager = Depends(get_service_by_type(UnifiedUSBManager))
 ):
     await manager.connect(ws_uid, websocket)
 
@@ -34,26 +37,14 @@ async def websocket_get_cognex_status(
             if manager.is_closed(ws_uid):
                 break
 
-            ret = {}
-
-            if is_windows():
-                # Windows Cognex device detection
-                ret['status'] = False
-                # TODO: Implement Windows-specific Cognex device detection
-            elif is_linux():
-                # Linux Cognex device detection using lsusb
-                usb_devices = CommandExecutor.check_usb_devices()
-                ret['status'] = any("1447:8022" in device["id"] for device in usb_devices)
-            else:
-                ret['status'] = False
-
-            # if os.path.isdir("/dev/serial/by-id"):
-            #     ret['status'] = True
-            # else:
-            #     ret['status'] = False
+            # Use centralized USB manager for cross-platform Cognex detection
+            cognex_devices = await port_manager.get_available_ports_by_type('dmc_readers')
+            ret = {
+                'status': len(cognex_devices) > 0,
+                'devices': cognex_devices
+            }
 
             await websocket.send_json(ret)
-
             await sleep(1)
 
         await manager.disconnect(ws_uid)
@@ -66,7 +57,11 @@ async def websocket_get_cognex_status(
 
 
 @router.websocket("/{ws_uid}/camera_status/ws")
-async def websocket_get_camera_status(ws_uid: str, websocket: WebSocket):
+async def websocket_get_camera_status(
+        ws_uid: str, 
+        websocket: WebSocket,
+        port_manager: UnifiedUSBManager = Depends(get_service_by_type(UnifiedUSBManager))
+):
     await manager.connect(ws_uid, websocket)
 
     try:
@@ -74,15 +69,14 @@ async def websocket_get_camera_status(ws_uid: str, websocket: WebSocket):
             if manager.is_closed(ws_uid):
                 break
 
-            ret = {}
-            
-            # Use cross-platform camera detection
-            cameras = CommandExecutor.check_camera_devices()
-            ret['status'] = len(cameras) > 0
-            ret['cameras'] = cameras
+            # Use centralized USB manager for cross-platform camera detection
+            cameras = await port_manager.get_available_ports_by_type('cameras')
+            ret = {
+                'status': len(cameras) > 0,
+                'cameras': cameras
+            }
 
             await websocket.send_json(ret)
-
             await sleep(1)
 
         await manager.disconnect(ws_uid)

@@ -36,6 +36,92 @@ class CncService(metaclass=Singleton):
     @staticmethod
     def get_available_types():
         return ["GRBL", "FluidNC", "Marlin"]
+    
+    def _sync_validate_port(self, port_manager, port: str, expected_device_type: str):
+        """Synchronous port validation - fallback when async fails"""
+        try:
+            import serial.tools.list_ports
+            
+            # Device type names mapping
+            device_type_names = {
+                'cncs': 'CNC machine',
+                'dmc_readers': 'DMC reader (Cognex)',
+                'ultra_arm_robots': 'Ultra Arm robot',
+                'cameras': 'camera device',
+                'profilometers': 'profilometer (Keyence/SICK)',
+            }
+            
+            # Get the actual port name (remove description if present)
+            actual_port = port.split('(')[0].strip() if '(' in port else port
+            expected_name = device_type_names.get(expected_device_type, expected_device_type)
+            
+            result = {
+                'is_valid': False,
+                'is_correct_device_type': False,
+                'expected_device_type': expected_device_type,
+                'expected_device_name': expected_name,
+                'actual_device_types': [],
+                'actual_device_name': '',
+                'device_description': '',
+                'error_message': '',
+                'suggested_action': '',
+                'port': actual_port
+            }
+            
+            # Find the device using synchronous serial port listing
+            port_device = None
+            for comport in serial.tools.list_ports.comports():
+                if comport.device == actual_port:
+                    device_info = port_manager._create_device_info(comport)
+                    port_device = device_info
+                    break
+            
+            if port_device:
+                device_types = port_device['device_types']
+                result['actual_device_types'] = device_types
+                result['device_description'] = port_device['description']
+                
+                # Check if port has the expected device type
+                if expected_device_type in device_types:
+                    result['is_valid'] = True
+                    result['is_correct_device_type'] = True
+                    result['error_message'] = f"Port {actual_port} validated as {expected_name}"
+                else:
+                    result['is_valid'] = False
+                    result['is_correct_device_type'] = False
+                    
+                    # Determine what device type is actually connected
+                    if 'dmc_readers' in device_types:
+                        result['actual_device_name'] = 'DMC reader (Cognex)'
+                    elif 'cncs' in device_types:
+                        result['actual_device_name'] = 'CNC machine'
+                    elif 'ultra_arm_robots' in device_types:
+                        result['actual_device_name'] = 'Ultra Arm robot'
+                    elif 'profilometers' in device_types:
+                        result['actual_device_name'] = 'profilometer (Keyence/SICK)'
+                    elif 'cameras' in device_types:
+                        result['actual_device_name'] = 'camera device'
+                    else:
+                        result['actual_device_name'] = ', '.join(device_types) if device_types else 'unknown device'
+                    
+                    result['error_message'] = (
+                        f"Configuration mismatch: Expected {expected_name} on port {actual_port}, "
+                        f"but found {result['actual_device_name']} instead"
+                    )
+                    result['suggested_action'] = f"Please update configuration to use the correct port for {expected_name}"
+            else:
+                result['error_message'] = f"Port {actual_port} not found or not connected"
+                result['suggested_action'] = f"Check if {expected_name} is connected and try again"
+                
+            return result
+            
+        except Exception as e:
+            self.logger.error(f"Sync validation failed: {e}")
+            return {
+                'is_valid': False,
+                'error_message': f"Port validation failed: {str(e)}",
+                'suggested_action': "Connection will be attempted anyway"
+            }
 
     def start_cnc_service(self):
         pass
@@ -88,7 +174,6 @@ class CncService(metaclass=Singleton):
 
     def _callback(self, uid, *data):
         if uid in self._callbacks_buffers:
-            self.logger.debug(f"[CNC SERVICE] Callback received for {uid}: {data}")
             self._callbacks_buffers[uid].append(data)
 
     def read_callback_buffer(self, uid):
@@ -118,6 +203,7 @@ class CncService(metaclass=Singleton):
         # Add collected messages to batch buffer
         self._batch_buffers[uid].extend(messages_collected)
         
+        
         # Check if we should send a batch
         time_since_last_batch = current_time - self._last_batch_time[uid]
         should_send_batch = (
@@ -130,6 +216,7 @@ class CncService(metaclass=Singleton):
             batch = self._batch_buffers[uid].copy()
             self._batch_buffers[uid].clear()
             self._last_batch_time[uid] = current_time
+            
             
             # Return batch or single message based on size
             if len(batch) == 1:
@@ -260,6 +347,50 @@ class CncService(metaclass=Singleton):
                 callback=lambda *vars: self._callback(cnc_model.uid, vars)
             )
         
+        # VALIDATE PORT TYPE BEFORE CONNECTION
+        try:
+            from services.port_manager.port_manager import UnifiedUSBManager
+            import asyncio
+            
+            port_manager = UnifiedUSBManager()
+            
+            # Use the existing event loop if available, otherwise create a new one
+            try:
+                # Try to get current event loop
+                loop = asyncio.get_running_loop()
+                # If we have a running loop, use asyncio.create_task (but we can't await here)
+                # So we'll use a synchronous approach instead
+                raise RuntimeError("Running loop detected, use sync approach")
+            except RuntimeError:
+                # No running loop, we can create one
+                try:
+                    loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop)
+                    validation_result = loop.run_until_complete(port_manager.validate_port_for_device_type(cnc_model.port, 'cncs'))
+                    loop.close()
+                except Exception as async_error:
+                    self.logger.warning(f"CNC {cnc_model.uid}: Async validation failed ({async_error}), using sync validation")
+                    # Fall back to synchronous validation
+                    validation_result = self._sync_validate_port(port_manager, cnc_model.port, 'cncs')
+            
+            self.logger.info(f"CNC {cnc_model.uid}: {validation_result['error_message']}")
+            
+            if not validation_result['is_valid']:
+                error_msg = f"{validation_result['error_message']}. {validation_result['suggested_action']}"
+                self.logger.warning(f"CNC {cnc_model.uid}: {error_msg}")
+                self._callback(cnc_model.uid, ('connection_error', error_msg, True, cnc_model.uid))
+                
+                # Store connection error and set mock object
+                self._connection_errors[cnc_model.uid] = error_msg
+                self._cnc_objects[cnc_model.uid] = Mock()
+                raise SerialException(error_msg)
+        
+        except ImportError:
+            self.logger.warning(f"CNC {cnc_model.uid}: Port manager not available - skipping port validation")
+        except Exception as validation_error:
+            self.logger.warning(f"CNC {cnc_model.uid}: Port validation failed: {validation_error} - attempting connection anyway")
+        
+        # PROCEED WITH CONNECTION IF VALIDATION PASSED
         try:
             self._cnc_objects[cnc_model.uid].init()
         except SerialException as e:
@@ -392,7 +523,8 @@ class CncService(metaclass=Singleton):
         # Check if connection failed and raise exception to inform the API
         if cnc_uid in self._cnc_objects and isinstance(self._cnc_objects[cnc_uid], Mock):
             connection_error = self._connection_errors.get(cnc_uid, 'Unknown connection error')
-            raise Exception(f"Failed to connect to CNC: {connection_error}")
+            # Pass through the detailed validation error message directly to the frontend
+            raise Exception(connection_error)
 
     def update_cnc(self, cnc_uid):
         self._deinit_cnc(cnc_uid)

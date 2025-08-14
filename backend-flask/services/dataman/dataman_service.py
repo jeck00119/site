@@ -1,10 +1,12 @@
 import os
 import threading
 import time
+import asyncio
 
 import serial
 
 from src.metaclasses.singleton import Singleton
+from services.port_manager.port_manager import UnifiedUSBManager
 
 
 class DatamanService(metaclass=Singleton):
@@ -16,16 +18,54 @@ class DatamanService(metaclass=Singleton):
         self.running_lock = threading.Lock()
         self.data_lock = threading.Lock()
         self.data = ''
+        self.port_manager = UnifiedUSBManager()
 
     def initialize(self):
         self.setup_serial()
         # self.start_response_thread()
 
     def setup_serial(self):
-        directory_path = "/dev/serial/by-id"
-        files = [f for f in os.listdir(directory_path) if "cognex" in f]
-        if len(files) != 0:
-            self.serial = serial.Serial(port=f'{directory_path}/{files[0]}', timeout=1)
+        """Setup serial connection using cross-platform USB device detection with validation."""
+        try:
+            # Use async method in sync context
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            
+            # If port was specified in constructor, validate it
+            if self.port:
+                validation_result = loop.run_until_complete(
+                    self.port_manager.validate_port_for_device_type(self.port, 'dmc_readers')
+                )
+                print(f"DatamanService: {validation_result['error_message']}")
+                
+                if validation_result['is_valid']:
+                    # Use the configured port if it's valid
+                    device_port = validation_result['port']
+                    self.port = device_port
+                    self.serial = serial.Serial(port=device_port, timeout=1)
+                    print(f"DatamanService: Connected to DMC reader at {device_port}")
+                    loop.close()
+                    return
+                else:
+                    print(f"DatamanService: Configured port validation failed - {validation_result['suggested_action']}")
+            
+            # Get DMC reader devices using centralized port manager
+            dmc_devices = loop.run_until_complete(self.port_manager.get_dmc_reader_devices())
+            
+            if dmc_devices:
+                # Use the first available DMC reader device
+                device_port = dmc_devices[0]['device']
+                self.port = device_port
+                self.serial = serial.Serial(port=device_port, timeout=1)
+                print(f"DatamanService: Connected to DMC reader at {device_port}")
+            else:
+                print("DatamanService: No DMC reader devices found")
+                self.serial = None
+            
+            loop.close()
+        except Exception as e:
+            print(f"DatamanService: Failed to setup serial connection: {e}")
+            self.serial = None
 
     def start_response_thread(self):
         self.running = True

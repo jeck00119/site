@@ -77,7 +77,7 @@ export default {
   },
   emits: ['shortcut-executed', 'shortcut-configured'],
   setup(props, { emit }) {
-    const cncStore = useCncStore();
+    const cncStore = useCncStore(props.axisUid);
     
     const showShortcutDialog = ref(false);
     const selectedLocation = ref(null);
@@ -86,13 +86,24 @@ export default {
     const currentShortcutIndex = ref(null);
     const currentShortcutButton = ref(null);
 
-    // These are already computed refs from the composables
+    // Get locations from the composable - this is already a computed ref
+    const { locations } = cncStore;
+    
 
-
-    const locations = cncStore.locations;
-
-    onMounted(() => {
+    onMounted(async () => {
       loadShortcuts();
+      // Fetch locations when component mounts to ensure they're available
+      try {
+        await cncStore.fetchLocations(props.axisUid);
+      } catch (error) {
+        console.error("[SHORTCUT DEBUG] Failed to fetch locations:", error);
+        // Fallback: try loading all locations
+        try {
+          await cncStore.loadLocations();
+        } catch (loadError) {
+          console.error("[SHORTCUT DEBUG] Failed to load locations:", loadError);
+        }
+      }
     });
 
     function loadShortcuts() {
@@ -112,10 +123,17 @@ export default {
       localStorage.setItem(`cnc-shortcuts-${props.axisUid}`, JSON.stringify(shortcuts.value));
     }
 
-    function openShortcutDialog(event) {
+    async function openShortcutDialog(event) {
       // Only allow configuration when connected
       if (!props.isConnected) {
         return;
+      }
+      
+      // Fetch fresh locations for this axis right before opening the dialog
+      try {
+        await cncStore.fetchLocations(props.axisUid);
+      } catch (error) {
+        console.error("[SHORTCUT] Failed to fetch locations:", error);
       }
       
       currentShortcutButton.value = event.target;
@@ -132,23 +150,96 @@ export default {
       renamedLocation.value = '';
     }
 
-    function executeLocationShortcut(event) {
+    async function executeLocationShortcut(event) {
       const shortcutIndex = parseInt(event.target.dataset.shortcutIndex);
       const shortcut = shortcuts.value[shortcutIndex];
       
       // Only execute if connected and shortcut exists
       if (props.isConnected && shortcut && shortcut.locationUid) {
-        cncStore.moveToLocation({
-          cncUid: props.axisUid,
-          location: shortcut.locationUid,
-          timeout: 5,
-          block: false,
-        });
-        
-        emit('shortcut-executed', { 
-          shortcut, 
-          index: shortcutIndex 
-        });
+        try {
+          // Get fresh locations to find the target location
+          await cncStore.fetchLocations(props.axisUid);
+          const targetLocation = locations.value.find(loc => loc.uid === shortcut.locationUid);
+          
+          if (!targetLocation) {
+            console.error('Target location not found:', shortcut.locationUid);
+            return;
+          }
+          
+          // Get current position from CNC store
+          const currentPos = cncStore.pos?.value || { x: 0, y: 0, z: 0 };
+          // Calculate movement steps needed for each axis (round to avoid floating point issues)
+          const deltaX = Math.round((targetLocation.x - currentPos.x) * 1000) / 1000;
+          const deltaY = Math.round((targetLocation.y - currentPos.y) * 1000) / 1000;
+          const deltaZ = Math.round((targetLocation.z - currentPos.z) * 1000) / 1000;
+          
+          // Move each axis using the same logic as movement buttons
+          const feedrate = targetLocation.feedrate || 1500;
+          
+          if (deltaX !== 0) {
+            if (deltaX > 0) {
+              await cncStore.increaseAxis({
+                cncUid: props.axisUid,
+                axis: 'x',
+                step: Math.abs(deltaX),
+                feedrate: feedrate
+              });
+            } else {
+              await cncStore.decreaseAxis({
+                cncUid: props.axisUid,
+                axis: 'x',
+                step: Math.abs(deltaX),
+                feedrate: feedrate
+              });
+            }
+          }
+          
+          if (deltaY !== 0) {
+            if (deltaY > 0) {
+              await cncStore.increaseAxis({
+                cncUid: props.axisUid,
+                axis: 'y',
+                step: Math.abs(deltaY),
+                feedrate: feedrate
+              });
+            } else {
+              await cncStore.decreaseAxis({
+                cncUid: props.axisUid,
+                axis: 'y',
+                step: Math.abs(deltaY),
+                feedrate: feedrate
+              });
+            }
+          }
+          
+          if (deltaZ !== 0) {
+            if (deltaZ > 0) {
+              await cncStore.increaseAxis({
+                cncUid: props.axisUid,
+                axis: 'z',
+                step: Math.abs(deltaZ),
+                feedrate: feedrate
+              });
+            } else {
+              await cncStore.decreaseAxis({
+                cncUid: props.axisUid,
+                axis: 'z',
+                step: Math.abs(deltaZ),
+                feedrate: feedrate
+              });
+            }
+          }
+          
+          emit('shortcut-executed', { 
+            shortcut, 
+            index: shortcutIndex,
+            targetLocation,
+            movements: { deltaX, deltaY, deltaZ }
+          });
+          
+        } catch (error) {
+          console.error('[SHORTCUT] Error executing shortcut:', error);
+        }
       }
     }
 

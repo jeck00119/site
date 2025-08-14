@@ -63,7 +63,9 @@ class Interface:
                 try:
                     self._thread_read.join(timeout=2.0)  # 2 second timeout
                     if self._thread_read.is_alive():
-                        self.logger.warning("Serial interface {}: Read thread did not stop within timeout".format(self.name))
+                        self.logger.warning("Serial interface {}: Read thread did not stop within timeout - forcing shutdown".format(self.name))
+                        # Force thread to exit by setting daemon and letting it be garbage collected
+                        self._thread_read.daemon = True
                     else:
                         self.logger.debug("Serial interface {}: Read thread stopped successfully".format(self.name))
                 except Exception as e:
@@ -86,46 +88,51 @@ class Interface:
             return 0
 
     def _run(self):
-        print(">>>> [INTERFACE] Read thread has started.")
         while self._do_read:
             try:
                 if self._serial and self._serial.isOpen():
-                    print(">>>> [INTERFACE] Waiting for data from serial port...")
-                    data = self._serial.read_until(bytes("\r\n", "ascii"))
+                    # Use read() with timeout instead of read_until() to prevent blocking
+                    data = self._serial.read(1024)  # Read up to 1024 bytes
                     if len(data) > 0:
-                        print(f">>>> [INTERFACE] RAW DATA RECEIVED: {data}")
-                        data_to_process = self._buf + data.decode('ascii')
-                        self._buf = ""
-                        while True:
-                            match = re.search("^([^\r\n]*)\r?\n(.*)", data_to_process, re.S)
-                            if not match:
-                                self._buf = data_to_process
-                                break
-                            else:
-                                print(f">>>> [INTERFACE] Parsed line and putting into queue: '{match.group(1)}'")
-                                self.queue.put(match.group(1))
-                                data_to_process = match.group(2)
-                                if self.logger.isEnabledFor(9):
-                                    self.logger.log(9, "{}:READ: '{}'".format(self.name, match.group(1)))
+                        try:
+                            data_to_process = self._buf + data.decode('ascii', errors='ignore')
+                            self._buf = ""
+                            while True:
+                                match = re.search("^([^\r\n]*)\r?\n(.*)", data_to_process, re.S)
+                                if not match:
+                                    self._buf = data_to_process
+                                    break
+                                else:
+                                    line = match.group(1)
+                                    if line:  # Only process non-empty lines
+                                        self.queue.put(line)
+                                        if self.logger.isEnabledFor(9):
+                                            self.logger.log(9, "{}:READ: '{}'".format(self.name, line))
+                                    data_to_process = match.group(2)
+                        except UnicodeDecodeError:
+                            # Skip corrupted data silently  
+                            self._buf = ""
                     else:
-                        print(">>>> [INTERFACE] Serial read timed out (no data).")
+                        # No data available, check if we should continue
+                        if not self._do_read:
+                            break
                 else:
                     # Serial port is closed, break the loop
-                    print(">>>> [INTERFACE] Serial port is closed, stopping read thread")
                     break
-                time.sleep(0.01)  # Reduced from 40ms to 10ms for faster serial reading
+                time.sleep(0.01)  # Small delay to prevent CPU spinning
             except (serial.SerialException, OSError) as e:
                 if not self._do_read:
                     # Expected exception when stopping
-                    print(">>>> [INTERFACE] Serial exception during shutdown (expected)")
                     break
                 self.logger.error("Problem during reading the serial port. Retrying every 3 seconds.")
-                time.sleep(3)
+                # Check _do_read during retry wait to allow immediate shutdown
+                for _ in range(30):  # 30 * 0.1s = 3 seconds total
+                    if not self._do_read:
+                        return  # Exit immediately if shutdown requested
+                    time.sleep(0.1)
             except Exception:
                 if not self._do_read:
                     # Expected exception when stopping
-                    print(">>>> [INTERFACE] Exception during shutdown (expected)")
                     break
                 self.logger.error("Unknown problem")
                 traceback.print_exc()
-        print(">>>> [INTERFACE] Read thread has stopped.")

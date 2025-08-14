@@ -223,13 +223,14 @@ class Gerbil:
         self.gcode_parser_state_requested = True
         self.poll_stop()
         
-        # Stop reading thread
+        # Stop reading thread immediately
         self.logger.debug("{}: Stopping reading thread...".format(self.name))
         self._iface_read_do = False
         
-        # Stop the interface (this will close the serial port and interrupt blocking reads)
+        # Stop the interface first (this will close the serial port and interrupt blocking reads)
         try:
             if self._iface:
+                self.logger.debug("{}: Stopping interface...".format(self.name))
                 self._iface.stop()
         except Exception as e:
             self.logger.warning(f"{self.name}: Error stopping interface: {e}")
@@ -237,12 +238,13 @@ class Gerbil:
         # Add dummy message to wake up any blocked queue.get() calls
         try:
             self._queue.put("dummy_msg_for_joining_thread")
-        except:
-            pass
+        except Exception as e:
+            self.logger.debug(f"{self.name}: Could not add dummy message to queue: {e}")
         
-        # Join with timeout to prevent hanging
+        # Join reading thread with timeout to prevent hanging
         if self._thread_read_iface:
             try:
+                self.logger.debug("{}: Waiting for reading thread to join...".format(self.name))
                 self._thread_read_iface.join(timeout=2.0)  # 2 second timeout
                 if self._thread_read_iface.is_alive():
                     self.logger.warning(f"{self.name}: Reading thread did not stop within timeout")
@@ -251,18 +253,29 @@ class Gerbil:
             except Exception as e:
                 self.logger.warning(f"{self.name}: Error joining reading thread: {e}")
         
-        # Also need to stop the polling thread with timeout
+        # Stop the polling thread with timeout (if still running)
         if self._thread_polling and self._thread_polling.is_alive():
             try:
+                self.logger.debug("{}: Waiting for polling thread to join...".format(self.name))
                 self._thread_polling.join(timeout=1.0)  # 1 second timeout
                 if self._thread_polling.is_alive():
                     self.logger.warning(f"{self.name}: Polling thread did not stop within timeout")
+                else:
+                    self.logger.debug("{}: Polling thread successfully joined.".format(self.name))
             except Exception as e:
                 self.logger.warning(f"{self.name}: Error joining polling thread: {e}")
+        
+        # Clear all buffers like Marlin does
+        try:
+            GrblBufferManager.clear_all_buffers(self)
+        except Exception as e:
+            self.logger.debug(f"{self.name}: Error clearing buffers: {e}")
             
         self.logger.info("{}: Disconnect completed.".format(self.name))
         self.connected = False
         self._iface = None
+        self._thread_read_iface = None
+        self._thread_polling = None
         self.callback("on_disconnected")
 
     def set_callback(self, callback):
@@ -527,73 +540,94 @@ class Gerbil:
             time.sleep(0.05)  # 50ms delay between commands (consistent with Marlin)
 
     def _onread(self):
-        while self._iface_read_do:
-            line = self._queue.get()
-            if len(line) > 0:
-                if line[0] == "<":
-                    self._update_state(line)
-                elif "MSG" in line:
-                    self.callback("on_read", line)
-                elif line == "ok":
-                    self._handle_ok()
-                elif re.match(r"^\[G[0123] .*", line):
-                    self._update_gcode_parser_state(line)
-                    self.callback("on_read", line)
-                elif re.match(r"^\[...:.*", line):
-                    self._update_hash_state(line)
-                    self.callback("on_read", line)
-                    if "PRB" in line:
-                        if self.hash_state_requested:
-                            self._hash_state_sent = False
-                            self.hash_state_requested = False
-                            self.callback("on_hash_stateupdate", self.settings_hash)
-                            self.preprocessor.cs_offsets = self.settings_hash
+        self.logger.debug(f"[GRBL THREAD] _onread thread started, _iface_read_do={self._iface_read_do}")
+        try:
+            while self._iface_read_do:
+                try:
+                    line = self._queue.get()
+                    self.logger.debug(f"[GRBL QUEUE] Processing line from queue: '{line}'")
+                    
+                    # Check for dummy message used to wake up thread during shutdown
+                    if line == "dummy_msg_for_joining_thread":
+                        self.logger.debug("[GRBL THREAD] Received shutdown signal, exiting _onread loop")
+                        break
+                        
+                    if len(line) > 0:
+                        if line[0] == "<":
+                            self._update_state(line)
+                        elif "MSG" in line:
+                            self.callback("on_read", line)
+                        elif line == "ok":
+                            self._handle_ok()
+                        elif re.match(r"^\[G[0123] .*", line):
+                            self._update_gcode_parser_state(line)
+                            self.callback("on_read", line)
+                        elif re.match(r"^\[...:.*", line):
+                            self._update_hash_state(line)
+                            self.callback("on_read", line)
+                            if "PRB" in line:
+                                if self.hash_state_requested:
+                                    self._hash_state_sent = False
+                                    self.hash_state_requested = False
+                                    self.callback("on_hash_stateupdate", self.settings_hash)
+                                    self.preprocessor.cs_offsets = self.settings_hash
+                                else:
+                                    self.callback("on_probe", self.settings_hash["PRB"])
+                        elif "ALARM" in line:
+                            self.cmode = "Alarm"
+                            
+                            # Use centralized alarm handler
+                            GrblErrorHandler.handle_grbl_alarm(self, line, self.logger)
+                            
+                            self.callback("on_stateupdate", self.cmode, self.cmpos, self.cwpos)
+                            self.callback("on_read", line)
+                            self.callback("on_alarm", line)
+                        elif "error" in line:
+                            self._error = True
+                            
+                            # Use centralized error handler
+                            GrblErrorHandler.handle_grbl_error(self, line, self.logger)
+                            
+                            if len(self._rx_buffer_backlog) > 0:
+                                problem_command = self._rx_buffer_backlog[0]
+                                problem_line = self._rx_buffer_backlog_line_number[0]
+                            else:
+                                problem_command = "unknown"
+                                problem_line = -1
+                            self.callback("on_error", line, problem_command, problem_line)
+                            self._set_streaming_complete(True)
+                            self._set_streaming_src_end_reached(True)
+                        elif "Grbl " in line:
+                            self.callback("on_read", line)
+                            self._on_bootup()
+                            self.hash_state_requested = True
+                            self.request_settings()
+                            self.gcode_parser_state_requested = True
                         else:
-                            self.callback("on_probe", self.settings_hash["PRB"])
-                elif "ALARM" in line:
-                    self.cmode = "Alarm"
+                            m = re.match(r"\$(.*)=(.*)", line)
+                            if m:
+                                key = int(m.group(1))
+                                val = m.group(2)
+                                self.settings[key] = {
+                                    "val": val,
+                                    "cmt": 'comment'
+                                }
+                                self.callback("on_read", line)
+                                if key == self._last_setting_number:
+                                    self.callback("on_settings_downloaded", self.settings)
+                            else:
+                                self.callback("on_read", line)
+                except Exception as e:
+                    if self._iface_read_do:
+                        self.logger.error(f"[GRBL THREAD] Error processing queue line: {e}")
+                    # Continue processing even if one line fails
                     
-                    # Use centralized alarm handler
-                    GrblErrorHandler.handle_grbl_alarm(self, line, self.logger)
-                    
-                    self.callback("on_stateupdate", self.cmode, self.cmpos, self.cwpos)
-                    self.callback("on_read", line)
-                    self.callback("on_alarm", line)
-                elif "error" in line:
-                    self._error = True
-                    
-                    # Use centralized error handler
-                    GrblErrorHandler.handle_grbl_error(self, line, self.logger)
-                    
-                    if len(self._rx_buffer_backlog) > 0:
-                        problem_command = self._rx_buffer_backlog[0]
-                        problem_line = self._rx_buffer_backlog_line_number[0]
-                    else:
-                        problem_command = "unknown"
-                        problem_line = -1
-                    self.callback("on_error", line, problem_command, problem_line)
-                    self._set_streaming_complete(True)
-                    self._set_streaming_src_end_reached(True)
-                elif "Grbl " in line:
-                    self.callback("on_read", line)
-                    self._on_bootup()
-                    self.hash_state_requested = True
-                    self.request_settings()
-                    self.gcode_parser_state_requested = True
-                else:
-                    m = re.match(r"\$(.*)=(.*)", line)
-                    if m:
-                        key = int(m.group(1))
-                        val = m.group(2)
-                        self.settings[key] = {
-                            "val": val,
-                            "cmt": 'comment'
-                        }
-                        self.callback("on_read", line)
-                        if key == self._last_setting_number:
-                            self.callback("on_settings_downloaded", self.settings)
-                    else:
-                        self.callback("on_read", line)
+        except Exception as e:
+            self.logger.error(f"[GRBL THREAD] Error in _onread thread: {e}")
+            import traceback
+            self.logger.error(f"[GRBL THREAD] Traceback: {traceback.format_exc()}")
+        finally:
+            self.logger.debug(f"[GRBL THREAD] _onread thread is ending")
 
     def _handle_ok(self):
         if not self.streaming_complete:

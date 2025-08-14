@@ -65,8 +65,11 @@
         <StepsControl
           :selected-steps="selectedSteps"
           :feedrate="selectedFeedrate"
+          :axis-uid="axisUid"
+          :is-connected="isConnected"
           @steps-changed="onStepsChanged"
           @feedrate-changed="onFeedrateChanged"
+          @keyboard-move="onKeyboardMove"
         />
       </div>
 
@@ -123,19 +126,6 @@ import { useRouter } from "vue-router";
 import api from "../../utils/api.js";
 import { useCncStore, useWebSocket, useLoadingState } from '@/composables/useStore';
 
-// Throttle utility for high-frequency updates
-function throttle(func, limit) {
-  let inThrottle;
-  return function() {
-    const args = arguments;
-    const context = this;
-    if (!inThrottle) {
-      func.apply(context, args);
-      inThrottle = true;
-      setTimeout(() => inThrottle = false, limit);
-    }
-  }
-}
 
 // Import child components
 import PositionDisplay from "./PositionDisplay.vue";
@@ -343,19 +333,9 @@ export default {
       }
     }
 
-    // Throttled position update to prevent excessive UI updates using composable
-    const throttledPositionUpdate = throttle((data) => {
-      cncStore.updateCncData(data.uid, {
-        mPos: data.mPos,
-        wPos: data.wPos,
-        state: data.state
-      });
-    }, 50); // Max 20 updates per second
 
     function handleStateUpdate(msg) {
-      // Use throttled updates for position data to improve performance
-      throttledPositionUpdate({
-        uid: props.axisUid,
+      cncStore.updateCncData(props.axisUid, {
         mPos: msg.mPos,
         wPos: msg.wPos,
         state: msg.state
@@ -452,6 +432,30 @@ export default {
     function onTerminalCleared() {
       terminalMessages.value = [];
     }
+    
+    // Keyboard control handler
+    async function onKeyboardMove(moveData) {
+      try {
+        if (moveData.direction === 'plus') {
+          await cncStore.dispatch('cnc/api_increaseAxis', {
+            cncUid: moveData.cncUid,
+            axis: moveData.axis,
+            step: moveData.step,
+            feedrate: moveData.feedrate
+          });
+        } else {
+          await cncStore.dispatch('cnc/api_decreaseAxis', {
+            cncUid: moveData.cncUid,
+            axis: moveData.axis,
+            step: moveData.step,
+            feedrate: moveData.feedrate
+          });
+        }
+        addToConsole(`Keyboard move: ${moveData.axis.toUpperCase()}${moveData.direction === 'plus' ? '+' : '-'} ${moveData.step} @ ${moveData.feedrate}`);
+      } catch (error) {
+        addToConsole(`Keyboard move failed: ${error.message}`);
+      }
+    }
 
     // Connection handling methods
     async function handleConnect() {
@@ -534,7 +538,8 @@ export default {
       onLocationSaved,
       onLocationDeleted,
       onTerminalCommand,
-      onTerminalCleared
+      onTerminalCleared,
+      onKeyboardMove
     };
   }
 };

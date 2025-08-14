@@ -68,12 +68,14 @@ class HardwareConfig(BaseModel):
     serial_inter_byte_timeout: Optional[float] = Field(default=None, description="Serial inter-byte timeout")
     serial_exclusive: bool = Field(default=True, description="Exclusive serial port access")
     
-    # USB Device Configuration
-    usb_scan_interval: int = Field(default=5, ge=1, le=60, description="USB device scan interval in seconds")
-    usb_auto_connect: bool = Field(default=True, description="Auto-connect to USB devices")
+    # USB Device Configuration - DEPRECATED: Use UnifiedUSBManager instead
+    # These settings are kept for backward compatibility only - NOT USED
+    # All USB operations now handled by services/port_manager/port_manager.py UnifiedUSBManager
+    usb_scan_interval: int = Field(default=5, ge=1, le=60, description="DEPRECATED: Use UnifiedUSBManager")
+    usb_auto_connect: bool = Field(default=True, description="DEPRECATED: Use UnifiedUSBManager") 
     usb_vendor_ids: List[str] = Field(
-        default=["0x1234", "0x5678"],
-        description="Allowed USB vendor IDs"
+        default=["0x1447", "0x046d", "0x045e"],
+        description="DEPRECATED: Use UnifiedUSBManager device_types configuration instead"
     )
     
     # Network Device Configuration
@@ -165,7 +167,7 @@ class HardwareConfig(BaseModel):
     
     @validator("usb_vendor_ids")
     def validate_usb_vendor_ids(cls, v):
-        """Validate USB vendor IDs format."""
+        """Validate USB vendor IDs format - DEPRECATED but kept for compatibility."""
         validated = []
         for vid in v:
             if not vid.startswith("0x"):

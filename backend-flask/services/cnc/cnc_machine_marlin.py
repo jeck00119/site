@@ -134,8 +134,6 @@ class CncMachineMarlin(BaseCncMachine):
         if self._marlin:
             try:
                 # Use proper Marlin protocol with line numbering and checksums
-                print(f"[MOVE_BY DEBUG] Using proper Marlin protocol")
-                print(f"[MOVE_BY DEBUG] Params: X={x} Y={y} Z={z} F={feed_rate}")
                 
                 # Immediately set state to Jog when starting movement
                 if self._marlin.current_mode != "Jog":
@@ -149,7 +147,6 @@ class CncMachineMarlin(BaseCncMachine):
                 
                 # Use G1 (linear interpolation) to properly respect feedrate
                 command = f"G1 {self.parse_coordinates(x, y, z, feed_rate)}"
-                print(f"[MOVE_BY DEBUG] Movement command: {command}")
                 self._marlin.stream(command)
                 
                 # Return to absolute mode

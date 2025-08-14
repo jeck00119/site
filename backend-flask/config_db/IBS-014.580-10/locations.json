@@ -9,6 +9,16 @@
             "x": 0,
             "y": 0,
             "z": 0
+        },
+        "2": {
+            "axis_uid": "8a84a38d-1587-4705-b6f5-801abafa330d",
+            "degree_in_step": "deg",
+            "feedrate": 1500,
+            "name": "pos1",
+            "uid": "b4f05ce7-b2be-46da-b041-9e74c6e9eb8a",
+            "x": 100,
+            "y": 100,
+            "z": 5
         }
     }
 }

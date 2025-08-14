@@ -1,3 +1,4 @@
+import asyncio
 from asyncio import sleep
 
 from fastapi import APIRouter, HTTPException, Depends
@@ -43,7 +44,8 @@ async def check_ports(
         port_manager: PortManager = Depends(get_service_by_type(PortManager)),
 ):
     try:
-        return await port_manager.get_available_ports()
+        # Get only CNC-specific ports, excluding DMC readers and other device types
+        return await port_manager.get_cnc_ports()
     except Exception as e:
         raise create_error_response(
             operation="check available ports",
@@ -383,13 +385,19 @@ async def axis_plus(
 @router.get("/{cnc_uid}/__API__/{location_uid}/move_to_location")
 async def move_to_location(
         cnc_uid: str,
-        location_uid,
-        block,
-        timeout,
+        location_uid: str,
+        block: bool,
+        timeout: int,
         cnc_service: CncService = Depends(get_service_by_type(CncService)),
-        location_repository: LocationRepository = Depends(get_service_by_type(LocationRepository))
+        location_repository: LocationRepository = Depends(get_service_by_type(LocationRepository)),
+        configuration_service: ConfigurationService = Depends(get_service_by_type(ConfigurationService))
 ):
     try:
+        # Ensure repository has correct configuration context
+        current_config = configuration_service.get_current_configuration_name()
+        if current_config:
+            location_repository.set_db(current_config)
+            
         handle_cnc_operation_errors("move to location", cnc_service, cnc_uid)
         location = LocationModel(**location_repository.read_id(location_uid))
         await cnc_service.move_to_location(cnc_uid, location, block, timeout)

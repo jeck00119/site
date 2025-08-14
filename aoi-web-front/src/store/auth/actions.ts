@@ -141,7 +141,7 @@ export default {
             if (payload instanceof FormData) {
                 formData = new URLSearchParams();
                 for (let [key, value] of payload.entries()) {
-                    formData.append(key, value);
+                    formData.append(key, value.toString());
                 }
             } else {
                 formData = new URLSearchParams(payload);

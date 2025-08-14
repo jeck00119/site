@@ -107,19 +107,32 @@ async function post<T = any>(url: string, payload?: any, headers?: Headers, time
 
 async function postStream<T = any>(url: string, payload?: any, headers?: Headers): Promise<RequestResponse<T>> {
     try {
-        const mergedHeaders = mergeWithAuthHeaders(headers);
-
-        // Handle different payload types properly
+        let finalHeaders = { ...getAuthHeaders() };
         let body: string | URLSearchParams | FormData;
-        if (payload instanceof URLSearchParams || payload instanceof FormData) {
+        
+        // Handle different payload types properly
+        if (payload instanceof URLSearchParams) {
             body = payload;
+            // For URLSearchParams, set the correct content-type
+            finalHeaders['Content-Type'] = 'application/x-www-form-urlencoded';
+        } else if (payload instanceof FormData) {
+            body = payload;
+            // For FormData, let browser set the content-type (includes boundary)
+            // Don't set Content-Type header
         } else {
             body = JSON.stringify(payload);
+            finalHeaders['Content-Type'] = 'application/json';
         }
+        
+        // Merge with provided headers (allowing override)
+        if (headers) {
+            finalHeaders = { ...finalHeaders, ...headers };
+        }
+
 
         const response = await fetch(url, {
             method: 'POST',
-            headers: mergedHeaders,
+            headers: finalHeaders,
             body: body,
             signal: AbortSignal.timeout(30000) // 30 second timeout for stream requests
         });
