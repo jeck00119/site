@@ -15,7 +15,7 @@ from api.route_utils import RouteHelper, require_authentication
 from repo.repositories import CncRepository, LocationRepository
 from repo.repository_exceptions import UidNotFound, UidNotUnique
 from services.authorization.authorization import get_current_user
-from services.cnc.cnc_models import CncModel, LocationModel
+from services.cnc.cnc_models import CncModel, LocationModel, SequenceModel, SequenceItemModel
 from services.cnc.cnc_service import CncService
 from services.configurations.configurations_service import ConfigurationService
 from services.port_manager.port_manager import PortManager
@@ -489,3 +489,335 @@ async def ws_cnc(
 async def close_ws(cnc_uid):
     await manager.connection_closed(cnc_uid)
     return JSONResponse(status_code=status.HTTP_200_OK, content='')
+
+
+# Position Sequence Endpoints
+@router.get("/{cnc_uid}/sequences")
+async def get_sequences(
+    cnc_uid: str,
+    cnc_repository: CncRepository = Depends(get_service_by_type(CncRepository)),
+    configuration_service: ConfigurationService = Depends(get_service_by_type(ConfigurationService))
+):
+    """Get all saved sequences for a specific CNC"""
+    try:
+        # Ensure repository has correct configuration context
+        current_config = configuration_service.get_current_configuration_name()
+        if current_config:
+            cnc_repository.set_db(current_config)
+        
+        cnc = cnc_repository.read_id(cnc_uid)
+        if not cnc:
+            raise HTTPException(status_code=404, detail=f"CNC {cnc_uid} not found")
+        
+        # Handle different ways the sequences might be stored
+        sequences = []
+        if isinstance(cnc, dict):
+            sequences = cnc.get('sequences', [])
+        elif hasattr(cnc, 'sequences') and cnc.sequences is not None:
+            sequences = cnc.sequences
+        elif hasattr(cnc, '__dict__') and 'sequences' in cnc.__dict__:
+            sequences = cnc.__dict__['sequences'] or []
+        
+        # Ensure we return a list
+        if not isinstance(sequences, list):
+            sequences = []
+        return JSONResponse(status_code=200, content=sequences)
+    except UidNotFound:
+        raise HTTPException(status_code=404, detail=f"CNC {cnc_uid} not found")
+    except Exception as e:
+        print(f"[SEQUENCE] Error getting sequences for CNC {cnc_uid}: {e}")
+        print(f"[SEQUENCE] Exception type: {type(e)}")
+        # Return empty list instead of error to avoid breaking the frontend
+        return JSONResponse(status_code=200, content=[])
+
+
+@router.post("/{cnc_uid}/sequences")
+async def save_sequence(
+    cnc_uid: str,
+    sequence: dict,
+    cnc_repository: CncRepository = Depends(get_service_by_type(CncRepository)),
+    configuration_service: ConfigurationService = Depends(get_service_by_type(ConfigurationService))
+):
+    """Save or update a sequence for a specific CNC"""
+    try:
+        # Ensure repository has correct configuration context
+        current_config = configuration_service.get_current_configuration_name()
+        if current_config:
+            cnc_repository.set_db(current_config)
+        
+        cnc = cnc_repository.read_id(cnc_uid)
+        if not cnc:
+            raise HTTPException(status_code=404, detail=f"CNC {cnc_uid} not found")
+        
+        # Get current CNC data as dict for manipulation - handle TinyDB format
+        if isinstance(cnc, dict):
+            cnc_data = {
+                'uid': cnc.get('uid'),
+                'name': cnc.get('name'),
+                'type': cnc.get('type'), 
+                'port': cnc.get('port'),
+                'sequences': cnc.get('sequences', [])
+            }
+        else:
+            cnc_data = {
+                'uid': getattr(cnc, 'uid', None),
+                'name': getattr(cnc, 'name', None),
+                'type': getattr(cnc, 'type', None),
+                'port': getattr(cnc, 'port', None),
+                'sequences': getattr(cnc, 'sequences', [])
+            }
+        
+        # Initialize sequences if not present
+        if 'sequences' not in cnc_data or cnc_data['sequences'] is None:
+            cnc_data['sequences'] = []
+        
+        # Check if sequence already exists (update) or is new (add)
+        existing_index = next((i for i, s in enumerate(cnc_data['sequences']) 
+                              if s.get('uid') == sequence.get('uid')), None)
+        
+        if existing_index is not None:
+            # Update existing sequence
+            cnc_data['sequences'][existing_index] = sequence
+        else:
+            # Add new sequence
+            cnc_data['sequences'].append(sequence)
+        
+        # Use RouteHelper for consistent updating
+        result = RouteHelper.update_entity(cnc_repository, cnc_data, "CNC")
+        
+        # Return sequence-specific response
+        return JSONResponse(status_code=200, content={
+            "message": "Sequence saved successfully",
+            "sequence": sequence
+        })
+    except UidNotFound:
+        raise HTTPException(status_code=404, detail=f"CNC {cnc_uid} not found")
+    except Exception as e:
+        print(f"[SEQUENCE] Error saving sequence: {e}")
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+
+
+@router.delete("/{cnc_uid}/sequences/{sequence_uid}")
+async def delete_sequence(
+    cnc_uid: str,
+    sequence_uid: str,
+    cnc_repository: CncRepository = Depends(get_service_by_type(CncRepository)),
+    configuration_service: ConfigurationService = Depends(get_service_by_type(ConfigurationService))
+):
+    """Delete a sequence for a specific CNC"""
+    try:
+        # Ensure repository has correct configuration context
+        current_config = configuration_service.get_current_configuration_name()
+        if current_config:
+            cnc_repository.set_db(current_config)
+        
+        cnc = cnc_repository.read_id(cnc_uid)
+        if not cnc:
+            raise HTTPException(status_code=404, detail=f"CNC {cnc_uid} not found")
+        
+        if not hasattr(cnc, 'sequences') or not cnc.sequences:
+            raise HTTPException(status_code=404, detail="No sequences found")
+        
+        # Get current CNC data as dict for manipulation - handle TinyDB format
+        if isinstance(cnc, dict):
+            cnc_data = {
+                'uid': cnc.get('uid'),
+                'name': cnc.get('name'),
+                'type': cnc.get('type'), 
+                'port': cnc.get('port'),
+                'sequences': cnc.get('sequences', [])
+            }
+        else:
+            cnc_data = {
+                'uid': getattr(cnc, 'uid', None),
+                'name': getattr(cnc, 'name', None),
+                'type': getattr(cnc, 'type', None),
+                'port': getattr(cnc, 'port', None),
+                'sequences': getattr(cnc, 'sequences', [])
+            }
+        
+        # Find and remove the sequence
+        initial_length = len(cnc_data.get('sequences', []))
+        cnc_data['sequences'] = [s for s in cnc_data.get('sequences', []) if s.get('uid') != sequence_uid]
+        
+        if len(cnc_data['sequences']) == initial_length:
+            raise HTTPException(status_code=404, detail=f"Sequence {sequence_uid} not found")
+        
+        # Use RouteHelper for consistent updating
+        result = RouteHelper.update_entity(cnc_repository, cnc_data, "CNC")
+        
+        return JSONResponse(status_code=200, content={
+            "message": "Sequence deleted successfully"
+        })
+    except UidNotFound:
+        raise HTTPException(status_code=404, detail=f"CNC {cnc_uid} not found")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# Shortcuts Endpoints (similar to sequences)
+@router.get("/{cnc_uid}/shortcuts")
+async def get_shortcuts(
+    cnc_uid: str,
+    cnc_repository: CncRepository = Depends(get_service_by_type(CncRepository)),
+    configuration_service: ConfigurationService = Depends(get_service_by_type(ConfigurationService))
+):
+    """Get all saved shortcuts for a specific CNC"""
+    try:
+        # Ensure repository has correct configuration context
+        current_config = configuration_service.get_current_configuration_name()
+        if current_config:
+            cnc_repository.set_db(current_config)
+        
+        cnc = cnc_repository.read_id(cnc_uid)
+        if not cnc:
+            raise HTTPException(status_code=404, detail=f"CNC {cnc_uid} not found")
+        
+        # Handle different ways the shortcuts might be stored
+        shortcuts = []
+        if isinstance(cnc, dict):
+            shortcuts = cnc.get('shortcuts', [])
+        elif hasattr(cnc, 'shortcuts') and cnc.shortcuts is not None:
+            shortcuts = cnc.shortcuts
+        elif hasattr(cnc, '__dict__') and 'shortcuts' in cnc.__dict__:
+            shortcuts = cnc.__dict__['shortcuts'] or []
+        
+        # Ensure we return a list
+        if not isinstance(shortcuts, list):
+            shortcuts = []
+        return JSONResponse(status_code=200, content=shortcuts)
+    except UidNotFound:
+        raise HTTPException(status_code=404, detail=f"CNC {cnc_uid} not found")
+    except Exception as e:
+        print(f"[SHORTCUT] Error getting shortcuts for CNC {cnc_uid}: {e}")
+        print(f"[SHORTCUT] Exception type: {type(e)}")
+        # Return empty list instead of error to avoid breaking the frontend
+        return JSONResponse(status_code=200, content=[])
+
+
+@router.post("/{cnc_uid}/shortcuts")
+async def save_shortcut(
+    cnc_uid: str,
+    shortcut: dict,
+    cnc_repository: CncRepository = Depends(get_service_by_type(CncRepository)),
+    configuration_service: ConfigurationService = Depends(get_service_by_type(ConfigurationService))
+):
+    """Save or update shortcuts for a specific CNC"""
+    try:
+        # Ensure repository has correct configuration context
+        current_config = configuration_service.get_current_configuration_name()
+        if current_config:
+            cnc_repository.set_db(current_config)
+        
+        cnc = cnc_repository.read_id(cnc_uid)
+        if not cnc:
+            raise HTTPException(status_code=404, detail=f"CNC {cnc_uid} not found")
+        
+        # Get current CNC data as dict for manipulation - handle TinyDB format
+        if isinstance(cnc, dict):
+            cnc_data = {
+                'uid': cnc.get('uid'),
+                'name': cnc.get('name'),
+                'type': cnc.get('type'), 
+                'port': cnc.get('port'),
+                'sequences': cnc.get('sequences', []),
+                'shortcuts': cnc.get('shortcuts', [])
+            }
+        else:
+            cnc_data = {
+                'uid': getattr(cnc, 'uid', None),
+                'name': getattr(cnc, 'name', None),
+                'type': getattr(cnc, 'type', None),
+                'port': getattr(cnc, 'port', None),
+                'sequences': getattr(cnc, 'sequences', []),
+                'shortcuts': getattr(cnc, 'shortcuts', [])
+            }
+        
+        # Initialize shortcuts if not present
+        if 'shortcuts' not in cnc_data or cnc_data['shortcuts'] is None:
+            cnc_data['shortcuts'] = []
+        
+        # Check if shortcut already exists (update) or is new (add)
+        existing_index = next((i for i, s in enumerate(cnc_data['shortcuts']) 
+                              if s.get('uid') == shortcut.get('uid')), None)
+        
+        if existing_index is not None:
+            # Update existing shortcut
+            cnc_data['shortcuts'][existing_index] = shortcut
+        else:
+            # Add new shortcut
+            cnc_data['shortcuts'].append(shortcut)
+        
+        # Use RouteHelper for consistent updating
+        result = RouteHelper.update_entity(cnc_repository, cnc_data, "CNC")
+        
+        # Return shortcut-specific response
+        return JSONResponse(status_code=200, content={
+            "message": "Shortcut saved successfully",
+            "shortcut": shortcut
+        })
+    except UidNotFound:
+        raise HTTPException(status_code=404, detail=f"CNC {cnc_uid} not found")
+    except Exception as e:
+        print(f"[SHORTCUT] Error saving shortcut: {e}")
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+
+
+@router.delete("/{cnc_uid}/shortcuts/{shortcut_uid}")
+async def delete_shortcut(
+    cnc_uid: str,
+    shortcut_uid: str,
+    cnc_repository: CncRepository = Depends(get_service_by_type(CncRepository)),
+    configuration_service: ConfigurationService = Depends(get_service_by_type(ConfigurationService))
+):
+    """Delete shortcuts for a specific CNC"""
+    try:
+        # Ensure repository has correct configuration context
+        current_config = configuration_service.get_current_configuration_name()
+        if current_config:
+            cnc_repository.set_db(current_config)
+        
+        cnc = cnc_repository.read_id(cnc_uid)
+        if not cnc:
+            raise HTTPException(status_code=404, detail=f"CNC {cnc_uid} not found")
+        
+        if not hasattr(cnc, 'shortcuts') or not cnc.shortcuts:
+            raise HTTPException(status_code=404, detail="No shortcuts found")
+        
+        # Get current CNC data as dict for manipulation - handle TinyDB format
+        if isinstance(cnc, dict):
+            cnc_data = {
+                'uid': cnc.get('uid'),
+                'name': cnc.get('name'),
+                'type': cnc.get('type'), 
+                'port': cnc.get('port'),
+                'sequences': cnc.get('sequences', []),
+                'shortcuts': cnc.get('shortcuts', [])
+            }
+        else:
+            cnc_data = {
+                'uid': getattr(cnc, 'uid', None),
+                'name': getattr(cnc, 'name', None),
+                'type': getattr(cnc, 'type', None),
+                'port': getattr(cnc, 'port', None),
+                'sequences': getattr(cnc, 'sequences', []),
+                'shortcuts': getattr(cnc, 'shortcuts', [])
+            }
+        
+        # Find and remove the shortcut
+        initial_length = len(cnc_data.get('shortcuts', []))
+        cnc_data['shortcuts'] = [s for s in cnc_data.get('shortcuts', []) if s.get('uid') != shortcut_uid]
+        
+        if len(cnc_data['shortcuts']) == initial_length:
+            raise HTTPException(status_code=404, detail=f"Shortcut {shortcut_uid} not found")
+        
+        # Use RouteHelper for consistent updating
+        result = RouteHelper.update_entity(cnc_repository, cnc_data, "CNC")
+        
+        return JSONResponse(status_code=200, content={
+            "message": "Shortcut deleted successfully"
+        })
+    except UidNotFound:
+        raise HTTPException(status_code=404, detail=f"CNC {cnc_uid} not found")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

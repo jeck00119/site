@@ -86,8 +86,8 @@ export default {
     
     
     const tabs = [
-      { name: "Shortcuts", key: "shortcuts" },
-      { name: "Sequence", key: "sequence" }
+      { name: "Shortcuts (Macros)", key: "shortcuts" },
+      { name: "Position Sequence", key: "sequence" }
     ];
     
     const currentTabName = computed(() => tabs[currentTab.value].name);

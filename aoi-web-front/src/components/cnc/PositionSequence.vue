@@ -122,6 +122,8 @@
 <script>
 import { ref, computed, onMounted, watch, nextTick } from "vue";
 import { useCncStore } from '@/composables/useStore';
+import useDualPersistence from '@/composables/useDualPersistence';
+import useCncMovement from '@/composables/useCncMovement';
 
 export default {
   name: "PositionSequence",
@@ -139,6 +141,9 @@ export default {
   setup(props, { emit }) {
     const cncStore = useCncStore(props.axisUid);
     
+    // Use centralized composables
+    const persistence = useDualPersistence(props.axisUid, 'sequences');
+    const movement = useCncMovement(props.axisUid);
     
     // Sequence state
     const sequenceList = ref([]);
@@ -213,8 +218,11 @@ export default {
           currentStepIndex.value = i;
           const position = sequenceList.value[i];
           
-          // Execute movement to position using the same logic as shortcuts
-          await executePositionMovement(position);
+          // Execute movement using centralized composable
+          await movement.executeMovementToPosition(position, {
+            feedrate: position.feedrate || 1500,
+            waitForIdle: true
+          });
           
           // Quick pause between positions
           await new Promise(resolve => setTimeout(resolve, 200));
@@ -246,136 +254,16 @@ export default {
       emit('sequence-stopped');
     }
     
-    // Wait for CNC to become idle (movement completed)
-    function waitForCncIdle(timeoutMs = 15000) {
-      return new Promise((resolve, reject) => {
-        const startTime = Date.now();
-        
-        const checkIdle = () => {
-          // Check if we've exceeded the timeout
-          if (Date.now() - startTime > timeoutMs) {
-            console.warn('[SEQUENCE] Timeout waiting for CNC to become idle, continuing anyway');
-            resolve(); // Continue instead of rejecting to avoid stopping the sequence
-            return;
-          }
-          
-          // Check if CNC state is IDLE - access the computed ref directly
-          const currentState = cncStore.cncState?.value;
-          
-          if (currentState && currentState.toLowerCase() === 'idle') {
-            resolve();
-            return;
-          }
-          
-          // Check again in 50ms for faster response
-          setTimeout(checkIdle, 50);
-        };
-        
-        // Initial check
-        checkIdle();
-      });
+    // Movement logic is now handled by useCncMovement composable
+    
+    // Centralized persistence functions
+    async function saveSequence() {
+      await persistence.saveData(sequenceList.value);
     }
     
-    // Execute movement to a specific position
-    async function executePositionMovement(position) {
-      try {
-        // Get current position from CNC store
-        const currentPos = cncStore.pos?.value || { x: 0, y: 0, z: 0 };
-        
-        // Calculate movement deltas
-        const deltaX = Math.round((position.x - currentPos.x) * 1000) / 1000;
-        const deltaY = Math.round((position.y - currentPos.y) * 1000) / 1000;
-        const deltaZ = Math.round((position.z - currentPos.z) * 1000) / 1000;
-        
-        const feedrate = position.feedrate || 1500;
-        
-        // Start all axis movements simultaneously
-        const movements = [];
-        
-        if (deltaX !== 0) {
-          if (deltaX > 0) {
-            movements.push(cncStore.increaseAxis({
-              cncUid: props.axisUid,
-              axis: 'x',
-              step: Math.abs(deltaX),
-              feedrate: feedrate
-            }));
-          } else {
-            movements.push(cncStore.decreaseAxis({
-              cncUid: props.axisUid,
-              axis: 'x',
-              step: Math.abs(deltaX),
-              feedrate: feedrate
-            }));
-          }
-        }
-        
-        if (deltaY !== 0) {
-          if (deltaY > 0) {
-            movements.push(cncStore.increaseAxis({
-              cncUid: props.axisUid,
-              axis: 'y',
-              step: Math.abs(deltaY),
-              feedrate: feedrate
-            }));
-          } else {
-            movements.push(cncStore.decreaseAxis({
-              cncUid: props.axisUid,
-              axis: 'y',
-              step: Math.abs(deltaY),
-              feedrate: feedrate
-            }));
-          }
-        }
-        
-        if (deltaZ !== 0) {
-          if (deltaZ > 0) {
-            movements.push(cncStore.increaseAxis({
-              cncUid: props.axisUid,
-              axis: 'z',
-              step: Math.abs(deltaZ),
-              feedrate: feedrate
-            }));
-          } else {
-            movements.push(cncStore.decreaseAxis({
-              cncUid: props.axisUid,
-              axis: 'z',
-              step: Math.abs(deltaZ),
-              feedrate: feedrate
-            }));
-          }
-        }
-        
-        // Wait for all movements to be sent
-        if (movements.length > 0) {
-          await Promise.all(movements);
-          // Wait for CNC to complete all movements and return to idle
-          await waitForCncIdle();
-        }
-        
-      } catch (error) {
-        console.error('[SEQUENCE] Error moving to position:', position.name, error);
-        throw error;
-      }
-    }
-    
-    // Persistence functions
-    function saveSequence() {
-      const sequenceKey = `cnc-sequence-${props.axisUid}`;
-      localStorage.setItem(sequenceKey, JSON.stringify(sequenceList.value));
-    }
-    
-    function loadSequence() {
-      const sequenceKey = `cnc-sequence-${props.axisUid}`;
-      const saved = localStorage.getItem(sequenceKey);
-      if (saved) {
-        try {
-          sequenceList.value = JSON.parse(saved);
-        } catch (error) {
-          console.error('Failed to load sequence:', error);
-          sequenceList.value = [];
-        }
-      }
+    async function loadSequence() {
+      const loadedData = await persistence.loadData();
+      sequenceList.value = loadedData || [];
     }
     
     // Auto-scroll to current executing position
@@ -399,8 +287,7 @@ export default {
     
     // Lifecycle
     onMounted(async () => {
-      
-      loadSequence();
+      await loadSequence();
       // Fetch locations when component mounts
       try {
         await cncStore.fetchLocations(props.axisUid);

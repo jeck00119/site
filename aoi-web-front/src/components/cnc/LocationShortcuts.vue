@@ -59,6 +59,8 @@
 <script>
 import { ref, computed, onMounted } from "vue";
 import { useCncStore } from '@/composables/useStore';
+import useDualPersistence from '@/composables/useDualPersistence';
+import useCncMovement from '@/composables/useCncMovement';
 
 export default {
   name: "LocationShortcuts",
@@ -76,6 +78,10 @@ export default {
   setup(props, { emit }) {
     const cncStore = useCncStore(props.axisUid);
     
+    // Use centralized composables
+    const persistence = useDualPersistence(props.axisUid, 'shortcuts');
+    const movement = useCncMovement(props.axisUid);
+    
     const showShortcutDialog = ref(false);
     const selectedLocation = ref(null);
     const renamedLocation = ref("");
@@ -88,7 +94,7 @@ export default {
     
 
     onMounted(async () => {
-      loadShortcuts();
+      await loadShortcuts();
       // Fetch locations when component mounts to ensure they're available
       try {
         await cncStore.fetchLocations(props.axisUid);
@@ -103,21 +109,14 @@ export default {
       }
     });
 
-    function loadShortcuts() {
-      // Load shortcuts from localStorage or store
-      const savedShortcuts = localStorage.getItem(`cnc-shortcuts-${props.axisUid}`);
-      if (savedShortcuts) {
-        try {
-          shortcuts.value = JSON.parse(savedShortcuts);
-        } catch (error) {
-          console.error("Failed to load shortcuts:", error);
-          shortcuts.value = Array(9).fill(null);
-        }
-      }
+    // Centralized persistence functions
+    async function loadShortcuts() {
+      const loadedData = await persistence.loadData();
+      shortcuts.value = loadedData || Array(9).fill(null);
     }
 
-    function saveShortcuts() {
-      localStorage.setItem(`cnc-shortcuts-${props.axisUid}`, JSON.stringify(shortcuts.value));
+    async function saveShortcuts() {
+      await persistence.saveData(shortcuts.value);
     }
 
     async function openShortcutDialog(event) {
@@ -163,75 +162,16 @@ export default {
             return;
           }
           
-          // Get current position from CNC store
-          const currentPos = cncStore.pos?.value || { x: 0, y: 0, z: 0 };
-          // Calculate movement steps needed for each axis (round to avoid floating point issues)
-          const deltaX = Math.round((targetLocation.x - currentPos.x) * 1000) / 1000;
-          const deltaY = Math.round((targetLocation.y - currentPos.y) * 1000) / 1000;
-          const deltaZ = Math.round((targetLocation.z - currentPos.z) * 1000) / 1000;
-          
-          // Move each axis using the same logic as movement buttons
-          const feedrate = targetLocation.feedrate || 1500;
-          
-          if (deltaX !== 0) {
-            if (deltaX > 0) {
-              await cncStore.increaseAxis({
-                cncUid: props.axisUid,
-                axis: 'x',
-                step: Math.abs(deltaX),
-                feedrate: feedrate
-              });
-            } else {
-              await cncStore.decreaseAxis({
-                cncUid: props.axisUid,
-                axis: 'x',
-                step: Math.abs(deltaX),
-                feedrate: feedrate
-              });
-            }
-          }
-          
-          if (deltaY !== 0) {
-            if (deltaY > 0) {
-              await cncStore.increaseAxis({
-                cncUid: props.axisUid,
-                axis: 'y',
-                step: Math.abs(deltaY),
-                feedrate: feedrate
-              });
-            } else {
-              await cncStore.decreaseAxis({
-                cncUid: props.axisUid,
-                axis: 'y',
-                step: Math.abs(deltaY),
-                feedrate: feedrate
-              });
-            }
-          }
-          
-          if (deltaZ !== 0) {
-            if (deltaZ > 0) {
-              await cncStore.increaseAxis({
-                cncUid: props.axisUid,
-                axis: 'z',
-                step: Math.abs(deltaZ),
-                feedrate: feedrate
-              });
-            } else {
-              await cncStore.decreaseAxis({
-                cncUid: props.axisUid,
-                axis: 'z',
-                step: Math.abs(deltaZ),
-                feedrate: feedrate
-              });
-            }
-          }
+          // Execute movement using centralized composable
+          await movement.executeMovementToPosition(targetLocation, {
+            feedrate: targetLocation.feedrate || 1500,
+            waitForIdle: true
+          });
           
           emit('shortcut-executed', { 
             shortcut, 
             index: shortcutIndex,
-            targetLocation,
-            movements: { deltaX, deltaY, deltaZ }
+            targetLocation
           });
           
         } catch (error) {
