@@ -320,8 +320,10 @@ export default {
   color: white;
   display: flex;
   flex-direction: column;
-  height: 237px;
-  width: 320px;
+  height: 100%;
+  width: 100%;
+  min-height: 237px;
+  min-width: 380px;  /* Increased from 320px for wider display */
   border-radius: 8px;
   padding: 0.5rem;
   overflow: hidden;

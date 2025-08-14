@@ -166,8 +166,10 @@ export default {
 .location-tabs {
   display: flex;
   flex-direction: column;
-  height: 280px;
-  width: 320px;
+  height: 100%;
+  width: 100%;
+  min-height: 280px;
+  min-width: 380px;  /* Increased from 320px to match container */
   color: white;
   overflow: hidden;
   box-sizing: border-box;
@@ -241,17 +243,19 @@ export default {
 
 /* Tab Content */
 .tab-content {
-  height: 237px;
+  flex: 1;  /* Changed from fixed height to flex to use available space */
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  min-height: 237px;  /* Maintain minimum height */
 }
 
 .tab-pane {
-  height: 237px;
+  flex: 1;  /* Changed from fixed height to flex */
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  min-height: 237px;  /* Maintain minimum height */
 }
 
 /* Animation for tab switching */

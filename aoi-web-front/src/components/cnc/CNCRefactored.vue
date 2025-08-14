@@ -617,26 +617,33 @@ export default {
 
 .location-tabs-section {
   grid-column: 10/15;
-  grid-row: 5/8;
+  grid-row: 4/8;  /* Changed from 5/8 to 4/8 - takes more vertical space */
   color: white;
   background-color: #161616;
   border-radius: 8px;
-  overflow: visible; /* Allow inner container to potentially expand */
+  overflow: hidden;
   padding: 0.5rem;
-  position: relative; /* Allow absolute positioning of inner container */
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .tabs-inner-container {
-  width: 320px;
-  height: 280px;
-  /* This is where we can easily adjust size for sequence expansion */
+  width: 100%;
+  height: 100%;
+  max-width: 380px;  /* Increased from 320px to make tabs wider */
+  max-height: 360px;  /* Increased from 280px to accommodate taller section */
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 
 
 .feedrate-section {
   grid-column: 10/15;
-  grid-row: 2/5;
+  grid-row: 2/4;  /* Changed from 2/5 to 2/4 - takes less vertical space */
   color: white;
   background-color: #161616;
   border-radius: 8px;

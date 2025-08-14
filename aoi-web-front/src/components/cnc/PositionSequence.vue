@@ -46,9 +46,9 @@
         <div class="item-content">
           <div class="item-name">{{ item.name }}</div>
           <div class="item-coords">
-            <div>X: {{ item.x?.toFixed(3) || '---' }}</div>
-            <div>Y: {{ item.y?.toFixed(3) || '---' }}</div>
-            <div>Z: {{ item.z?.toFixed(3) || '---' }}</div>
+            <span>X: {{ item.x?.toFixed(3) || '---' }}</span>
+            <span>Y: {{ item.y?.toFixed(3) || '---' }}</span>
+            <span>Z: {{ item.z?.toFixed(3) || '---' }}</span>
           </div>
         </div>
         <div class="item-actions">
@@ -120,7 +120,7 @@
 </template>
 
 <script>
-import { ref, computed, onMounted } from "vue";
+import { ref, computed, onMounted, watch, nextTick } from "vue";
 import { useCncStore } from '@/composables/useStore';
 
 export default {
@@ -378,6 +378,25 @@ export default {
       }
     }
     
+    // Auto-scroll to current executing position
+    watch(currentStepIndex, async (newIndex) => {
+      if (isExecuting.value && sequenceList.value.length > 0) {
+        await nextTick(); // Wait for DOM updates
+        
+        // Find the current step element
+        const sequenceItems = document.querySelectorAll('.sequence-item');
+        const currentItem = sequenceItems[newIndex];
+        
+        if (currentItem) {
+          // Scroll the item into view with smooth animation
+          currentItem.scrollIntoView({
+            behavior: 'smooth',
+            block: 'center' // Center the item in the visible area
+          });
+        }
+      }
+    });
+    
     // Lifecycle
     onMounted(async () => {
       
@@ -415,16 +434,19 @@ export default {
   color: white;
   display: flex;
   flex-direction: column;
-  height: 237px;
-  width: 320px;
+  height: 100%;
+  width: 100%;
+  min-height: 237px;
+  min-width: 380px;  /* Increased from 320px for wider display */
   border-radius: 8px;
   padding: 0.5rem;
-  overflow: hidden;
+  overflow: visible; /* Changed from hidden to visible to prevent cutting off content */
   box-sizing: border-box;
 }
 
 /* Playback Controls */
 .sequence-controls {
+  margin-top: 0.4rem;  /* Added top margin to prevent overlap with tab navigation */
   margin-bottom: 0.5rem;
   display: flex;
   align-items: center;
@@ -482,8 +504,8 @@ export default {
   margin-bottom: 0.5rem;
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 8px;
-  min-height: 240px;
-  max-height: 260px;
+  min-height: 100px;
+  /* Removed max-height to allow list to grow with container */
 }
 
 
@@ -502,8 +524,19 @@ export default {
 }
 
 .sequence-item.current-step {
-  background-color: rgba(204, 161, 82, 0.2);
+  background-color: rgba(204, 161, 82, 0.3);
   border-left: 3px solid rgb(204, 161, 82);
+  box-shadow: 0 0 10px rgba(204, 161, 82, 0.4);
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    background-color: rgba(204, 161, 82, 0.3);
+  }
+  50% {
+    background-color: rgba(204, 161, 82, 0.4);
+  }
 }
 
 .sequence-item.completed-step {
@@ -529,6 +562,12 @@ export default {
   font-size: 0.75rem;
   color: rgba(255, 255, 255, 0.7);
   font-family: monospace;
+  display: flex;
+  gap: 1rem;
+}
+
+.item-coords span {
+  white-space: nowrap;
 }
 
 .item-actions {
