@@ -21,7 +21,7 @@ export default {
     },
 
     async annotate(context, payload) {
-        const token = context.rootGetters["auth/getToken"];
+        const token = context.rootGetters["auth/getToken"] || sessionStorage.getItem('auth-token');
 
         const response = await postStream(`http://${ipAddress}:${port}/annotation/annotate`, payload, {
             'Authorization': token

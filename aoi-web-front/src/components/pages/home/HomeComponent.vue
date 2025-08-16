@@ -296,14 +296,9 @@ export default{
 .flex-container {
     display: block;
     width: 100%;
-    height: 90vh;
+    min-height: 90vh;
     color: white;
     position: relative;
-    overflow-y: auto;
-}
-
-.flex-container::-webkit-scrollbar { 
-    display: none;  /* Safari and Chrome */
 }
 
 .home-header {
@@ -325,7 +320,7 @@ export default{
     justify-content: space-around;
     width: 100%;
     position: relative;
-    background-color: rgb(204, 161, 82);
+    background-color: var(--color-primary);
     background: radial-gradient(#fa709a, #fee140);
     border-radius: 20px;
 }
@@ -424,7 +419,7 @@ export default{
     padding: 4px;
     justify-content: center;
     align-items: center;
-    color: rgba(204, 161, 82);
+    color: black !important;
 }
 
 .button-icon {
@@ -440,6 +435,7 @@ export default{
     justify-content: center;
     align-items: center;
     font-size: 80%;
+    color: black !important;
 }
 
 .algorithms-configuration-container {
@@ -495,7 +491,7 @@ export default{
 .inspection-list-container {
     width: 20%;
     height: 100%;
-    background-color: rgba(204, 161, 82);
+    background-color: var(--color-primary);
     background: linear-gradient(109.6deg, #FF512F 11.2%, #DD2476 78.9%);
     border-radius: 20px;
 }
@@ -553,19 +549,21 @@ img {
     display: flex; 
     flex-wrap: wrap;
     justify-content: center;
+    align-content: center; /* Center wrapped content vertically */
     margin: 1%;
     height: 95%;
     background-color: black;
+    padding: 2% 0; /* Add padding top and bottom for breathing room */
 }
 
 .button-container {
     height: 22%;
-    width: 50%;
+    width: 50%; /* Back to 50% since no gap */
     display: flex;
     flex-wrap: wrap;
     flex-direction: row;
-    margin-bottom: 1%;
     justify-content: center;
+    align-items: center; /* Center buttons vertically */
 }
 
 .primary-button {
@@ -575,6 +573,9 @@ img {
     position: relative;
     z-index: 1;
     border: none;
+    background-color: rgba(40, 40, 40, 0.8) !important;
+    color: var(--color-primary) !important;
+    margin: 1.5%; /* Equal margin on all sides */
 }
 
 .primaryclicked{
@@ -584,9 +585,49 @@ img {
 .config-button{
     font-size: 2vw;
     font-weight: bold;
-    width:100%;
+    width: 80%; /* Match primary-button width */
     height: 100%;
     border:none;
+    background-color: rgba(40, 40, 40, 0.8) !important;
+    color: var(--color-primary) !important;
+    margin: 1.5%; /* Same margin as primary buttons */
+}
+
+/* Force all text content in config buttons to be visible */
+.config-button * {
+    color: var(--color-primary) !important;
+}
+
+.config-button:hover * {
+    color: white !important;
+}
+
+/* Fix card button text visibility */
+.button-container-router * {
+    color: black !important;
+}
+
+.button-text {
+    color: black !important;
+    opacity: 1 !important;
+}
+
+/* Ensure all text in base-button-rectangle is visible */
+base-button-rectangle * {
+    color: black !important;
+}
+
+/* Card button hover effects - change text to white */
+.button-container-router:hover * {
+    color: white !important;
+}
+
+.button-text:hover {
+    color: white !important;
+}
+
+base-button-rectangle:hover * {
+    color: white !important;
 }
 
 .icon-wrapper {
@@ -656,7 +697,7 @@ img {
     height:5vh;
     background-color:transparent;
     border:none;
-    color:rgba(204, 161, 82);
+    color: var(--color-primary);
     border-radius: 20px;
     font-size: 50%;
     font-weight: bold;
@@ -669,7 +710,7 @@ img {
     color:white;
     /* background : rgba(204, 161, 82);     */
     /* background-image: radial-gradient( rgba(204, 161, 82) 60%, transparent ); */
-    background-image: linear-gradient(to right, rgba(204, 161, 82), transparent );
+    background-image: linear-gradient(to right, var(--color-primary), transparent );
     /* -moz-box-shadow: 0 0 50px 20px rgba(204, 161, 82);
     box-shadow: 0 0 50px 20px rgba(204, 161, 82); */
 
@@ -678,7 +719,22 @@ img {
 
 .name-wrapper{
     display:block;
-    
+    opacity: 1 !important;
+    color: var(--color-primary) !important;
+}
+
+.name-wrapper:hover{
+    color: white !important;
+    text-shadow: 0 0 10px rgba(204, 161, 82, 0.8);
+}
+
+/* Force all text content in buttons to be visible */
+.primary-button * {
+    color: var(--color-primary) !important;
+}
+
+.primary-button:hover * {
+    color: white !important;
 }
 
 .inner-button {
@@ -687,6 +743,7 @@ img {
     justify-content: center;
     height: 100%;
     width: 100%;
+    color: var(--color-primary) !important;
 }
 
 .clicked-anim-enter-from,
@@ -752,7 +809,7 @@ img {
 
 @keyframes name-appear{
     from {
-        opacity: 0;
+        opacity: 1;
     }
     to {
         opacity: 1;

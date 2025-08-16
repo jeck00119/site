@@ -1,0 +1,15 @@
+The authentication issue has multiple causes:
+
+1. INCONSISTENT AUTHENTICATION:
+   - /configurations endpoints: NO authentication required
+   - /image_source endpoints: NO authentication required
+   - /component endpoints: REQUIRES authentication
+
+2. TOKEN EXPIRATION ISSUE:
+   - tryLogin() had a bug where it would fail if tokenExpiration was null
+   - This has been fixed to check for all required auth data
+
+3. RECOMMENDATION:
+   - Either add authentication to ALL endpoints
+   - OR remove authentication from /component endpoints
+   - For consistency and security, all data endpoints should require auth

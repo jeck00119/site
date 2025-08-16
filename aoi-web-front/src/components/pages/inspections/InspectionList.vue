@@ -765,6 +765,7 @@ button {
 .table-wrapper {
     margin-top: 3vh;
     height: 100%;
+    overflow-y: auto;
 }
 
 /* table {

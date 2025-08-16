@@ -1,26 +1,26 @@
 <template>
   <div class="page-container">
     <div class="nav-container">
-      <the-navigator></the-navigator>
+      <the-navigator @visibility-changed="onNavVisibilityChanged"></the-navigator>
     </div>
-    <div class="body-container">
-      <div style="align-self: center" class="route-wrapper">
+    <div class="body-container" ref="bodyContainer">
+      <div class="route-wrapper">
         <router-view v-slot="slotProps">
           <transition name="route" mode="out-in">
             <component :is="slotProps.Component"></component>
           </transition>
         </router-view>
       </div>
-      <div style="align-self: flex-end" class="error-list-wrapper">
-        <the-footer></the-footer>
-      </div>
+    </div>
+    <div class="error-list-wrapper">
+      <the-footer :nav-is-open="navIsOpen"></the-footer>
     </div>
   </div>
 </template>
 
 
 <script>
-import { computed, onMounted, onUnmounted, watch } from 'vue';
+import { computed, onMounted, onUnmounted, watch, ref, nextTick } from 'vue';
 import { useRouter } from 'vue-router'; 
 import { uuid } from 'vue3-uuid';
 import { useWebSocket, useAuthStore, useConfigurationsStore, useAlgorithmsStore, useImageSourcesStore, useComponentsStore } from '@/composables/useStore';
@@ -38,7 +38,10 @@ export default {
 
   setup() {
     const router = useRouter();
+    const route = router.currentRoute;
     const logger = createLogger('App');
+    const navIsOpen = ref(false);
+    const bodyContainer = ref(null);
     
     // Use centralized store composables
     const { isAuthenticated, tryLogin, didAutoLogout } = useAuthStore();
@@ -196,11 +199,87 @@ export default {
       }
     }
 
+    function onNavVisibilityChanged(isVisible) {
+      navIsOpen.value = isVisible;
+      logger.debug('Navigation visibility changed', { isVisible });
+    }
+
     tryLogin();
+
+    function adjustBodyHeight() {
+      const bodyContainerEl = bodyContainer.value || document.querySelector('.body-container');
+      const routeWrapper = document.querySelector('.route-wrapper');
+      const footer = document.querySelector('.error-list-wrapper');
+      
+      if (bodyContainerEl && routeWrapper && footer) {
+        // Reset padding to measure natural content
+        routeWrapper.style.paddingBottom = '0';
+        
+        // Get the natural content height and viewport info
+        const contentHeight = routeWrapper.scrollHeight;
+        const viewportHeight = window.innerHeight;
+        const footerHeight = footer.offsetHeight;
+        
+        // Calculate how much space we need
+        let bottomPadding = 0;
+        
+        if (contentHeight <= viewportHeight - footerHeight) {
+          // Short content - only need minimal clearance
+          bottomPadding = Math.max(20, footerHeight * 0.3); // 20px minimum or 30% of footer
+        } else {
+          // Long content - need enough space to scroll past footer
+          bottomPadding = footerHeight + 20; // Footer height + 20px buffer
+        }
+        
+        // Apply the calculated padding
+        routeWrapper.style.paddingBottom = `${bottomPadding}px`;
+        
+        // Set body container height to match content + padding
+        const totalHeight = Math.max(contentHeight + bottomPadding, viewportHeight);
+        bodyContainerEl.style.minHeight = `${totalHeight}px`;
+        
+        logger.debug('Adjusted layout', { 
+          contentHeight, 
+          viewportHeight, 
+          footerHeight, 
+          bottomPadding, 
+          totalHeight 
+        });
+      }
+    }
+
+    // Watch for route changes to adjust height and scroll to top
+    watch(route, () => {
+      // Scroll to top immediately when route changes
+      window.scrollTo({
+        top: 0,
+        left: 0,
+        behavior: 'smooth' // Smooth scroll to top
+      });
+      
+      nextTick(() => {
+        setTimeout(adjustBodyHeight, 100); // Small delay to let content render
+      });
+    });
 
     onMounted(() => {
       logger.lifecycle('mounted', 'App component mounted');
       onLoad();
+      
+      // Adjust height initially and on resize
+      setTimeout(adjustBodyHeight, 200); // Initial delay for content to load
+      
+      // Adjust height when window resizes
+      window.addEventListener('resize', adjustBodyHeight);
+      
+      // Also adjust when content changes (but with throttling to avoid infinite loops)
+      let adjustTimeout;
+      const observer = new ResizeObserver(() => {
+        clearTimeout(adjustTimeout);
+        adjustTimeout = setTimeout(adjustBodyHeight, 150);
+      });
+      observer.observe(document.body);
+      
     });
 
     onUnmounted(() => {
@@ -212,6 +291,12 @@ export default {
         logger.warn('Error during component unmounting', error);
       }
     });
+
+    return {
+      navIsOpen,
+      onNavVisibilityChanged,
+      bodyContainer
+    };
   }
 }
 </script>
@@ -220,31 +305,35 @@ export default {
 
 <style scoped>
 .page-container {
-  display: flex;
-  flex-direction: column;
-  width: 100vw;
+  width: 100%;
+  min-height: 100vh;
   padding: 0;
+  position: relative;
 }
 
 .body-container {
-  display: flex;
-  flex-direction: column;
-  height: 100vh;
+  width: 100%;
+  min-height: 100vh;
   padding: 0;
+  background-color: rgb(53, 53, 53); /* Match body background */
 }
 
 .route-wrapper {
-  height: 93vh;
-  padding: 0;
   width: 95%;
-  margin-left: 3%;
+  margin: 0 auto;
+  padding: 0; /* JavaScript will set bottom padding dynamically */
+  overflow: visible;
 }
 
 .error-list-wrapper {
+  position: fixed;
+  bottom: 0;
+  left: 0;
   height: 7vh;
-  width: 100vw;
+  width: 100%;
   background-color: black;
   color: white;
+  z-index: 1000;
 }
 
 .route-enter-from {

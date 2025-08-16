@@ -3,7 +3,7 @@ import { ipAddress, port } from "../../url";
 
 export default {
     async setCalibrationParameters(context, payload) {
-        const token = context.rootGetters["auth/getToken"];
+        const token = context.rootGetters["auth/getToken"] || sessionStorage.getItem('auth-token');
 
         const response = await post(`http://${ipAddress}:${port}/stereo_calibration`, payload, {
             "content-type": "application/json",

@@ -70,7 +70,7 @@ export default {
 
     async saveRobots(context) {
         const robots = context.getters.getRobots;
-        const token = context.rootGetters["auth/getToken"];
+        const token = context.rootGetters["auth/getToken"] || sessionStorage.getItem('auth-token');
 
         const response = await post(`http://${ipAddress}:${port}/robot/save`, robots, {
             'content-type': 'application/json',
@@ -93,7 +93,7 @@ export default {
     },
 
     async loadCurrentAngles(context, payload) {
-        const token = context.rootGetters["auth/getToken"];
+        const token = context.rootGetters["auth/getToken"] || sessionStorage.getItem('auth-token');
 
         const { response, responseData } = await get(`http://${ipAddress}:${port}/robot/${payload.uid}/current_angles`, {
             'content-type': 'application/json',
@@ -112,7 +112,7 @@ export default {
     },
 
     async loadCurrentRobotPositions(context, payload) {
-        const token = context.rootGetters["auth/getToken"];
+        const token = context.rootGetters["auth/getToken"] || sessionStorage.getItem('auth-token');
 
         const { response, responseData } = await get(`http://${ipAddress}:${port}/robot/${payload.uid}/positions`, {
             'content-type': 'application/json',
@@ -131,7 +131,7 @@ export default {
     },
 
     async deleteRobotPosition(context, payload) {
-        const token = context.rootGetters["auth/getToken"];
+        const token = context.rootGetters["auth/getToken"] || sessionStorage.getItem('auth-token');
 
         const response = await remove(`http://${ipAddress}:${port}/robot/${payload.uid}/delete_position`, {
             'content-type': 'application/json',
@@ -150,7 +150,7 @@ export default {
     },
 
     async moveRobotToPosition(context, payload) {
-        const token = context.rootGetters["auth/getToken"];
+        const token = context.rootGetters["auth/getToken"] || sessionStorage.getItem('auth-token');
 
         const response = await post(`http://${ipAddress}:${port}/robot/${payload.robotUid}/${payload.positionUid}/move_to_position`, null, {
             'content-type': 'application/json',
@@ -165,7 +165,7 @@ export default {
     },
 
     async moveRobotHome(context, payload) {
-        const token = context.rootGetters["auth/getToken"];
+        const token = context.rootGetters["auth/getToken"] || sessionStorage.getItem('auth-token');
 
         const response = await post(`http://${ipAddress}:${port}/robot/${payload.uid}/home`, null, {
             'content-type': 'application/json',
@@ -180,7 +180,7 @@ export default {
     },
 
     async setRobotJointAngle(context, payload) {
-        const token = context.rootGetters["auth/getToken"];
+        const token = context.rootGetters["auth/getToken"] || sessionStorage.getItem('auth-token');
 
         const response = await post(`http://${ipAddress}:${port}/robot/${payload.uid}/set_angle`, {
             joint_number: payload.jointNumber,
@@ -199,7 +199,7 @@ export default {
     },
 
     async saveCurrentPosition(context, payload) {
-        const token = context.rootGetters["auth/getToken"];
+        const token = context.rootGetters["auth/getToken"] || sessionStorage.getItem('auth-token');
 
         const response = await post(`http://${ipAddress}:${port}/robot/${payload.uid}/save_position`, {
             uid: uuid.v4(),
@@ -219,7 +219,7 @@ export default {
     },
 
     async updateCurrentPosition(context, payload) {
-        const token = context.rootGetters["auth/getToken"];
+        const token = context.rootGetters["auth/getToken"] || sessionStorage.getItem('auth-token');
 
         const response = await put(`http://${ipAddress}:${port}/robot/${payload.robotUid}/update_position`, {
             uid: payload.positionUid,
@@ -245,7 +245,7 @@ export default {
     },
 
     async releaseServos(context, payload) {
-        const token = context.rootGetters["auth/getToken"];
+        const token = context.rootGetters["auth/getToken"] || sessionStorage.getItem('auth-token');
 
         const response = await post(`http://${ipAddress}:${port}/robot/${payload.uid}/release_servos`, null, {
             'content-type': 'application/json',
@@ -260,7 +260,7 @@ export default {
     },
 
     async powerServos(context, payload) {
-        const token = context.rootGetters["auth/getToken"];
+        const token = context.rootGetters["auth/getToken"] || sessionStorage.getItem('auth-token');
 
         const response = await post(`http://${ipAddress}:${port}/robot/${payload.uid}/power_servos`, null, {
             'content-type': 'application/json',

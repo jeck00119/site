@@ -65,7 +65,7 @@ export default {
 
     async updateUsersRole(context, payload) {
         try {
-            const token = context.rootGetters["auth/getToken"];
+            const token = context.rootGetters["auth/getToken"] || sessionStorage.getItem('auth-token');
 
             const { response } = await api.post('/auth/update_role', payload, {
                 'content-type': 'application/json',
@@ -216,6 +216,16 @@ export default {
         const userData = sessionStorage.getItem('user');
         const tokenExpiration = sessionStorage.getItem('expiration-date');
         const userLevel = sessionStorage.getItem('level');
+
+        // Check if we have all required auth data
+        if (!authToken || !userData || !tokenExpiration) {
+            // Clear any partial auth data
+            sessionStorage.removeItem('auth-token');
+            sessionStorage.removeItem('user');
+            sessionStorage.removeItem('expiration-date');
+            sessionStorage.removeItem('level');
+            return;
+        }
 
         const expiresIn = +tokenExpiration - new Date().getTime();
 

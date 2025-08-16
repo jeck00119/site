@@ -42,6 +42,45 @@
                     ],
                     "name": "Default Sequence",
                     "uid": "sequence-8a84a38d-1587-4705-b6f5-801abafa330d-default"
+                },
+                {
+                    "cncUid": "8a84a38d-1587-4705-b6f5-801abafa330d",
+                    "items": [
+                        {
+                            "feedrate": 1500,
+                            "locationUid": "b4f05ce7-b2be-46da-b041-9e74c6e9eb8a",
+                            "name": "pos1",
+                            "x": 100,
+                            "y": 100,
+                            "z": 5
+                        },
+                        {
+                            "feedrate": 1500,
+                            "locationUid": "4264366a-6ecb-4b45-a5ee-6faaa1dd4359",
+                            "name": "test1",
+                            "x": 0,
+                            "y": 0,
+                            "z": 0
+                        },
+                        {
+                            "feedrate": 1500,
+                            "locationUid": "82003131-843d-42a5-a4c0-5c0529a75869",
+                            "name": "pos3",
+                            "x": 0,
+                            "y": 0,
+                            "z": 0
+                        },
+                        {
+                            "feedrate": 1500,
+                            "locationUid": "cae08b94-e07d-4eef-b7dc-a009498a9e97",
+                            "name": "Home_Zero",
+                            "x": 0,
+                            "y": 0,
+                            "z": 0
+                        }
+                    ],
+                    "name": "Default Sequences",
+                    "uid": "sequences-8a84a38d-1587-4705-b6f5-801abafa330d-default"
                 }
             ],
             "type": "Marlin",

@@ -39,16 +39,13 @@ const HelpComponent = () => import('./components/pages/about/HelpComponent.vue')
 const routes: RouteRecordRaw[] = [
     {
         path: '/',
-        redirect: (to) => {
-            // This will be handled by the auth guard instead of hardcoding login redirect
-            return '/configurations';
-        }
+        redirect: '/aoi'
     },
     {
         path: '/aoi', component: HomeComponent
     },
     {
-        path: '/inspections-and-results', component: ResultsList
+        path: '/inspections-and-results', component: ResultsList, meta: { requiresAuth: true }
     },
     {
         path: '/components', component: ComponentsConfiguration, meta: { requiresAuth: true }
@@ -90,7 +87,7 @@ const routes: RouteRecordRaw[] = [
         path: '/auto-annotate', component: AutoAnnotate, meta: { requiresAuth: true }
     },
     {
-        path: '/algorithm-debug', component: AlgorithmDebug
+        path: '/algorithm-debug', component: AlgorithmDebug, meta: { requiresAuth: true }
     },
     {
         path: '/log', component: LogList, meta: { requiresAuth: true }
@@ -108,7 +105,7 @@ const routes: RouteRecordRaw[] = [
         path: '/roles', component: UserRoles, meta: { requiresAdmin: true, requiresAuth: true }
     },
     {
-        path: '/help', component: HelpComponent
+        path: '/help', component: HelpComponent, meta: { requiresAuth: true }
     },
     {
         path: '/configurations', component: Configurations, meta: { requiresAuth: true }

@@ -19,6 +19,8 @@ from repo.repositories import (
     CameraCalibrationRepository, ImageGeneratorRepository,
     ProfilometerRepository, StereoCalibrationRepository
 )
+# Note: ComponentsRepository, ReferencesRepository, and ImageGeneratorRepository 
+# have been consolidated but maintain the same interface
 
 
 class RepositoryFactory:
@@ -31,19 +33,19 @@ class RepositoryFactory:
     REPOSITORY_TYPES = {
         'camera': {'class': CameraRepository, 'db_name': 'cameras'},
         'camera_settings': {'class': CameraSettingsRepository, 'db_name': 'camera_settings'},
-        'components': {'class': ComponentsRepository, 'db_name': 'components'},
+        'components': {'class': ComponentsRepository, 'db_name': 'components'},  # Consolidated
         'custom_components': {'class': CustomComponentsRepository, 'db_name': 'custom_components'},
         'cnc': {'class': CncRepository, 'db_name': 'cnc'},
         'location': {'class': LocationRepository, 'db_name': 'locations'},
         'robot': {'class': RobotRepository, 'db_name': 'robot'},
         'robot_positions': {'class': RobotPositionsRepository, 'db_name': 'robot_positions'},
         'algorithms': {'class': AlgorithmsRepository, 'db_name': 'algorithms'},
-        'references': {'class': ReferencesRepository, 'db_name': 'references'},
+        'references': {'class': ReferencesRepository, 'db_name': 'references'},  # Consolidated
         'users': {'class': UsersRepository, 'db_name': 'users'},
         'configuration': {'class': ConfigurationRepository, 'db_name': 'configurations'},
         'image_source': {'class': ImageSourceRepository, 'db_name': 'image_source'},
         'camera_calibration': {'class': CameraCalibrationRepository, 'db_name': 'camera_calibration'},
-        'image_generator': {'class': ImageGeneratorRepository, 'db_name': 'image_generators'},
+        'image_generator': {'class': ImageGeneratorRepository, 'db_name': 'image_generators'},  # Consolidated
         'profilometer': {'class': ProfilometerRepository, 'db_name': 'profilometer'},
         'stereo_calibration': {'class': StereoCalibrationRepository, 'db_name': 'stereo_calibration'},
     }
@@ -53,20 +55,22 @@ class RepositoryFactory:
     USE_GENERIC_FOR = [
         # Already migrated and tested
         'custom_components',     # Least critical - safe to migrate
-        'references',           # Simple CRUD operations
-        'image_generator',      # Rarely used
         'camera_calibration',   # Isolated usage
         'location',             # CNC positioning data - safe to migrate
         'users',                # User management - test authentication carefully
         'robot_positions',      # Robot waypoints - safe to migrate
         
-        # NEW: Safe to migrate - pure CRUD repositories (no custom methods)
-        'components',           # Simple CRUD - used by ComponentsService (already migrated)
+        # Safe to migrate - pure CRUD repositories (no custom methods)
         'cnc',                 # Simple CRUD - CNC settings
         'robot',               # Simple CRUD - robot settings
         'profilometer',        # Simple CRUD - profilometer settings
         'image_source',        # Simple CRUD - image source configurations
         'stereo_calibration',  # Simple CRUD - stereo calibration data
+        
+        # CONSOLIDATED (Phase 1 complete - now simple wrapper classes):
+        # 'components' - Consolidated to simple BaseRepo wrapper
+        # 'references' - Consolidated to simple BaseRepo wrapper  
+        # 'image_generator' - Consolidated to simple BaseRepo wrapper
         
         # KEEP AS LEGACY (have custom methods - need special handling):
         # 'camera_settings' - has read_all_by_type method

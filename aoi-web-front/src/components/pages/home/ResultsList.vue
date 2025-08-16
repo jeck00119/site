@@ -1133,7 +1133,7 @@ p {
 }
 
 .data-wrapper {
-    height: 45vh;
+    min-height: 45vh;
     margin-top: 2vh;
     overflow-y: auto;
 }

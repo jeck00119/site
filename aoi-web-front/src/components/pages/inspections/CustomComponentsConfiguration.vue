@@ -1533,13 +1533,13 @@ export default{
 
 .alg-types {
     width: 20vw;
-    height: 90vh;
+    min-height: 90vh;
     background-color: rgb(188, 155, 155);
     margin-right: 1vh;
     display: flex;
     flex-direction: column;
     flex-wrap: nowrap;
-    overflow-y: auto;
+    /* overflow-y: auto; - moved scrolling to body level */
 }
 
 .alg-box{

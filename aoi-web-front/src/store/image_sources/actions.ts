@@ -5,7 +5,7 @@ import { get, post, update, remove, upload_image } from "../../utils/requests";
 
 export default {
     async loadImageSources(context) {
-        const token = context.rootGetters["auth/getToken"];
+        const token = context.rootGetters["auth/getToken"] || sessionStorage.getItem('auth-token');
         const { response, responseData } = await get(`http://${ipAddress}:${port}/image_source`, {
             'content-type': 'application/json',
             'Authorization': token,
@@ -23,7 +23,10 @@ export default {
         {
             const imageSources = [];
 
-            for(const imageSourceData of responseData.message)
+            // Handle both wrapped ({message: []}) and direct array responses
+            const sourceData = responseData.message || responseData;
+
+            for(const imageSourceData of sourceData)
             {
                 const imageSource = {
                     uid: imageSourceData.uid,
@@ -50,9 +53,12 @@ export default {
         else
         {
             console.log('Setting current image source:', responseData);
-            context.commit('setCurrentImageSource', responseData.message);
-            if(responseData.message.image_source_type === 'static' && responseData.message.image_generator_uid != ""){
-                const gen = context.getters.getImageGeneratorById(responseData.message.image_generator_uid);
+            // Handle both wrapped ({message: data}) and direct object responses
+            const sourceData = responseData.message || responseData;
+            
+            context.commit('setCurrentImageSource', sourceData);
+            if(sourceData.image_source_type === 'static' && sourceData.image_generator_uid != ""){
+                const gen = context.getters.getImageGeneratorById(sourceData.image_generator_uid);
                 context.commit('setCurrentImageGenerator', gen);
             }
         }
@@ -72,7 +78,7 @@ export default {
             activate_location: false
         };
 
-        const token = context.rootGetters["auth/getToken"];
+        const token = context.rootGetters["auth/getToken"] || sessionStorage.getItem('auth-token');
 
         const { response, responseData } = await post(`http://${ipAddress}:${port}/image_source`, newSource, {
             "content-type": "application/json",
@@ -99,7 +105,7 @@ export default {
     },
 
     async removeImageSource(context,payload){
-        const token = context.rootGetters["auth/getToken"];
+        const token = context.rootGetters["auth/getToken"] || sessionStorage.getItem('auth-token');
 
         const { response, responseData } = await remove(`http://${ipAddress}:${port}/image_source/${payload.uid}`, {
             "content-type": "application/json",
@@ -118,7 +124,7 @@ export default {
     },
 
     async updateImageSource(context,payload){
-        const token = context.rootGetters["auth/getToken"];
+        const token = context.rootGetters["auth/getToken"] || sessionStorage.getItem('auth-token');
 
         const { response, responseData } = await update(`http://${ipAddress}:${port}/image_source/${payload.uid}`, payload, {
             "content-type": "application/json",
@@ -147,7 +153,7 @@ export default {
             dir_path: ""
         }
 
-        const token = context.rootGetters["auth/getToken"];
+        const token = context.rootGetters["auth/getToken"] || sessionStorage.getItem('auth-token');
 
         const { response, responseData } = await post(`http://${ipAddress}:${port}/image_generator`, newGenerator, {
             "content-type": "application/json",
@@ -169,7 +175,7 @@ export default {
     },
 
     async uploadImagesFromGenerator(context, payload){
-        const token = context.rootGetters["auth/getToken"];
+        const token = context.rootGetters["auth/getToken"] || sessionStorage.getItem('auth-token');
 
         const response = await upload_image (`http://${ipAddress}:${port}/image_generator/upload_image_generator`, payload);
 
@@ -181,7 +187,7 @@ export default {
     },
 
     async getAllImageGenerators(context){
-        const token = context.rootGetters["auth/getToken"];
+        const token = context.rootGetters["auth/getToken"] || sessionStorage.getItem('auth-token');
         const { response, responseData } = await get(`http://${ipAddress}:${port}/image_generator`, {
             'content-type': 'application/json',
             'Authorization': token,

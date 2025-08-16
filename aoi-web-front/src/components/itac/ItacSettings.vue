@@ -403,9 +403,9 @@ input.error {
 ul {
     list-style: none;
     padding-left: 0pt;
-    height: 240px;
+    min-height: 240px;
     background-color: rgb(37, 36, 36);
-    overflow-y: scroll;
+    overflow-y: auto;
     margin-top: 20px;
     margin-right: 15px;
     margin-left: 15px;

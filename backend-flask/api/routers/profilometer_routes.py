@@ -38,7 +38,7 @@ async def get_robot_types(
 ) -> List[str]:
     try:
         types = profilometer_service.get_available_types()
-        return RouteHelper.create_success_response(types)
+        return RouteHelper.create_success_response("Types retrieved successfully", types)
     except Exception as e:
         raise create_error_response(
             operation="get_types",

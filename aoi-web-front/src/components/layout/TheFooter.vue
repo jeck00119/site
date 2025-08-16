@@ -1,7 +1,7 @@
 <template>
     <div class="footer-container">
         <div class="config-control">
-            <h3>{{ currentConfiguration ? currentConfiguration.name : '-' }}</h3>
+            <h3 :class="{ 'nav-open': $props.navIsOpen }">{{ currentConfiguration ? currentConfiguration.name : '-' }}</h3>
         </div>
         <div class="right-side-container">
             <div class="user-card" v-if="currentUser">
@@ -41,7 +41,14 @@ export default {
         TheErrorListButton
     },
 
-    setup() {
+    props: {
+        navIsOpen: {
+            type: Boolean,
+            default: false
+        }
+    },
+
+    setup(props) {
         const router = useRouter();
         const route = useRoute();
         const logger = createLogger('TheFooter');
@@ -85,6 +92,16 @@ export default {
     display: flex;
     justify-content: flex-start;
     align-items: center;
+}
+
+.config-control h3 {
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    transform: translateX(0);
+    will-change: transform;
+}
+
+.config-control h3.nav-open {
+    transform: translateX(20vw); /* Move h3 to the right when nav is open */
 }
 
 .tct-logo-container {

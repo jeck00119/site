@@ -17,7 +17,7 @@ export default {
     },
 
     async deleteItac(context, payload) {
-        const token = context.rootGetters["auth/getToken"];
+        const token = context.rootGetters["auth/getToken"] || sessionStorage.getItem('auth-token');
 
         const response = await remove(`http://${ipAddress}:${port}/itac/`+ payload.uid, {
             "content-type": "application/json",
@@ -36,7 +36,7 @@ export default {
     },
 
     async saveItac(context, payload) {
-        const token = context.rootGetters["auth/getToken"];
+        const token = context.rootGetters["auth/getToken"] || sessionStorage.getItem('auth-token');
 
         const response = await post(`http://${ipAddress}:${port}/itac`, payload, {
             "content-type": "application/json",
@@ -55,7 +55,7 @@ export default {
     },
 
     async updateItac(context, payload) {
-        const token = context.rootGetters["auth/getToken"];
+        const token = context.rootGetters["auth/getToken"] || sessionStorage.getItem('auth-token');
 
         const response = await update(`http://${ipAddress}:${port}/itac/`+ payload.uid, payload, {
             "content-type": "application/json",

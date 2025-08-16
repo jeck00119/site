@@ -55,7 +55,7 @@ export default {
     },
 
     async updateInspectionList(context, payload) {
-        const token = context.rootGetters["auth/getToken"];
+        const token = context.rootGetters["auth/getToken"] || sessionStorage.getItem('auth-token');
 
         const response = await post(`http://${ipAddress}:${port}/inspection_list`, payload, {
             "content-type": "application/json",

@@ -77,8 +77,8 @@ const store = createStore<RootState>({
         stereoCalibration: StereoCalibration,
         annotate: Annotate
     },
-    // Enable strict mode in development
-    strict: import.meta.env.DEV
+    // Disable strict mode to avoid warnings from Fabric.js observables
+    strict: false
 });
 
 export default store;

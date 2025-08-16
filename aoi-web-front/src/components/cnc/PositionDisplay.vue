@@ -1,7 +1,7 @@
 <template>
   <div class="positions-grid">
     <div class="axis-info">
-      <h3>Axis: {{ axisName }}</h3>
+      <h3>{{ axisName }}</h3>
     </div>
 
     <div class="position-layout">

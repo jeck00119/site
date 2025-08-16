@@ -216,7 +216,7 @@ export default {
 
 <style scoped>
 .parameters-wrapper {
-    overflow-y: auto;
+    /* overflow-y: auto; - moved scrolling to body level */
 }
 
 .form-control {

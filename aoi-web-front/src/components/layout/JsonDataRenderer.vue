@@ -62,8 +62,8 @@ export default{
 }
 
 .json-container {
-    height: 100%;
-    overflow-y: auto;
+    min-height: 100%;
+    /* overflow-y: auto; - moved scrolling to body level */
     width: 100%;
     /* display: flex; */
     background-color: rgb(21, 20, 20);

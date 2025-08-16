@@ -120,11 +120,19 @@
   /* Border Radius */
   --border-radius-none: 0;
   --border-radius-sm: 0.125rem;   /* 2px */
+  --border-radius-xs: 0.1875rem;  /* 3px */
   --border-radius-base: 0.25rem;  /* 4px */
+  --border-radius-5: 0.3125rem;   /* 5px */
   --border-radius-md: 0.375rem;   /* 6px */
   --border-radius-lg: 0.5rem;     /* 8px */
+  --border-radius-10: 0.625rem;   /* 10px */
   --border-radius-xl: 0.75rem;    /* 12px */
+  --border-radius-15: 0.9375rem;  /* 15px */
   --border-radius-2xl: 1rem;      /* 16px */
+  --border-radius-20: 1.25rem;    /* 20px */
+  --border-radius-25: 1.5625rem;  /* 25px */
+  --border-radius-30: 1.875rem;   /* 30px */
+  --border-radius-34: 2.125rem;   /* 34px */
   --border-radius-full: 9999px;
   
   /* Component Border Radius */
@@ -264,6 +272,66 @@
 }
 
 /* ===== UTILITY CLASSES ===== */
+
+/* Scrollbar utilities */
+.custom-scrollbar::-webkit-scrollbar { 
+  width: 10px; 
+}
+.custom-scrollbar::-webkit-scrollbar-track { 
+  background: var(--color-bg-secondary); 
+}
+.custom-scrollbar::-webkit-scrollbar-thumb { 
+  background: var(--color-text-muted); 
+  border-radius: var(--border-radius-base);
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover { 
+  background: var(--color-primary); 
+}
+
+.scrollbar-hidden::-webkit-scrollbar {
+  display: none;
+}
+
+/* Flexbox utilities */
+.flex-center { 
+  display: flex; 
+  justify-content: center; 
+  align-items: center; 
+}
+
+.flex-column { 
+  display: flex; 
+  flex-direction: column; 
+}
+
+.flex-between { 
+  display: flex; 
+  justify-content: space-between; 
+  align-items: center;
+}
+
+.flex-start {
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+}
+
+.flex-end {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+}
+
+.flex-column-center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.flex-wrap {
+  display: flex;
+  flex-wrap: wrap;
+}
 
 /* Spacing utilities */
 .p-0 { padding: var(--space-0); }

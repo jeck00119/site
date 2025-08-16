@@ -13,7 +13,7 @@ export default {
                 camera_type: payload.cameraType
             }
 
-        const token = context.rootGetters["auth/getToken"];
+        const token = context.rootGetters["auth/getToken"] || sessionStorage.getItem('auth-token');
 
         const { response } = await api.post(`/cameras`, camera, {
             "content-type": "application/json",
@@ -32,7 +32,7 @@ export default {
     },
 
     async removeCamera(context, payload) {
-        const token = context.rootGetters["auth/getToken"];
+        const token = context.rootGetters["auth/getToken"] || sessionStorage.getItem('auth-token');
 
         const { response } = await api.delete(`/cameras/${payload.uid}`, {
             "content-type": "application/json",
@@ -160,7 +160,7 @@ export default {
         context.commit("updateCurrentCameraSettings", {"name":"name", "value": payload.name});
         context.commit("updateCurrentCameraSettings", {"name":"uid", "value": uuid.v4()});
 
-        const token = context.rootGetters["auth/getToken"];
+        const token = context.rootGetters["auth/getToken"] || sessionStorage.getItem('auth-token');
 
         const { response } = await api.post(`/camera_settings`, payload, {
             'content-type': 'application/json',
@@ -179,7 +179,7 @@ export default {
 
     async putCameraSettings(context, payload)
     {
-        const token = context.rootGetters["auth/getToken"];
+        const token = context.rootGetters["auth/getToken"] || sessionStorage.getItem('auth-token');
 
         const { response } = await api.update(`/camera_settings/${payload.uid}`, payload, {
             'content-type': 'application/json',
@@ -195,7 +195,7 @@ export default {
 
     async removeCameraSettings(context, payload)
     {
-        const token = context.rootGetters["auth/getToken"];
+        const token = context.rootGetters["auth/getToken"] || sessionStorage.getItem('auth-token');
 
         const { response } = await api.delete(`/camera_settings/${payload}`, {
             'content-type': 'application/json',

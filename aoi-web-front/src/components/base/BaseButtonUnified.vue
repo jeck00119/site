@@ -217,8 +217,8 @@ export default {
   
   /* Default appearance */
   background-color: black;
-  color: rgba(204, 161, 82, 1);
-  border: 1px solid rgba(204, 161, 82, 1);
+  color: var(--color-primary);
+  border: 1px solid var(--color-primary);
   border-radius: 30px;
   padding: 0.25rem 0.5rem;
 }
@@ -226,13 +226,13 @@ export default {
 /* Variant styles */
 .unified-button--default {
   background-color: black;
-  color: rgba(204, 161, 82, 1);
-  border: 1px solid rgba(204, 161, 82, 1);
+  color: var(--color-primary);
+  border: 1px solid var(--color-primary);
   border-radius: 30px;
 }
 
 .unified-button--flat {
-  background-color: rgba(204, 161, 82, 1);
+  background-color: var(--color-primary);
   color: black;
   border: none;
   border-radius: 30px;
@@ -246,18 +246,18 @@ export default {
 }
 
 .unified-button--rectangle {
-  background-color: rgba(204, 161, 82, 1);
+  background-color: var(--color-primary);
   color: white;
-  border: 1px solid rgba(204, 161, 82, 1);
+  border: 1px solid var(--color-primary);
   border-radius: 4px;
   font-size: 90%;
   padding: 0.5rem 1rem;
 }
 
 .unified-button--action {
-  background-color: rgba(204, 161, 82, 1);
+  background-color: var(--color-primary);
   color: black;
-  border: 1px solid rgba(204, 161, 82, 1);
+  border: 1px solid var(--color-primary);
   border-radius: 6px;
   padding: 0.5rem 1rem;
   font-weight: 500;
@@ -296,12 +296,12 @@ export default {
 
 /* Active states */
 .unified-button--active {
-  background-color: rgba(204, 161, 82, 1);
+  background-color: var(--color-primary);
   color: black;
 }
 
 .unified-button--rectangle.unified-button--active {
-  background-color: rgba(204, 161, 82, 1);
+  background-color: var(--color-primary);
   color: black;
 }
 

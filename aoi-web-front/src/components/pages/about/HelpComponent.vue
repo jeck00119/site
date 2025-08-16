@@ -84,15 +84,11 @@ export default{
 }
 
 .content-container {
-    overflow-y: auto;
     background-color: #333;
     color: white;
     padding: 1%;
 }
 
-.content-container::-webkit-scrollbar { 
-    display: none;  /* Safari and Chrome */
-}
 
 .flex-container .close {
     position: absolute;
@@ -108,13 +104,11 @@ export default{
 
 .pdf-container {
     width: 100%;
-    height: 90vh;
-    overflow-y: auto;
+    min-height: 90vh;
 }
 
 .vue-pdf-embed > div {
-    overflow-y: auto;
-    height: 100%;
+    min-height: 100%;
 }
 
 .video-container {

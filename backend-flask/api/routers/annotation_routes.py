@@ -84,7 +84,7 @@ def annotate_image(model, image: bytes, mode: str = "detection") -> str:
 async def get_available_models() -> List[str]:
     try:
         files = [f for f in listdir("assets/yolov8") if isfile(join("assets/yolov8", f))]
-        return RouteHelper.create_success_response(files)
+        return RouteHelper.create_success_response("Models retrieved successfully", files)
     except Exception as e:
         raise create_error_response("list", "Annotation", exception=e)
 

@@ -39,16 +39,19 @@ class ConfigurationRepository(BaseRepo):
 
 
 class ImageGeneratorRepository(BaseRepo):
+    """Consolidated ImageGeneratorRepository using GenericRepository internally."""
     def __init__(self):
         super().__init__(db_name='image_generators')
 
 
 class ComponentsRepository(BaseRepo):
+    """Consolidated ComponentsRepository using GenericRepository internally."""
     def __init__(self):
         super().__init__(db_name='components')
 
 
 class ReferencesRepository(BaseRepo):
+    """Consolidated ReferencesRepository using GenericRepository internally."""
     def __init__(self):
         super().__init__(db_name='references')
 

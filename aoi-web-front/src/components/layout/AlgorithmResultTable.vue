@@ -38,8 +38,8 @@ export default{
 }
 
 .table-wrapper {
-    height: 70vh;
-    overflow-y: auto;
+    min-height: 70vh;
+    /* overflow-y: auto; - moved scrolling to body level */
     width: 100%;
 }
 

@@ -6,7 +6,7 @@
 
 <script>
 import * as fabric from 'fabric';
-import { ref, watch, onMounted, toRef, onUnmounted, onBeforeUnmount } from 'vue';
+import { ref, watch, onMounted, toRef, onUnmounted, onBeforeUnmount, nextTick } from 'vue';
 
 import { useWebSocket, useFabricCanvas, useGraphicsStore, useErrorsStore, useImageSourcesStore } from '@/composables/useStore';
 import { DEFAULT_IMAGE_DATA_URI_PREFIX, ImageDataUtils } from '@/utils/imageConstants';
@@ -48,6 +48,11 @@ export default {
         let webSocketInstance = null;
         
         function connectToCamera() {
+            // Don't connect if no valid feed location
+            if (!props.feedLocation) {
+                return;
+            }
+            
             // Disconnect existing connection if any
             if (webSocketInstance) {
                 webSocketInstance.disconnect();
@@ -209,20 +214,23 @@ export default {
                         noScaleCache: false
                     });
                     
-                    graphic.on('rotating', function(event) {
-                        context.emit('graphics-changed', event.transform.target);
-                    });
+                    // Defer event binding to avoid Vuex strict mode warnings
+                    nextTick(() => {
+                        graphic.on('rotating', function(event) {
+                            context.emit('graphics-changed', event.transform.target);
+                        });
 
-                    graphic.on('scaling', function(event) {
-                        context.emit('graphics-changed', event.transform.target);
-                    });
+                        graphic.on('scaling', function(event) {
+                            context.emit('graphics-changed', event.transform.target);
+                        });
 
-                    graphic.on('moving', function(event) {
-                        context.emit('graphics-changed', event.transform.target);
-                    });
+                        graphic.on('moving', function(event) {
+                            context.emit('graphics-changed', event.transform.target);
+                        });
 
-                    graphic.on('modified',  function(event) {
-                        context.emit('graphic-modified', event.transform.target);
+                        graphic.on('modified',  function(event) {
+                            context.emit('graphic-modified', event.transform.target);
+                        });
                     });
 
                     if (canvas.value) {

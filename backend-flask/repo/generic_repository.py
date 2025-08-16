@@ -98,8 +98,12 @@ def create_image_source_repository():
 
 def create_components_repository():
     """Factory for ComponentsRepository compatibility."""
-    from services.components.components_model import ComponentModel
-    return RepositoryRegistry.get_repository('components', ComponentModel)
+    try:
+        from services.components.components_model import ComponentModel
+        model_class = ComponentModel
+    except ImportError:
+        model_class = None
+    return RepositoryRegistry.get_repository('components', model_class)
 
 def create_references_repository():
     """Factory for ReferencesRepository compatibility."""

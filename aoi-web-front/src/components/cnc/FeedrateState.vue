@@ -301,6 +301,7 @@ export default {
 .firmware-section {
   display: flex;
   flex-direction: column;
+  align-items: center; /* Center the firmware content */
   width: 100%;
   gap: var(--space-2);
 }
@@ -308,6 +309,7 @@ export default {
 .firmware-info {
   display: flex;
   align-items: center;
+  justify-content: center; /* Center the firmware info */
   padding: var(--space-0) var(--space-2);
   gap: var(--space-2);
 }
@@ -315,6 +317,7 @@ export default {
 .firmware-version {
   display: flex;
   align-items: center;
+  justify-content: center; /* Center the version info */
   padding: var(--space-0) var(--space-2);
   gap: var(--space-2);
 }

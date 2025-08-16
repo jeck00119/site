@@ -79,6 +79,7 @@ class Field(BaseModel):
 @router.get("")
 @handle_route_errors("list", "Algorithm")
 async def list_configured_algorithms(
+        _: dict = Depends(require_authentication("list algorithms")),
         algorithms_repository: AlgorithmsRepository = Depends(get_service_by_type(AlgorithmsRepository))
 ) -> List[AlgorithmModel]:
     algorithms = RouteHelper.list_entities(algorithms_repository, "Algorithm")
@@ -89,19 +90,21 @@ async def list_configured_algorithms(
 @router.get("/types")
 @handle_route_errors("list types", "Algorithm")
 async def list_algorithms_types(
+        _: dict = Depends(require_authentication("list algorithm types")),
         algorithm_service: AlgorithmsService = Depends(get_service_by_type(AlgorithmsService))
 ) -> List[str]:
     result = algorithm_service.list_algorithms_types()
-    return RouteHelper.create_success_response(result)
+    return RouteHelper.create_success_response("Algorithm types retrieved successfully", result)
 
 
 @router.get("/basic/types")
 @handle_route_errors("list basic types", "Algorithm")
 async def list_basic_algorithm_types(
+        _: dict = Depends(require_authentication("list basic algorithm types")),
         basic_algorithms_service: BasicAlgorithmsService = Depends(get_service_by_type(BasicAlgorithmsService))
 ) -> Dict[str, Any]:
     result = basic_algorithms_service.list_algorithm_types_and_params()
-    return RouteHelper.create_success_response(result)
+    return RouteHelper.create_success_response("Basic algorithm types retrieved successfully", result)
 
 
 @router.get("/reference/types")
@@ -110,7 +113,7 @@ async def list_reference_algorithm_types(
         algorithm_service: AlgorithmsService = Depends(get_service_by_type(AlgorithmsService))
 ) -> Dict[str, Any]:
     result = algorithm_service.list_reference_algorithms_types()
-    return RouteHelper.create_success_response(result)
+    return RouteHelper.create_success_response("Reference algorithm types retrieved successfully", result)
 
 
 @router.get("/types/{algorithm_type}")
@@ -181,23 +184,17 @@ async def get_algorithm(
 
 
 @router.post("")
+@handle_route_errors("create", "Algorithm", success_status=201)
 async def post_algorithm(
         algorithm: AlgorithmModel,
         _: dict = Depends(require_authentication),
         algorithms_repository: AlgorithmsRepository = Depends(get_service_by_type(AlgorithmsRepository))
 ) -> Dict[str, str]:
-    try:
-        return RouteHelper.create_entity(
-            algorithms_repository,
-            algorithm,
-            "Algorithm"
-        )
-    except Exception as e:
-        raise create_error_response(
-            operation="create",
-            entity_type="Algorithm",
-            exception=e
-        )
+    return RouteHelper.create_entity(
+        algorithms_repository,
+        algorithm,
+        "Algorithm"
+    )
 
 
 @router.put("/{algorithm_uid}")
@@ -356,41 +353,29 @@ async def edit_live_algorithm(
 
 @router.post("/__API__/edit_reference_algorithm")
 @handle_route_errors("edit reference algorithm", "Algorithm")
+@handle_route_errors("edit reference algorithm", "Algorithm")
 async def edit_reference_algorithm(
         field: Field,
         algorithm_service: AlgorithmsService = Depends(get_service_by_type(AlgorithmsService))
 ) -> Dict[str, str]:
-    try:
-        algorithm_service.edit_reference_algorithm(field.key, field.value)
-        return RouteHelper.create_success_response("Reference algorithm edited successfully")
-    except Exception as e:
-        raise create_error_response(
-            operation="edit reference algorithm",
-            entity_type="Algorithm",
-            exception=e
-        )
+    algorithm_service.edit_reference_algorithm(field.key, field.value)
+    return RouteHelper.create_success_response("Reference algorithm edited successfully")
 
 
 @router.post("/__API__/upload_resource")
+@handle_route_errors("upload resource", "Algorithm")
 async def upload_resource(
         file: UploadFile = File(...),
         path: str = Form(...)
 ) -> Dict[str, str]:
-    try:
-        with open(f"{path}/{file.filename}", 'wb') as f:
-            while True:
-                chunk = await file.read(64 * 1024)
-                if not chunk:
-                    break
-                f.write(chunk)
-        
-        return RouteHelper.create_success_response("Resource uploaded successfully")
-    except Exception as e:
-        raise create_error_response(
-            operation="upload resource",
-            entity_type="Algorithm",
-            exception=e
-        )
+    with open(f"{path}/{file.filename}", 'wb') as f:
+        while True:
+            chunk = await file.read(64 * 1024)
+            if not chunk:
+                break
+            f.write(chunk)
+    
+    return RouteHelper.create_success_response("Resource uploaded successfully")
 
 
 @router.get("/__API__/process_live_algorithm")
@@ -619,20 +604,14 @@ async def process_live_compound_algorithm(
 
 
 @router.post("/__API__/set_static_image")
+@handle_route_errors("set static image", "Algorithm")
 async def set_static_image(
         encoded_image: str = Body(...),
         load_image_service: LoadImageService = Depends(get_service_by_type(LoadImageService))
 ) -> Dict[str, str]:
-    try:
-        load_image_service.set_encoded_image(encoded_image)
-        load_image_service.load_image()
-        return RouteHelper.create_success_response("Static image set successfully")
-    except Exception as e:
-        raise create_error_response(
-            operation="set static image",
-            entity_type="Algorithm",
-            exception=e
-        )
+    load_image_service.set_encoded_image(encoded_image)
+    load_image_service.load_image()
+    return RouteHelper.create_success_response("Static image set successfully")
 
 
 manager = ConnectionManager()

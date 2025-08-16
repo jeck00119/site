@@ -9,7 +9,7 @@ import * as fabric from "fabric";
 export default {
     async loadAlgorithms(context) {
         try {
-            const token = context.rootGetters["auth/getToken"];
+            const token = context.rootGetters["auth/getToken"] || sessionStorage.getItem('auth-token');
 
             const { response, responseData } = await api.get('/algorithm/types', {
                 'content-type': 'application/json',
@@ -25,7 +25,7 @@ export default {
             } else {
                 const algorithms = []
 
-                for (const algorithmType of responseData.message) {
+                for (const algorithmType of responseData.data) {
                     const algorithm = {
                         uid: uuid.v4(),
                         type: algorithmType
@@ -44,7 +44,7 @@ export default {
 
     async loadBasicAlgorithms(context) {
         try {
-            const token = context.rootGetters["auth/getToken"];
+            const token = context.rootGetters["auth/getToken"] || sessionStorage.getItem('auth-token');
 
             const { response, responseData } = await api.get('/algorithm/basic/types', {
                 'content-type': 'application/json',
@@ -68,7 +68,7 @@ export default {
 
     async loadReferenceAlgorithms(context) {
         try {
-            const token = context.rootGetters["auth/getToken"];
+            const token = context.rootGetters["auth/getToken"] || sessionStorage.getItem('auth-token');
 
             const { response, responseData } = await api.get('/reference', {
                 'content-type': 'application/json',
@@ -100,7 +100,7 @@ export default {
 
     async loadConfiguredAlgorithms(context) {
         try {
-            const token = context.rootGetters["auth/getToken"];
+            const token = context.rootGetters["auth/getToken"] || sessionStorage.getItem('auth-token');
 
             const { response, responseData } = await api.get('/algorithm', {
                 'content-type': 'application/json',
@@ -368,7 +368,7 @@ export default {
     },
 
     async removeAlgorithm(context, payload) {
-        const token = context.rootGetters["auth/getToken"];
+        const token = context.rootGetters["auth/getToken"] || sessionStorage.getItem('auth-token');
 
         const { response } = await api.delete(`/algorithm/${payload.uid}`, {
             'content-type': 'application/json',
@@ -387,7 +387,7 @@ export default {
     },
 
     async addAlgorithm(context, payload) {
-        const token = context.rootGetters["auth/getToken"];
+        const token = context.rootGetters["auth/getToken"] || sessionStorage.getItem('auth-token');
 
         const { response } = await api.post('/algorithm', payload, {
             'content-type': 'application/json',
@@ -407,7 +407,7 @@ export default {
 
     async updateConfiguredAlgorithm(context, payload) {
         try {
-            const token = context.rootGetters["auth/getToken"];
+            const token = context.rootGetters["auth/getToken"] || sessionStorage.getItem('auth-token');
 
             const { response } = await api.update(`/algorithm/${payload.uid}`, payload, {
                 'content-type': 'application/json',
@@ -427,7 +427,7 @@ export default {
 
     async addConfiguredAlgorithm(context, payload) {
         try {
-            const token = context.rootGetters["auth/getToken"];
+            const token = context.rootGetters["auth/getToken"] || sessionStorage.getItem('auth-token');
 
             const { response } = await api.post('/algorithm', payload, {
                 'content-type': 'application/json',

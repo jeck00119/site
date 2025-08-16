@@ -1,14 +1,14 @@
 <template>
     <div class="nav-container">
-        <transition name="slide-fade" mode="out-in">
-            <div class="brg-container" v-if="!navBarVisibility" @click="showNavBar" height="10vh">
-                <svg viewBox="0 0 100 80" width="40" height="40" fill="background-color: rgb(204, 161, 82)">
-                    <rect width="100" height="20" rx="10"></rect>
-                    <rect y="25" width="100" height="20" rx="10"></rect>
-                    <rect y="50" width="100" height="20" rx="10"></rect>
-                </svg>
-            </div>
-            <div class="nav-menu" v-else>
+        <div class="brg-container" v-show="!navBarVisibility" @click="showNavBar" height="10vh">
+            <svg viewBox="0 0 100 80" width="40" height="40" fill="background-color: rgb(204, 161, 82)">
+                <rect width="100" height="20" rx="10"></rect>
+                <rect y="25" width="100" height="20" rx="10"></rect>
+                <rect y="50" width="100" height="20" rx="10"></rect>
+            </svg>
+        </div>
+        <transition name="slide-fade">
+            <div class="nav-menu scrollbar-hidden" v-if="navBarVisibility">
                 <div class="header">
                     <div class="header-item-logo">
                         <img class="aoi-logo" src="../../assets/icons/aoi-logo.png" alt="AOI Logo">
@@ -133,7 +133,7 @@ export default {
     .nav-container {
         display: flex;
         position: fixed;
-        z-index: 100;
+        z-index: 2000; /* Higher than footer z-index */
     }
 
     .header {
@@ -146,8 +146,6 @@ export default {
         height: 20%;
     }
     .nav-menu {
-        /* position: fixed; */
-        /* z-index: 100; */
         background-color: rgb(0, 0, 0);
         width: 20vw;
         overflow-y: auto;
@@ -155,12 +153,9 @@ export default {
         height: 100vh;
     }
 
-    .nav-menu::-webkit-scrollbar { 
-        display: none;  /* Safari and Chrome */
-    }
 
     h1 {
-        color: rgb(204, 161, 82);
+        color: var(--color-primary);
         font-weight: 900;
     }
 
@@ -201,49 +196,32 @@ export default {
     }
 
     .brg-container {
+        position: absolute;
         margin-left: 0.5vw;
         margin-top: 0.4vh;
+        z-index: 1;
+        transition: opacity 0.2s ease;
     }
 
     .brg-container:hover {
         cursor: pointer;
     }
 
-    .slide-fade-enter-active {
-        transition: all .3s ease-in;
-    }
+    .slide-fade-enter-active,
     .slide-fade-leave-active {
-        /* transition: all .8s cubic-bezier(1.0, 0.5, 0.8, 1.0); */
-        transition: all .3s ease-out;
+        transition: transform .3s cubic-bezier(0.4, 0, 0.2, 1);
     }
 
     .slide-fade-enter-from,
     .slide-fade-leave-to {
         transform: translateX(-20vw);
+        opacity: 0.95;
     }
 
     .slide-fade-enter-to,
     .slide-fade-leave-from {
         transform: translateX(0);
+        opacity: 1;
     }
 
-    .slide-fade-leave-from {
-        transform: translateX(0);
-    }
-
-    ::-webkit-scrollbar {
-        width: 10px;
-    }
-
-    ::-webkit-scrollbar-track {
-        background: black; 
-    }
- 
-    ::-webkit-scrollbar-thumb {
-        background: #888; 
-    }
-
-    ::-webkit-scrollbar-thumb:hover {
-        background: #555; 
-    }
 </style>

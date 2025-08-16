@@ -10,7 +10,7 @@
                         <div class="form-control">
                             <label for="name">Name:</label>
                             <base-dropdown
-                                width="50%"
+                                width="35%"
                                 :current="eventName"
                                 :values="events"
                                 name="name"
@@ -24,7 +24,7 @@
                         <div class="form-control">
                             <label for="file">Audio file:</label>
                             <base-dropdown
-                                width="50%"
+                                width="35%"
                                 :current="filename"
                                 :values="files"
                                 name="file"
@@ -34,7 +34,7 @@
                         <div class="form-control">
                             <label for="channel">Channel:</label>
                             <base-dropdown
-                                width="50%"
+                                width="35%"
                                 :current="channel"
                                 :values="channels"
                                 name="channel"
@@ -44,7 +44,7 @@
                         <div class="form-control">
                             <label for="priority">Priority:</label>
                             <base-dropdown
-                                width="50%"
+                                width="35%"
                                 :current="priority"
                                 :values="priorities"
                                 name="priority"
@@ -59,13 +59,13 @@
                                 :current="volume"
                                 :step="1"
                                 name="volume"
-                                width="50%"
+                                width="35%"
                                 @update-value="updateVolume">
                             </base-slider>
                         </div>
                     </div>
                     <div class="actions-container">
-                        <base-button-rectangle width="50%" @state-changed="saveCurrentConfig">
+                        <base-button-rectangle width="25%" @state-changed="saveCurrentConfig">
                             <div class="button-container">
                                 <div class="button-icon">
                                     <v-icon name="ri-save-3-fill" scale="1.5"/>
@@ -73,7 +73,7 @@
                                 <div class="button-text">Save</div>
                             </div>
                         </base-button-rectangle>
-                        <base-button-rectangle width="50%" @state-changed="addChannel">
+                        <base-button-rectangle width="25%" @state-changed="addChannel">
                             <div class="button-container">
                                 <div class="button-icon">
                                     <v-icon name="io-add-circle-sharp" scale="1.5"/>
@@ -259,10 +259,10 @@ export default {
 .flex-container {
     display: flex;
     flex-direction: column;
-    justify-content: flex-start;
+    justify-content: center; /* Changed from flex-start to center for vertical centering */
     align-items: center;
     width: 95%;
-    height: 100%;
+    min-height: 80vh; /* Changed from height: 100% to min-height: 80vh to ensure proper viewport centering */
     color: white;
     margin: auto;
 }
@@ -301,17 +301,19 @@ export default {
     color: white;
     border: none;
     display: flex;
+    align-items: center; /* Vertically align labels with their fields */
     /* background-color: red; */
     justify-content: center;
+    margin-left: -0.5%; /* Very slight shift to the right */
 }
 
 
 label {
-   width: 20%;
+   width: 8%; /* Much closer - minimal space between label and field */
 }
 
 input {
-    width: 50%;
+    width: 35%;
     background-color: rgb(67, 46, 46);
     color: white;
     border: none;
@@ -321,6 +323,8 @@ input {
     display: flex;
     justify-content: center;
     align-items: center;
+    gap: 1rem; /* Added gap for spacing between buttons */
+    margin-top: 2rem; /* Add space between volume control and buttons */
     /* background-color: violet; */
 }
 

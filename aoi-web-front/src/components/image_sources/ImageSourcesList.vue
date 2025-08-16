@@ -1,5 +1,5 @@
 <template>
-    <div class="list-container" :style="{width: '100%', height: '100%'}">
+    <div class="list-container custom-scrollbar" :style="{width: '100%', height: '100%'}">
         <div class="select-container">
             <vue-multiselect
                 v-model="currentImageSource"
@@ -12,14 +12,14 @@
         </div>
         <div class="action-wrapper">
             <button class="action-button" @click="showAddDialog">
-                <div class="button-container">
+                <div class="flex-center">
                     <div class="button-icon">
                         <v-icon name="io-add-circle-sharp" scale="1"/>
                     </div>
                 </div>
             </button>
             <button class="action-button" @click="showDeleteDialog(currentImageSource)" :disabled="!currentImageSource">
-                <div class="button-container">
+                <div class="flex-center">
                     <div class="button-icon">
                         <v-icon name="fa-trash" scale="1"/>
                     </div>
@@ -270,27 +270,21 @@ export default {
 }
 
 .button-container {
-    display: flex;
     width: 100%;
     height: 100%;
-    justify-content: center;
-    align-items: center;
-    color: rgb(204, 161, 82);
+    color: var(--color-primary);
 }
 
 .button-icon {
     height: 100%;
-    display: flex;
-    justify-content: center;
-    align-items: center;
 }
 
 ul {
-    color: rgba(204, 161, 82);
+    color: var(--color-primary);
     list-style: none;
     padding-left: 0pt;
     background-color: rgb(0, 0, 0);
-    overflow-y: auto;
+    /* overflow-y: auto; - moved scrolling to body level */
     width: 100%;
 }
 
@@ -300,7 +294,7 @@ li {
     align-items: center;
     /* margin:3px; */
     /* user-select:none; */
-    color: rgba(204, 161, 82);
+    color: var(--color-primary);
     height: 7%;
     background-color: rgb(37, 36, 36);
 }
@@ -324,11 +318,11 @@ li:hover {
 
 .add-button {
     width: 100%;
-    color: rgba(204, 161, 82);
+    color: var(--color-primary);
 }
 
 .type-button-selected {
-    background-color: rgba(204, 161, 82);
+    background-color: var(--color-primary);
     color: white;
 }
 
@@ -378,7 +372,7 @@ label {
 }
 
 .dialog-button:hover {
-    background-color: rgba(204, 161, 82);
+    background-color: var(--color-primary);
 }
 
 .dialog-ctrl-buttons-container {
@@ -388,17 +382,17 @@ label {
 }
 
 .dialog-add-button {
-    background-color: rgba(204, 161, 82);
+    background-color: var(--color-primary);
     color: white;
 }
 
 .add-button {
     border: none;
-    color: rgba(204, 161, 82);
+    color: var(--color-primary);
 }
 
 .add-button:hover {
-    background-color: rgba(204, 161, 82);
+    background-color: var(--color-primary);
     color: white;
 }
 
@@ -410,19 +404,4 @@ button[disabled] {
     cursor: not-allowed;
 }
 
-::-webkit-scrollbar {
-    width: 10px;
-}
-
-::-webkit-scrollbar-track {
-    background: rgb(0, 0, 0);
-}
-
-::-webkit-scrollbar-thumb {
-    background: #888;
-}
-
-::-webkit-scrollbar-thumb:hover {
-    background: #555;
-}
 </style>

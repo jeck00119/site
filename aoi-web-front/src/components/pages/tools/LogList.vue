@@ -228,9 +228,9 @@ export default {
 }
 
 .table-wrapper {
-    height: 70vh;
-    overflow-y: auto;
+    max-height: 70vh;
     margin-top: 5vh;
+    overflow-y: auto;
 }
 
 .table-wrapper thead th {
@@ -314,11 +314,10 @@ th {
   padding: 10px;
   border: 1px solid #ccc;
   width: 45vw;
-  height: 25vh;
+  max-height: 25vh;
   display: flex;
   justify-content: flex-start;
   z-index: 5;
-  overflow: auto;
 }
 
 .details-container {

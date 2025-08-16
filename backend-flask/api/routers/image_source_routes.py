@@ -8,13 +8,14 @@ from starlette.websockets import WebSocket, WebSocketDisconnect
 from wsproto.utilities import LocalProtocolError
 
 from api.dependencies.services import get_service_by_type
-from api.error_handlers import create_error_response
-from api.route_utils import RouteHelper, require_authentication
+from api.error_handlers import create_error_response, handle_route_errors
+from api.route_utils import RouteHelper, require_authentication, get_repository_and_config_service
 from security.validators import validate_input, detect_security_threats, validate_file_upload
 from api.ws_connection_manager import ConnectionManager
 from repo.repositories import ImageSourceRepository
 from repo.repository_exceptions import UidNotFound, UidNotUnique
 from services.camera_calibration.camera_calibration_service import CameraCalibrationService
+from services.configurations.configurations_service import ConfigurationService
 from services.image_source.image_source_model import ImageSourceModel, ImgSrcEnum
 from services.image_source.image_source_service import ImageSourceService
 from src.utils import frame_to_base64
@@ -26,101 +27,107 @@ router = APIRouter(
 
 
 @router.get("")
+@handle_route_errors("list", "ImageSource")
 async def list_image_sources(
-        image_source_repository: ImageSourceRepository = Depends(get_service_by_type(ImageSourceRepository))
-) -> JSONResponse:
-    try:
-        sources = RouteHelper.list_entities(
-            image_source_repository,
-            "ImageSource"
-        )
-        resp = []
-        for img_src in sources:
-            resp.append({
-                'uid': img_src['uid'],
-                'name': img_src['name']
-            })
-        return RouteHelper.create_success_response(resp)
-    except Exception as e:
-        raise create_error_response("list", "ImageSource", exception=e)
+        _: dict = Depends(require_authentication("list image sources")),
+        repo_and_config=Depends(get_repository_and_config_service(ImageSourceRepository))
+) -> List[Dict[str, str]]:
+    image_source_repository, configuration_service = repo_and_config
+    sources = RouteHelper.list_entities_with_config_context(
+        image_source_repository,
+        configuration_service,
+        "ImageSource"
+    )
+    return RouteHelper.transform_list_to_uid_name(sources)
 
 
 @router.get("/{image_source_uid}")
 @validate_input(image_source_uid="safe_string")
+@handle_route_errors("retrieve", "ImageSource", "image_source_uid")
 async def get_image_source(
         image_source_uid: str,
-        image_source_repository: ImageSourceRepository = Depends(get_service_by_type(ImageSourceRepository)),
+        _: dict = Depends(require_authentication("get image source")),
+        repo_and_config=Depends(get_repository_and_config_service(ImageSourceRepository)),
         image_source_service: ImageSourceService = Depends(get_service_by_type(ImageSourceService))
-) -> JSONResponse:
-    try:
-        entity = RouteHelper.get_entity_by_id(
-            image_source_repository,
-            image_source_uid,
-            "ImageSource"
-        )
-        image_source_service.load_settings_to_image_source(uid=image_source_uid)
-        result = ImageSourceModel(**entity)
-        return RouteHelper.create_success_response(result.model_dump())
-    except Exception as e:
-        raise create_error_response("get", "ImageSource", entity_id=image_source_uid, exception=e)
+) -> dict:
+    image_source_repository, configuration_service = repo_and_config
+    entity = RouteHelper.get_entity_with_config_context(
+        image_source_repository,
+        configuration_service,
+        image_source_uid,
+        "ImageSource"
+    )
+    image_source_service.load_settings_to_image_source(uid=image_source_uid)
+    model = ImageSourceModel(**entity)
+    return model.model_dump()
 
 
 @router.post("")
 @detect_security_threats()
+@handle_route_errors("create", "ImageSource", success_status=201)
 async def post_image_source(
         image_source: ImageSourceModel,
-        user: dict = Depends(require_authentication),
-        image_source_repository: ImageSourceRepository = Depends(get_service_by_type(ImageSourceRepository))
-) -> JSONResponse:
+        user: dict = Depends(require_authentication("create image source")),
+        repo_and_config=Depends(get_repository_and_config_service(ImageSourceRepository)),
+        image_source_service: ImageSourceService = Depends(get_service_by_type(ImageSourceService))
+) -> Dict[str, str]:
+    image_source_repository, configuration_service = repo_and_config
+    
+    # Create entity in repository
+    result = RouteHelper.create_entity_with_config_context(
+        image_source_repository,
+        configuration_service,
+        image_source,
+        "ImageSource"
+    )
+    
+    # Initialize the newly created image source in the service cache
     try:
-        RouteHelper.create_entity(
-            image_source_repository,
-            image_source,
-            "ImageSource"
-        )
-        return RouteHelper.create_success_response("")
+        image_source_service._initialize_image_source_by_uid(image_source.uid)
     except Exception as e:
-        raise create_error_response("create", "ImageSource", exception=e)
+        print(f"Warning: Failed to initialize image source {image_source.uid} in service cache: {e}")
+        # Don't fail the request if cache initialization fails
+    
+    return result
 
 
 @router.put("/{image_source_uid}")
 @validate_input(image_source_uid="safe_string")
 @detect_security_threats()
+@handle_route_errors("update", "ImageSource", "image_source_uid")
 async def put_image_source(
         image_source: ImageSourceModel,
-        user: dict = Depends(require_authentication),
+        user: dict = Depends(require_authentication("update image source")),
         image_source_service: ImageSourceService = Depends(get_service_by_type(ImageSourceService)),
-        image_source_repository: ImageSourceRepository = Depends(get_service_by_type(ImageSourceRepository))
-) -> JSONResponse:
-    try:
-        RouteHelper.update_entity(
-            image_source_repository,
-            image_source,
-            "ImageSource"
-        )
-        image_source_service.on_patch_image_source(image_source)
-        return RouteHelper.create_success_response("")
-    except Exception as e:
-        raise create_error_response("update", "ImageSource", entity_id=image_source.uid, exception=e)
+        repo_and_config=Depends(get_repository_and_config_service(ImageSourceRepository))
+) -> Dict[str, str]:
+    image_source_repository, configuration_service = repo_and_config
+    result = RouteHelper.update_entity_with_config_context(
+        image_source_repository,
+        configuration_service,
+        image_source,
+        "ImageSource"
+    )
+    image_source_service.on_patch_image_source(image_source)
+    return result
 
 
 @router.delete("/{image_source_uid}")
+@handle_route_errors("delete", "ImageSource", "image_source_uid")
 async def delete_image_source(
         image_source_uid: str,
-        user: dict = Depends(require_authentication),
+        user: dict = Depends(require_authentication("delete image source")),
         image_source_service: ImageSourceService = Depends(get_service_by_type(ImageSourceService)),
-        image_source_repository: ImageSourceRepository = Depends(get_service_by_type(ImageSourceRepository))
-) -> JSONResponse:
-    try:
-        RouteHelper.delete_entity(
-            image_source_repository,
-            image_source_uid,
-            "ImageSource"
-        )
-        image_source_service.on_delete_image_source(image_source_uid)
-        return RouteHelper.create_success_response("")
-    except Exception as e:
-        raise create_error_response("delete", "ImageSource", entity_id=image_source_uid, exception=e)
+        repo_and_config=Depends(get_repository_and_config_service(ImageSourceRepository))
+) -> Dict[str, str]:
+    image_source_repository, configuration_service = repo_and_config
+    image_source_service.on_delete_image_source(image_source_uid)
+    return RouteHelper.delete_entity_with_config_context(
+        image_source_repository,
+        configuration_service,
+        image_source_uid,
+        "ImageSource"
+    )
 
 
 manager = ConnectionManager()
@@ -131,15 +138,24 @@ async def websocket_endpoint(
         websocket: WebSocket,
         ws_uid,
         image_source_uid,
-        image_source_repository: ImageSourceRepository = Depends(get_service_by_type(ImageSourceRepository)),
+        repo_and_config=Depends(get_repository_and_config_service(ImageSourceRepository)),
         image_source_service: ImageSourceService = Depends(get_service_by_type(ImageSourceService)),
         camera_calibration_service: CameraCalibrationService = Depends(get_service_by_type(CameraCalibrationService))
 ):
     try:
         await manager.connect(ws_uid, websocket)
+        image_source_repository, configuration_service = repo_and_config
         
-        # Safely read image source configuration
+        # Check if configuration is set before proceeding
+        current_config = configuration_service.get_current_configuration_name()
+        if not current_config:
+            print(f"WebSocket connection attempted without configuration set for image source {image_source_uid}")
+            await manager.disconnect(ws_uid)
+            return
+        
+        # Setup configuration context and safely read image source configuration
         try:
+            RouteHelper.setup_configuration_context(image_source_repository, configuration_service)
             image_source = image_source_repository.read_id(image_source_uid)
         except Exception as e:
             print(f"Error reading image source {image_source_uid}: {e}")
@@ -156,6 +172,12 @@ async def websocket_endpoint(
                 break
 
             try:
+                # Check if image source is initialized before trying to grab frames
+                if image_source_uid not in image_source_service.image_sources:
+                    # Don't spam logs, just wait and check again
+                    await sleep(1.0)
+                    continue
+                    
                 frame = image_source_service.grab_from_image_source(image_source_uid)
                 
                 if frame is None:
@@ -206,11 +228,13 @@ async def websocket_live_image_source_with_fps(
         image_source_uid,
         generator_or_camera_uid,
         fps,
-        image_source_repository: ImageSourceRepository = Depends(get_service_by_type(ImageSourceRepository)),
+        repo_and_config=Depends(get_repository_and_config_service(ImageSourceRepository)),
         image_source_service: ImageSourceService = Depends(get_service_by_type(ImageSourceService)),
         camera_calibration_service: CameraCalibrationService = Depends(get_service_by_type(CameraCalibrationService))
 ):
     await manager.connect(ws_uid, websocket)
+    image_source_repository, configuration_service = repo_and_config
+    RouteHelper.setup_configuration_context(image_source_repository, configuration_service)
     image_source = image_source_repository.read_id(image_source_uid)
 
     if image_source_service.check_image_source_type(image_source_uid) == ImgSrcEnum.DYNAMIC:
@@ -267,9 +291,9 @@ async def websocket_live_image_source_with_fps(
 
 
 @router.post("/{ws_uid}/ws/close")
-async def close_ws(ws_uid: str) -> JSONResponse:
+async def close_ws(ws_uid: str) -> Dict[str, str]:
     try:
         await manager.connection_closed(ws_uid)
-        return RouteHelper.create_success_response("")
+        return {"status": "success", "message": "WebSocket connection closed successfully"}
     except Exception as e:
         raise create_error_response("close_ws", "ImageSource", exception=e)

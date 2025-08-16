@@ -7,7 +7,7 @@
         ref="terminalOutput"
         readonly 
         :value="terminalHistory"
-        class="terminal-output"
+        class="terminal-output custom-scrollbar"
         @scroll="handleScroll"
       ></textarea>
       
@@ -359,23 +359,5 @@ export default {
   background-color: rgb(160, 82, 45);
 }
 
-/* Scrollbar styling for webkit browsers */
-.terminal-output::-webkit-scrollbar {
-  width: 8px;
-}
-
-.terminal-output::-webkit-scrollbar-track {
-  background: #2a2a2a;
-  border-radius: 4px;
-}
-
-.terminal-output::-webkit-scrollbar-thumb {
-  background: #555;
-  border-radius: 4px;
-}
-
-.terminal-output::-webkit-scrollbar-thumb:hover {
-  background: #777;
-}
 </style>
 

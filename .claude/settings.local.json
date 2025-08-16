@@ -64,8 +64,13 @@
       "Bash(E:/site/venv/Scripts/python -c \"from backend-flask.services.cnc.cnc_error_handler import CncErrorHandler; print(''GRBL errors imported:'', len(CncErrorHandler.GRBL_ERROR_LIST)); print(''Marlin errors imported:'', len(CncErrorHandler.MARLIN_ERROR_LIST)); print(''GRBL instructions imported:'', len(CncErrorHandler.GRBL_INSTRUCTIONS))\")",
       "Bash(E:/site/venv/Scripts/python -c \"from services.cnc.cnc_error_handler import CncErrorHandler; print(''GRBL errors imported:'', len(CncErrorHandler.GRBL_ERROR_LIST)); print(''Marlin errors imported:'', len(CncErrorHandler.MARLIN_ERROR_LIST)); print(''GRBL instructions imported:'', len(CncErrorHandler.GRBL_INSTRUCTIONS))\")",
       "Bash(E:/site/venv/Scripts/python -c \"from services.cnc.cnc_machine_marlin import CncMachineMarlin, ERROR_LIST_CNC; print(''Marlin error list imported:'', len(ERROR_LIST_CNC))\")",
-      "Bash(E:/site/venv/Scripts/python:*)"
+      "Bash(E:/site/venv/Scripts/python:*)",
+      "Bash(npm outdated)",
+      "Bash(npm audit:*)",
+      "WebSearch",
+      "Bash(npx depcheck:*)"
     ],
-    "deny": []
+    "deny": [],
+    "defaultMode": "acceptEdits"
   }
 }

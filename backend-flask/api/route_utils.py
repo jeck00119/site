@@ -4,13 +4,14 @@ Route Utilities
 Common utilities and patterns for API routes to reduce code duplication.
 """
 
-from typing import Any, Dict, List, Optional, Callable
+from typing import Any, Dict, List, Optional, Callable, Type
 from fastapi import Depends, HTTPException, status
 from starlette.responses import JSONResponse
 
 from api.dependencies.services import get_service_by_type
 from api.error_handlers import create_error_response, validate_authentication
 from services.authorization.authorization import get_current_user
+from services.configurations.configurations_service import ConfigurationService
 from repo.repository_exceptions import UidNotFound, UidNotUnique
 
 class RouteHelper:
@@ -182,6 +183,89 @@ class RouteHelper:
             } 
             for item in items
         ]
+    
+    @staticmethod
+    def setup_configuration_context(repository, configuration_service: ConfigurationService):
+        """
+        Apply configuration context to repository if current configuration exists.
+        This centralizes the common pattern of setting database context.
+        
+        Args:
+            repository: Repository instance to configure
+            configuration_service: Configuration service instance
+        """
+        current_config = configuration_service.get_current_configuration_name()
+        if current_config:
+            repository.set_db(current_config)
+    
+    @staticmethod
+    def get_entity_with_config_context(
+        repository, 
+        configuration_service: ConfigurationService,
+        entity_uid: str, 
+        entity_type: str = "Entity"
+    ):
+        """
+        Get entity by ID with configuration context setup.
+        Combines configuration setup and entity retrieval.
+        """
+        RouteHelper.setup_configuration_context(repository, configuration_service)
+        return RouteHelper.get_entity_by_id(repository, entity_uid, entity_type)
+    
+    @staticmethod
+    def list_entities_with_config_context(
+        repository, 
+        configuration_service: ConfigurationService,
+        entity_type: str = "Entity"
+    ) -> List[Dict]:
+        """
+        List entities with configuration context setup.
+        Combines configuration setup and entity listing.
+        """
+        RouteHelper.setup_configuration_context(repository, configuration_service)
+        return RouteHelper.list_entities(repository, entity_type)
+    
+    @staticmethod
+    def create_entity_with_config_context(
+        repository, 
+        configuration_service: ConfigurationService,
+        entity_data, 
+        entity_type: str = "Entity"
+    ):
+        """
+        Create entity with configuration context setup.
+        Combines configuration setup and entity creation.
+        """
+        RouteHelper.setup_configuration_context(repository, configuration_service)
+        return RouteHelper.create_entity(repository, entity_data, entity_type)
+    
+    @staticmethod
+    def update_entity_with_config_context(
+        repository, 
+        configuration_service: ConfigurationService,
+        entity_data, 
+        entity_type: str = "Entity"
+    ):
+        """
+        Update entity with configuration context setup.
+        Combines configuration setup and entity update.
+        """
+        RouteHelper.setup_configuration_context(repository, configuration_service)
+        return RouteHelper.update_entity(repository, entity_data, entity_type)
+    
+    @staticmethod
+    def delete_entity_with_config_context(
+        repository, 
+        configuration_service: ConfigurationService,
+        entity_uid: str, 
+        entity_type: str = "Entity"
+    ):
+        """
+        Delete entity with configuration context setup.
+        Combines configuration setup and entity deletion.
+        """
+        RouteHelper.setup_configuration_context(repository, configuration_service)
+        return RouteHelper.delete_entity(repository, entity_uid, entity_type)
 
 # Common dependency injection patterns
 def get_authenticated_user():
@@ -198,66 +282,169 @@ def require_authentication(operation: str = "perform this operation"):
         return user
     return _require_auth
 
-# Standard CRUD route factories
-def create_list_route(repository_class, entity_type: str):
-    """Create a standard list route."""
-    async def list_route(
-        repository=Depends(get_service_by_type(repository_class))
+def get_repository_with_config(repository_class: Type):
+    """
+    Create a dependency function that provides a repository with configuration context.
+    
+    Args:
+        repository_class: Repository class to inject
+        
+    Returns:
+        Dependency function that provides configured repository
+    """
+    async def _get_configured_repository(
+        repository=Depends(get_service_by_type(repository_class)),
+        configuration_service: ConfigurationService = Depends(get_service_by_type(ConfigurationService))
     ):
-        return RouteHelper.list_entities(repository, entity_type)
+        RouteHelper.setup_configuration_context(repository, configuration_service)
+        return repository
+    return _get_configured_repository
+
+def get_repository_and_config_service(repository_class: Type):
+    """
+    Create a dependency function that provides both repository and configuration service.
+    
+    Args:
+        repository_class: Repository class to inject
+        
+    Returns:
+        Tuple of (repository, configuration_service)
+    """
+    async def _get_repo_and_config(
+        repository=Depends(get_service_by_type(repository_class)),
+        configuration_service: ConfigurationService = Depends(get_service_by_type(ConfigurationService))
+    ):
+        return repository, configuration_service
+    return _get_repo_and_config
+
+# Standard CRUD route factories
+def create_list_route(repository_class, entity_type: str, with_config: bool = False):
+    """Create a standard list route."""
+    if with_config:
+        async def list_route(
+            repo_and_config=Depends(get_repository_and_config_service(repository_class))
+        ):
+            repository, configuration_service = repo_and_config
+            return RouteHelper.list_entities_with_config_context(
+                repository, configuration_service, entity_type
+            )
+    else:
+        async def list_route(
+            repository=Depends(get_service_by_type(repository_class))
+        ):
+            return RouteHelper.list_entities(repository, entity_type)
     return list_route
 
-def create_get_route(repository_class, entity_type: str, model_class):
+def create_get_route(repository_class, entity_type: str, model_class, with_config: bool = False):
     """Create a standard get by ID route."""
-    async def get_route(
-        entity_uid: str,
-        repository=Depends(get_service_by_type(repository_class))
-    ):
-        entity_data = RouteHelper.get_entity_by_id(repository, entity_uid, entity_type)
-        return model_class(**entity_data)
+    if with_config:
+        async def get_route(
+            entity_uid: str,
+            repo_and_config=Depends(get_repository_and_config_service(repository_class))
+        ):
+            repository, configuration_service = repo_and_config
+            entity_data = RouteHelper.get_entity_with_config_context(
+                repository, configuration_service, entity_uid, entity_type
+            )
+            return model_class(**entity_data)
+    else:
+        async def get_route(
+            entity_uid: str,
+            repository=Depends(get_service_by_type(repository_class))
+        ):
+            entity_data = RouteHelper.get_entity_by_id(repository, entity_uid, entity_type)
+            return model_class(**entity_data)
     return get_route
 
-def create_post_route(repository_class, service_class, entity_type: str, model_class):
+def create_post_route(repository_class, service_class, entity_type: str, model_class, with_config: bool = False):
     """Create a standard post route."""
-    async def post_route(
-        entity: model_class,
-        user: dict = Depends(require_authentication(f"create {entity_type.lower()}")),
-        repository=Depends(get_service_by_type(repository_class)),
-        service=Depends(get_service_by_type(service_class))
-    ):
-        # Create in repository
-        result = RouteHelper.create_entity(repository, entity.model_dump(), entity_type)
-        
-        # Initialize in service if applicable
-        if hasattr(service, f'create_{entity_type.lower()}'):
-            method = getattr(service, f'create_{entity_type.lower()}')
-            method(entity.uid)
-        
-        return result
+    if with_config:
+        async def post_route(
+            entity: model_class,
+            user: dict = Depends(require_authentication(f"create {entity_type.lower()}")),
+            repo_and_config=Depends(get_repository_and_config_service(repository_class)),
+            service=Depends(get_service_by_type(service_class))
+        ):
+            repository, configuration_service = repo_and_config
+            # Create in repository with config context
+            result = RouteHelper.create_entity_with_config_context(
+                repository, configuration_service, entity.model_dump(), entity_type
+            )
+            
+            # Initialize in service if applicable
+            if hasattr(service, f'create_{entity_type.lower()}'):
+                method = getattr(service, f'create_{entity_type.lower()}')
+                method(entity.uid)
+            
+            return result
+    else:
+        async def post_route(
+            entity: model_class,
+            user: dict = Depends(require_authentication(f"create {entity_type.lower()}")),
+            repository=Depends(get_service_by_type(repository_class)),
+            service=Depends(get_service_by_type(service_class))
+        ):
+            # Create in repository
+            result = RouteHelper.create_entity(repository, entity.model_dump(), entity_type)
+            
+            # Initialize in service if applicable
+            if hasattr(service, f'create_{entity_type.lower()}'):
+                method = getattr(service, f'create_{entity_type.lower()}')
+                method(entity.uid)
+            
+            return result
     return post_route
 
-def create_put_route(repository_class, entity_type: str, model_class):
+def create_put_route(repository_class, entity_type: str, model_class, with_config: bool = False):
     """Create a standard put route."""
-    async def put_route(
-        entity: model_class,
-        user: dict = Depends(require_authentication(f"update {entity_type.lower()}")),
-        repository=Depends(get_service_by_type(repository_class))
-    ):
-        return RouteHelper.update_entity(repository, entity.model_dump(), entity_type)
+    if with_config:
+        async def put_route(
+            entity: model_class,
+            user: dict = Depends(require_authentication(f"update {entity_type.lower()}")),
+            repo_and_config=Depends(get_repository_and_config_service(repository_class))
+        ):
+            repository, configuration_service = repo_and_config
+            return RouteHelper.update_entity_with_config_context(
+                repository, configuration_service, entity.model_dump(), entity_type
+            )
+    else:
+        async def put_route(
+            entity: model_class,
+            user: dict = Depends(require_authentication(f"update {entity_type.lower()}")),
+            repository=Depends(get_service_by_type(repository_class))
+        ):
+            return RouteHelper.update_entity(repository, entity.model_dump(), entity_type)
     return put_route
 
-def create_delete_route(repository_class, service_class, entity_type: str):
+def create_delete_route(repository_class, service_class, entity_type: str, with_config: bool = False):
     """Create a standard delete route."""
-    async def delete_route(
-        entity_uid: str,
-        user: dict = Depends(require_authentication(f"delete {entity_type.lower()}")),
-        repository=Depends(get_service_by_type(repository_class)),
-        service=Depends(get_service_by_type(service_class))
-    ):
-        # Delete from service if applicable
-        if hasattr(service, f'delete_{entity_type.lower()}'):
-            method = getattr(service, f'delete_{entity_type.lower()}')
-            method(entity_uid)
-        
-        return RouteHelper.delete_entity(repository, entity_uid, entity_type)
+    if with_config:
+        async def delete_route(
+            entity_uid: str,
+            user: dict = Depends(require_authentication(f"delete {entity_type.lower()}")),
+            repo_and_config=Depends(get_repository_and_config_service(repository_class)),
+            service=Depends(get_service_by_type(service_class))
+        ):
+            repository, configuration_service = repo_and_config
+            # Delete from service if applicable
+            if hasattr(service, f'delete_{entity_type.lower()}'):
+                method = getattr(service, f'delete_{entity_type.lower()}')
+                method(entity_uid)
+            
+            return RouteHelper.delete_entity_with_config_context(
+                repository, configuration_service, entity_uid, entity_type
+            )
+    else:
+        async def delete_route(
+            entity_uid: str,
+            user: dict = Depends(require_authentication(f"delete {entity_type.lower()}")),
+            repository=Depends(get_service_by_type(repository_class)),
+            service=Depends(get_service_by_type(service_class))
+        ):
+            # Delete from service if applicable
+            if hasattr(service, f'delete_{entity_type.lower()}'):
+                method = getattr(service, f'delete_{entity_type.lower()}')
+                method(entity_uid)
+            
+            return RouteHelper.delete_entity(repository, entity_uid, entity_type)
     return delete_route

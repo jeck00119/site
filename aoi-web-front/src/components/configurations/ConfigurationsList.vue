@@ -12,7 +12,7 @@
                                 width="8vw"
                                 @click="loadConfiguration(configuration.uid)"
                             >
-                                <div class="button-container">
+                                <div class="flex-center">
                                     <div class="button-icon">
                                         <v-icon name="fa-file-import" scale="1"/>
                                     </div>
@@ -26,7 +26,7 @@
                                 @click="removeConfiguration(configuration.uid)"
                                 :disabled="!isAuthorized"
                             >
-                                <div class="button-container">
+                                <div class="flex-center">
                                     <div class="button-icon">
                                         <v-icon name="md-delete-round" scale="1"/>
                                     </div>
@@ -40,7 +40,7 @@
                                 @click="showDialog(configuration.uid)"
                                 :disabled="!isAuthorized"
                             >
-                                <div class="button-container">
+                                <div class="flex-center">
                                     <div class="button-icon">
                                         <v-icon name="md-modeeditoutline-sharp" scale="1"/>
                                     </div>
@@ -54,7 +54,7 @@
                                 @click="copyConfigDialog(configuration.uid)"
                                 :disabled="!isAuthorized"
                             >
-                                <div class="button-container">
+                                <div class="flex-center">
                                     <div class="button-icon">
                                         <v-icon name="fa-copy" scale="1"/>
                                     </div>
@@ -120,7 +120,7 @@
                 @click="showAddDialog"
                 :disabled="!isAuthenticated"
             >
-                <div class="button-container">
+                <div class="flex-center">
                     <div class="button-icon">
                         <v-icon name="io-add-circle-sharp" scale="1"/>
                     </div>
@@ -137,8 +137,8 @@
             color="#CCA152"
             @close="clearNotification"
         >
-            <div class="message-wrapper">
-                <div class="icon-wrapper">
+            <div class="flex-column-center">
+                <div class="flex-center">
                     <v-icon :name="notificationIcon" scale="2.5" animation="spin"/>
                 </div>
                 <div class="text-wrapper">
@@ -445,13 +445,8 @@ export default{
     justify-content: space-between;
     /* align-items: center; */
     width: 100%;
-    height: 100%;
+    min-height: 100%;
     color: white;
-    overflow-y: auto;
-}
-
-.configurations-container::-webkit-scrollbar { 
-    display: none;
 }
 
 .list-wrapper {
@@ -479,26 +474,12 @@ export default{
     justify-content: space-between;
 }
 
-.button-container {
-    display: flex;
-    width: 100%;
-    height: 100%;
-    justify-content: center;
-    align-items: center;
-}
-
 .button-icon {
     height: 100%;
-    display: flex;
-    justify-content: center;
-    align-items: center;
 }
 
 .button-text {
     height: 100%;
-    display: flex;
-    justify-content: center;
-    align-items: center;
 }
 
 .error {
@@ -515,19 +496,6 @@ input {
     color: white;
 }
 
-.message-wrapper {
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
-}
-
-.icon-wrapper {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    margin-bottom: 3%;
-}
 
 .text-wrapper {
     font-size: 100%;

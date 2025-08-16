@@ -51,7 +51,7 @@ export default {
 
     async addChannel(context) {
         try {
-            const token = context.rootGetters["auth/getToken"];
+            const token = context.rootGetters["auth/getToken"] || sessionStorage.getItem('auth-token');
             
             const { response } = await api.post('/media/channel', {}, {
                 "content-type": "application/json",
@@ -72,7 +72,7 @@ export default {
 
     async addEvent(context, payload) {
         try {
-            const token = context.rootGetters["auth/getToken"];
+            const token = context.rootGetters["auth/getToken"] || sessionStorage.getItem('auth-token');
              
             const { response } = await api.post('/media/add_event', payload, {
                 "content-type": "application/json",

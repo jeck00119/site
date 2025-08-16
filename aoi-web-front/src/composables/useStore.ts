@@ -70,6 +70,7 @@ export function useCncStore(axisUid = null) {
   const moveToLocation = (payload: any) => dispatch('cnc/api_moveToLocation', payload);
   const patchLocation = (payload: any) => dispatch('cnc/patchLocation', payload);
   const fetchLocations = (axisUid: any) => dispatch('cnc/fetchLocations', axisUid);
+  const abort = (payload: any) => dispatch('cnc/api_jogCancel', payload);
   
   // Additional CNC management actions
   const loadCNCs = () => {
@@ -151,6 +152,7 @@ export function useCncStore(axisUid = null) {
     moveToLocation,
     patchLocation,
     fetchLocations,
+    abort,
     updateCncData,
     loadCNCs,
     loadCNCTypes,

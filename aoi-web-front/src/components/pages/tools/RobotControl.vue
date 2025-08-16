@@ -360,8 +360,8 @@ export default {
     flex-direction: row;
     align-items: start;
     width: 100%;
-    height: 93vh;
-    overflow-y: auto;
+    min-height: 93vh;
+    /* overflow-y: auto; - moved scrolling to body level */
     margin: auto;
     padding: 1%;
     border-radius: 10px;
@@ -373,8 +373,8 @@ export default {
     flex-direction: column;
     align-items: start;
     width: 50%;
-    height: 90%;
-    overflow-y: auto;
+    min-height: 90%;
+    /* overflow-y: auto; - moved scrolling to body level */
     margin: auto;
     margin-top: 2%;
     padding: 1%;
@@ -754,7 +754,7 @@ button[disabled] {
 
 .multiselect__content-wrapper {
   max-height: 100% !important;
-  overflow-y: auto;
+  /* overflow-y: auto; - moved scrolling to body level */
   width: 100%;
   background-color: red;
   margin: 0;

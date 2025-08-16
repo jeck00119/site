@@ -19,7 +19,7 @@ export default {
     async loadCNCs(context, _) {
         console.log('CNC Store: loadCNCs action called');
         try {
-            const token = context.rootGetters["auth/getToken"];
+            const token = context.rootGetters["auth/getToken"] || sessionStorage.getItem('auth-token');
             console.log('CNC Store: Token retrieved:', token ? 'Present' : 'Missing');
             
             const { response, responseData } = await api.get('/cnc', {
@@ -85,7 +85,7 @@ export default {
 
     async saveCNCs(context, _) {
         const cncs = context.getters.getCNCs;
-        const token = context.rootGetters["auth/getToken"];
+        const token = context.rootGetters["auth/getToken"] || sessionStorage.getItem('auth-token');
 
         try {
             const { response, data } = await api.post('/cnc/save', { cnc_list: cncs }, {
@@ -147,7 +147,7 @@ export default {
                 break;
         }
 
-        const token = context.rootGetters["auth/getToken"];
+        const token = context.rootGetters["auth/getToken"] || sessionStorage.getItem('auth-token');
         
         console.log("CNC postLocation - token:", token ? 'Present' : 'Missing');
         console.log("CNC postLocation - payload:", payload[0]);
@@ -185,7 +185,7 @@ export default {
         const oldName = patchedLocation.name.slice();
         patchedLocation.name = payload.newName;
         try{
-            const token = context.rootGetters["auth/getToken"];
+            const token = context.rootGetters["auth/getToken"] || sessionStorage.getItem('auth-token');
             const { response, responseData } = await api.put('/location', patchedLocation, {
                 "content-type": "application/json",
                 "Authorization": token
@@ -196,7 +196,7 @@ export default {
     },
 
     async deleteLocation(context, payload){
-        const token = context.rootGetters["auth/getToken"];
+        const token = context.rootGetters["auth/getToken"] || sessionStorage.getItem('auth-token');
         const { response, responseData } = await api.delete(`/location/${payload}`, {
             "content-type": "application/json",
             "Authorization": token

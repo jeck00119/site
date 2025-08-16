@@ -115,8 +115,8 @@ export default{
     display: flex;
     flex-direction: column;
     width: 100%;
-    height: 100%;
-    overflow-y: auto;
+    min-height: 100%;
+    /* overflow-y: auto; - moved scrolling to body level */
     justify-content: flex-start;
     align-items: center;
 }

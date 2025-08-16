@@ -57,7 +57,7 @@ export default {
 
     async saveProfilometers(context) {
         const profilometers = context.getters.getProfilometers;
-        const token = context.rootGetters["auth/getToken"];
+        const token = context.rootGetters["auth/getToken"] || sessionStorage.getItem('auth-token');
 
         const response =  await post(`http://${ipAddress}:${port}/profilometer/save`, profilometers, {
             "content-type": "application/json",

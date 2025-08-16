@@ -217,7 +217,9 @@ class ConfigurationService(metaclass=Singleton):
         
         self.set_configuration_flag()
 
+        # Set both UID and name for consistency
         self.current_configuration_uid = configuration_uid
+        # current_configuration_name is already set in set_repositories_atomic
         
         total_time = time.time() - start_time
         self.logger.info(f"Configuration loaded successfully in {total_time:.3f}s")
@@ -478,10 +480,18 @@ class ConfigurationService(metaclass=Singleton):
         self.logger.debug(f"Robot service took {time.time() - robot_start:.3f}s")
 
     def get_current_configuration_name(self):
+        # Return the cached name if available (most efficient)
+        if self.current_configuration_name:
+            return self.current_configuration_name
+        
+        # Fallback to looking up by UID if only UID is set
         if self.current_configuration_uid:
-            configuration = self.configuration_repository.read_id(self.current_configuration_uid)
-            return configuration["name"]
-
+            try:
+                configuration = self.configuration_repository.read_id(self.current_configuration_uid)
+                return configuration["name"]
+            except Exception:
+                return None
+        
         return None
 
     def get_current_configuration_part_number(self):

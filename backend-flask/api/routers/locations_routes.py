@@ -3,14 +3,10 @@ from fastapi import APIRouter, HTTPException, Depends
 from starlette import status
 from starlette.responses import JSONResponse
 
-from api.dependencies.services import get_service_by_type
-from api.error_handlers import create_error_response
-from api.route_utils import RouteHelper, require_authentication
+from api.error_handlers import handle_route_errors
+from api.route_utils import RouteHelper, require_authentication, get_repository_and_config_service
 from repo.repositories import LocationRepository
-from repo.repository_exceptions import UidNotFound, UidNotUnique
-from services.authorization.authorization import get_current_user
 from services.cnc.cnc_models import LocationModel
-from services.configurations.configurations_service import ConfigurationService
 
 router = APIRouter(
     tags=["location"],
@@ -19,125 +15,75 @@ router = APIRouter(
 
 
 @router.get("")
+@handle_route_errors("list", "Location")
 async def get_locations(
-        location_repository: LocationRepository = Depends(get_service_by_type(LocationRepository)),
-        configuration_service: ConfigurationService = Depends(get_service_by_type(ConfigurationService))
+        repo_and_config=Depends(get_repository_and_config_service(LocationRepository))
 ) -> List[Dict]:
-    try:
-        # Ensure repository has correct configuration context
-        current_config = configuration_service.get_current_configuration_name()
-        if current_config:
-            location_repository.set_db(current_config)
-            
-        return RouteHelper.list_entities(
-            location_repository,
-            "Location"
-        )
-    except Exception as e:
-        raise create_error_response("list", "Location", exception=e)
+    location_repository, configuration_service = repo_and_config
+    return RouteHelper.list_entities_with_config_context(
+        location_repository, configuration_service, "Location"
+    )
 
 
 @router.get("/axis/{axis_uid}")
+@handle_route_errors("retrieve", "Location", "axis_uid")
 async def get_locations_by_axis(
         axis_uid: str,
-        location_repository: LocationRepository = Depends(get_service_by_type(LocationRepository)),
-        configuration_service: ConfigurationService = Depends(get_service_by_type(ConfigurationService))
+        repo_and_config=Depends(get_repository_and_config_service(LocationRepository))
 ) -> List[Dict]:
-    try:
-        # Ensure repository has correct configuration context
-        current_config = configuration_service.get_current_configuration_name()
-        if current_config:
-            location_repository.set_db(current_config)
-            
-        return location_repository.get_locations_by_axis_uid(axis_uid)
-    except Exception as e:
-        raise create_error_response("retrieve", "Location", axis_uid, e)
+    location_repository, configuration_service = repo_and_config
+    RouteHelper.setup_configuration_context(location_repository, configuration_service)
+    return location_repository.get_locations_by_axis_uid(axis_uid)
 
 
 @router.get("/{location_uid}")
+@handle_route_errors("retrieve", "Location", "location_uid")
 async def get_location(
         location_uid: str,
-        location_repository: LocationRepository = Depends(get_service_by_type(LocationRepository)),
-        configuration_service: ConfigurationService = Depends(get_service_by_type(ConfigurationService))
+        repo_and_config=Depends(get_repository_and_config_service(LocationRepository))
 ) -> LocationModel:
-    try:
-        # Ensure repository has correct configuration context
-        current_config = configuration_service.get_current_configuration_name()
-        if current_config:
-            location_repository.set_db(current_config)
-            
-        res = RouteHelper.get_entity_by_id(
-            location_repository,
-            location_uid,
-            "Location"
-        )
-        return LocationModel(**res)
-    except Exception as e:
-        raise create_error_response("retrieve", "Location", location_uid, e)
+    location_repository, configuration_service = repo_and_config
+    res = RouteHelper.get_entity_with_config_context(
+        location_repository, configuration_service, location_uid, "Location"
+    )
+    return LocationModel(**res)
 
 
 @router.post("")
+@handle_route_errors("create", "Location", success_status=201)
 async def post_location(
         location_model: LocationModel,
         _: dict = Depends(require_authentication("create location")),
-        location_repository: LocationRepository = Depends(get_service_by_type(LocationRepository)),
-        configuration_service: ConfigurationService = Depends(get_service_by_type(ConfigurationService))
+        repo_and_config=Depends(get_repository_and_config_service(LocationRepository))
 ) -> Dict[str, str]:
-    try:
-        # Ensure repository has correct configuration context
-        current_config = configuration_service.get_current_configuration_name()
-        if current_config:
-            location_repository.set_db(current_config)
-            
-        return RouteHelper.create_entity(
-            location_repository,
-            location_model,
-            "Location"
-        )
-    except Exception as e:
-        raise create_error_response("create", "Location", exception=e)
+    location_repository, configuration_service = repo_and_config
+    return RouteHelper.create_entity_with_config_context(
+        location_repository, configuration_service, location_model, "Location"
+    )
 
 
 @router.put("/{location_uid}")
+@handle_route_errors("update", "Location", "location_uid")
 async def put_location(
         location_uid: str,
         location_model: LocationModel,
         _: dict = Depends(require_authentication("update location")),
-        location_repository: LocationRepository = Depends(get_service_by_type(LocationRepository)),
-        configuration_service: ConfigurationService = Depends(get_service_by_type(ConfigurationService))
+        repo_and_config=Depends(get_repository_and_config_service(LocationRepository))
 ) -> Dict[str, str]:
-    try:
-        # Ensure repository has correct configuration context
-        current_config = configuration_service.get_current_configuration_name()
-        if current_config:
-            location_repository.set_db(current_config)
-            
-        return RouteHelper.update_entity(
-            location_repository,
-            location_model,
-            "Location"
-        )
-    except Exception as e:
-        raise create_error_response("update", "Location", location_uid, e)
+    location_repository, configuration_service = repo_and_config
+    return RouteHelper.update_entity_with_config_context(
+        location_repository, configuration_service, location_model, "Location"
+    )
 
 
 @router.delete("/{location_uid}")
+@handle_route_errors("delete", "Location", "location_uid")
 async def delete_location(
         location_uid: str,
         _: dict = Depends(require_authentication("delete location")),
-        location_repository: LocationRepository = Depends(get_service_by_type(LocationRepository)),
-        configuration_service: ConfigurationService = Depends(get_service_by_type(ConfigurationService))
+        repo_and_config=Depends(get_repository_and_config_service(LocationRepository))
 ) -> Dict[str, str]:
-    try:
-        # Ensure repository has correct configuration context
-        current_config = configuration_service.get_current_configuration_name()
-        if current_config:
-            location_repository.set_db(current_config)
-            
-        return RouteHelper.delete_entity(
-            location_repository,
-            location_uid,
-            "Location"
-        )
-    except Exception as e:
-        raise create_error_response("delete", "Location", location_uid, e)
+    location_repository, configuration_service = repo_and_config
+    return RouteHelper.delete_entity_with_config_context(
+        location_repository, configuration_service, location_uid, "Location"
+    )

@@ -15,7 +15,7 @@ class EasyOCRAlgorithm(AbstractAlgorithm):
                  golden_position=None):
         super(EasyOCRAlgorithm, self).__init__(graphics, reference_algorithm=reference_algorithm,
                                                golden_position=golden_position)
-        self.reader = easyocr.Reader(['en'], recog_network='custom_example')
+        self.reader = easyocr.Reader(['en'])
         self.threshold = threshold
         self.invert_thresholding = invert_thresholding
         self.blur_size = blur_size

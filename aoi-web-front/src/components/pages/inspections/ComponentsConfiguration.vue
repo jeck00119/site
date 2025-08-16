@@ -98,7 +98,7 @@ export default {
         const showCamera = ref(false);
         const showResults = ref(false);
 
-        const feedLocation = ref('');
+        const feedLocation = ref(null);
         const currentImageSourceId = ref('');
         const currentReferenceId = ref('');
 
@@ -154,11 +154,24 @@ export default {
                         setAlgorithmConfigured();
                     }
 
-                    const algorithm = algorithmsStore.algorithms.find(alg => alg.type === currentComponent.value.algorithmType);
+                    // Find the matching algorithm
+                    const algorithmsData = algorithmsStore.algorithms?.value || algorithmsStore.algorithms || [];
+                    const algorithmsArray = Array.isArray(algorithmsData) ? 
+                        algorithmsData : 
+                        Object.values(algorithmsData || {});
+                    
+                    const algorithm = algorithmsArray.find(alg => 
+                        alg && (
+                            alg.type === currentComponent.value.algorithmType ||
+                            alg.name === currentComponent.value.algorithmType
+                        )
+                    );
 
                     if (algorithm) {
                         if (algorithmTypeId.value === algorithm.uid) {
-                            loadUIandAlgorithm(algorithm.type, currentComponent.value.algorithmUid);
+                            // Extract the actual string value from the reactive ref
+                            const algorithmUidValue = currentComponent.value.algorithmUid?.value || currentComponent.value.algorithmUid;
+                            loadUIandAlgorithm(algorithm.type || algorithm.name, algorithmUidValue);
                         }
                         else {
                             algorithmTypeId.value = algorithm.uid;
@@ -173,12 +186,11 @@ export default {
                     algorithmsStore.setCurrentAlgorithm(null);
                     algorithmsStore.setCurrentAlgorithmAttributes([]);
                     algorithmsStore.setAlgorithmResult(null);
-                    // componentsStore.setCurrentComponent(null); // Need to implement this method
                     graphicsStore.resetGraphicsItems();
-
                     showCamera.value = false;
                 }
             }catch(err) {
+                console.error('ComponentsConfiguration.loadComponent error:', err);
                 setNotification(3000, "Error while trying to load component.", 'bi-exclamation-circle-fill');
             }
             
@@ -201,11 +213,21 @@ export default {
 
         function changeCameraStatus(value) {
             showCamera.value = value;
+            // Only set feedLocation when camera is actually shown
+            if (value && currentImageSourceId.value) {
+                feedLocation.value = `ws://${ipAddress}:${port}/image_source/${currentImageSourceId.value}/ws`;
+            } else if (!value) {
+                // Clear feed location when camera is hidden
+                feedLocation.value = null;
+            }
         }
 
         function updateImageSource(imageSourceId) {
             currentImageSourceId.value = imageSourceId;
-            feedLocation.value = `ws://${ipAddress}:${port}/image_source/${imageSourceId}/ws`;
+            // Only set feedLocation if camera is currently shown
+            if (showCamera.value) {
+                feedLocation.value = `ws://${ipAddress}:${port}/image_source/${imageSourceId}/ws`;
+            }
         }
 
         function updateReference(referenceId) {

@@ -127,7 +127,9 @@ export default function useAlgorithms(algorithmUid: any, referenceUid: any, curr
 
         if(algorithm)
         {
-            loadUIandAlgorithm(algorithm.type, algorithmUid);
+            // Extract the actual string value from the reactive ref
+            const algorithmUidValue = algorithmUid?.value || algorithmUid;
+            loadUIandAlgorithm(algorithm.type, algorithmUidValue);
 
             if(loadedAlgorithm.value)
             {

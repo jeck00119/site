@@ -1,7 +1,8 @@
 from enum import Enum
 from typing import Any, Optional
+from pydantic import BaseModel
 
-from src.utils import generate_uid, CamelModel
+from src.utils import generate_uid
 
 
 class ImgSrcEnum(str, Enum):
@@ -9,7 +10,7 @@ class ImgSrcEnum(str, Enum):
     STATIC = 'static'
 
 
-class ImageSourceModel(CamelModel):
+class ImageSourceModel(BaseModel):
     uid: Any = generate_uid(length=8)
     name: str = f'ImageSource{uid}'
 

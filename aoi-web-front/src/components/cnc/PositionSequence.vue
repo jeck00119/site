@@ -387,12 +387,12 @@ export default {
 /* Sequence List */
 .sequence-list {
   flex: 1;
-  overflow-y: auto;
+  overflow-y: auto; /* Re-enabled scrolling */
   margin-bottom: 0.5rem;
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 8px;
   min-height: 100px;
-  /* Removed max-height to allow list to grow with container */
+  max-height: 300px; /* Reasonable max height for scrolling */
 }
 
 

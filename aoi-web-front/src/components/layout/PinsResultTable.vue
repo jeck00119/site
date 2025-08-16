@@ -141,16 +141,16 @@ table {
 }
 
 .table-wrapper {
-    height: 10vh;
+    min-height: 10vh;
     background-color: red;
     overflow-y: auto;
     width: 100%;
     margin-top: 1vh;
 }
 
-.table-wrapper::-webkit-scrollbar {
+/* .table-wrapper::-webkit-scrollbar {
     display: none;
-}
+} - preserved scrollbar styling for reference */
 
 .table-wrapper thead th {
     background-color: black;

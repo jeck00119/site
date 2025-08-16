@@ -26,6 +26,7 @@ manager = ConnectionManager()
 
 @router.get("")
 async def get_configuration(
+        _: dict = Depends(require_authentication("list configurations")),
         configuration_repository: ConfigurationRepository = Depends(get_service_by_type(ConfigurationRepository))
 ):
     return RouteHelper.list_entities(configuration_repository, "Configuration")
@@ -33,6 +34,7 @@ async def get_configuration(
 
 @router.get("/current")
 async def get_current_configuration(
+        _: dict = Depends(require_authentication("get current configuration")),
         configuration_repository: ConfigurationRepository = Depends(get_service_by_type(ConfigurationRepository)),
         configuration_service: ConfigurationService = Depends(get_service_by_type(ConfigurationService))
 ):
@@ -170,6 +172,7 @@ async def put_configuration(
 @router.get("/{configuration_uid}")
 async def load_configuration(
         configuration_uid: str,
+        _: dict = Depends(require_authentication("load configuration")),
         configuration_service: ConfigurationService = Depends(get_service_by_type(ConfigurationService))
 ):
     try:

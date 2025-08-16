@@ -36,7 +36,7 @@ export default {
     },
 
     async removeConfiguration(context, payload) {
-        const token = context.rootGetters["auth/getToken"];
+        const token = context.rootGetters["auth/getToken"] || sessionStorage.getItem('auth-token');
 
         const { response, responseData } = await remove(`http://${ipAddress}:${port}/configurations/${payload.uid}`, {
             "content-type": "application/json",
@@ -55,7 +55,7 @@ export default {
     },
 
     async editConfiguration(context, payload) {
-        const token = context.rootGetters["auth/getToken"];
+        const token = context.rootGetters["auth/getToken"] || sessionStorage.getItem('auth-token');
 
         const { response, responseData } = await update(`http://${ipAddress}:${port}/configurations/${payload.uid}`, payload, {
             "content-type": "application/json",
@@ -76,7 +76,7 @@ export default {
     async addConfiguration(context, payload) {
         payload.uid = uuid.v4();
 
-        const token = context.rootGetters["auth/getToken"];
+        const token = context.rootGetters["auth/getToken"] || sessionStorage.getItem('auth-token');
 
         const { response, responseData } = await post(`http://${ipAddress}:${port}/configurations`, payload, {
             "content-type": "application/json",
@@ -97,7 +97,7 @@ export default {
     async copyConfiguration(context, payload) {
         payload.config.uid = uuid.v4();
 
-        const token = context.rootGetters["auth/getToken"];
+        const token = context.rootGetters["auth/getToken"] || sessionStorage.getItem('auth-token');
 
         const { response, responseData } = await post(`http://${ipAddress}:${port}/configurations/copy/${payload.originalConfigId}`, payload.config, {
             "content-type": "application/json",

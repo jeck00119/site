@@ -167,7 +167,12 @@ class ImageSourceService(metaclass=Singleton):
                 
                 if uid not in self.image_sources:
                     error_msg = f"Image source {uid} not found or not initialized"
-                    logger.warning(error_msg)
+                    # Only log once per uid to avoid spam
+                    if uid not in getattr(self, '_logged_missing_sources', set()):
+                        logger.warning(error_msg)
+                        if not hasattr(self, '_logged_missing_sources'):
+                            self._logged_missing_sources = set()
+                        self._logged_missing_sources.add(uid)
                     if raise_on_error:
                         raise ImageSourceNotFoundError(error_msg)
                     self._cache_frame(uid, image)
@@ -275,11 +280,19 @@ class ImageSourceService(metaclass=Singleton):
                     self.camera_service.load_setting_file(image_source_model.camera_uid,
                                                           image_source_model.camera_settings_uid)
                 self.image_sources[uid] = image_source_model
+                
+                # Clear the logged missing source flag when initialized
+                if hasattr(self, '_logged_missing_sources') and uid in self._logged_missing_sources:
+                    self._logged_missing_sources.discard(uid)
 
             elif image_source_model.image_source_type == ImgSrcEnum.STATIC:
                 if image_source_model.image_generator_uid != '':
                     self.image_generator_service.initialize_generator(image_source_model.image_generator_uid)
                 self.image_sources[uid] = image_source_model
+                
+                # Clear the logged missing source flag when initialized
+                if hasattr(self, '_logged_missing_sources') and uid in self._logged_missing_sources:
+                    self._logged_missing_sources.discard(uid)
         else:
             return ' '
 
@@ -294,10 +307,20 @@ class ImageSourceService(metaclass=Singleton):
                 self.image_sources.pop(uid)
 
     def load_settings_to_image_source(self, uid):
-        settings_uid = self.image_sources[uid].camera_settings_uid
-        camera_uid = self.image_sources[uid].camera_uid
-
-        self.camera_service.load_setting_file(camera_uid, settings_uid)
+        # Ensure image source is initialized in cache
+        if uid not in self.image_sources:
+            try:
+                self._initialize_image_source_by_uid(uid)
+            except Exception as e:
+                logger.error(f"Failed to initialize image source {uid}: {e}")
+                return
+        
+        # Proceed only if image source is now in cache
+        if uid in self.image_sources:
+            settings_uid = self.image_sources[uid].camera_settings_uid
+            camera_uid = self.image_sources[uid].camera_uid
+            
+            self.camera_service.load_setting_file(camera_uid, settings_uid)
 
     def check_image_source_type(self, uid):
         image_source_model = ImageSourceModel(**self.image_sources_repository.read_id(uid))

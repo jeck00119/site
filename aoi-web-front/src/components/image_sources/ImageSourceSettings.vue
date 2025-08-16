@@ -1054,13 +1054,13 @@ export default {
 
 .setting {
     border: none;
-    color: rgba(204, 161, 82);
+    color: var(--color-primary);
     width: 100%;
     margin: 3px;
 }
 
 .setting:hover {
-    background-color: rgba(204, 161, 82);
+    background-color: var(--color-primary);
     color: white;
     transform: scale(1.02);
 }
@@ -1073,7 +1073,7 @@ export default {
 
 label {
     margin: 7px;
-    color: rgba(204, 161, 82);
+    color: var(--color-primary);
     width:50%;
     display:flex;
     justify-content: space-between;
@@ -1083,7 +1083,7 @@ label {
 select {
     width: 80%;
     margin: 5px;
-    color: rgba(204, 161, 82);
+    color: var(--color-primary);
     height: 100%;
 
 }
@@ -1101,8 +1101,8 @@ select {
 .settings-submenu {
     display: block;
     background-color: rgb(37, 36, 36);
-    color: rgba(204, 161, 82);
-    height: 52.7%;
+    color: var(--color-primary);
+    min-height: 52.7%;
     margin: 2%;
     position: relative;
     overflow-y: auto;
@@ -1170,7 +1170,7 @@ select {
     -webkit-appearance: none;
     appearance: none;
     width: 100%;
-    background-color: rgba(204, 161, 82);
+    background-color: var(--color-primary);
     height: 5px;
     border-radius: 25px;
     outline: none;
@@ -1219,7 +1219,7 @@ select {
 }
 
 .toggle-active {
-    background-color: rgba(204, 161, 82);
+    background-color: var(--color-primary);
     color: white;
 }
 
@@ -1245,14 +1245,14 @@ select {
 }
 
 .submenu-button {
-    color: rgba(204, 161, 82);
+    color: var(--color-primary);
     outline: none;
     border: none;
     height: 100%;
 }
 
 h1 {
-    color: rgba(204, 161, 82);
+    color: var(--color-primary);
 }
 
 .warning {
@@ -1317,7 +1317,7 @@ label {
 }
 
 .dialog-add-button {
-    background-color: rgba(204, 161, 82);
+    background-color: var(--color-primary);
     color: white;
 }
 
@@ -1372,14 +1372,14 @@ label {
     width: 17px;
     left: 4px;
     bottom: 4px;
-    background-color: rgba(204, 161, 82);
+    background-color: var(--color-primary);
     -webkit-transition: .4s;
     transition: .4s;
 }
 
 
 input:checked+.toggle {
-    background-color: rgba(204, 161, 82);
+    background-color: var(--color-primary);
 }
 
 input:focus+.toggle {
@@ -1408,7 +1408,7 @@ input:checked+.toggle:before {
 .cs-button {
     background-color: rgb(0, 0, 0);
     margin: 0.5vw;
-    color: rgba(204, 161, 82);
+    color: var(--color-primary);
     border: none;
 }
 
@@ -1431,7 +1431,7 @@ button[disabled] {
 .settings-label {
     margin:7px;
     margin-right:15%;
-    color: rgba(204, 161, 82);
+    color: var(--color-primary);
     width:50%;
     display:flex;
     justify-content: space-between;

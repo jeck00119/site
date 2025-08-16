@@ -157,8 +157,8 @@ export default {
     display: flex;
     flex-direction: column;
     align-items: center;
-    height: 100%;
-    overflow-y: auto;
+    min-height: 100%;
+    /* overflow-y: auto; - moved scrolling to body level */
 }
 
 .meter-config-wrapper {

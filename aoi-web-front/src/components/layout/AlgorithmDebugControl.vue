@@ -127,7 +127,7 @@
                             <div class="algorithm-list">
                                 <vue-multiselect
                                     v-model="currentAlgorithmName"
-                                    :options="Array.isArray(algorithms) ? algorithms.map(alg => alg && alg.type ? alg.type : String(alg)).filter(Boolean) : []"
+                                    :options="Array.isArray(algorithms) ? algorithms.map(alg => alg && alg.type ? alg.type : (alg && alg.name ? alg.name : 'Unknown Algorithm')).filter(Boolean) : []"
                                     placeholder="Select Algorithm"
                                     :searchable="true"
                                     :close-on-select="true"

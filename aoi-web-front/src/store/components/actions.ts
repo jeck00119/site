@@ -27,7 +27,7 @@ export default {
             };
         }
 
-        const token = context.rootGetters["auth/getToken"];
+        const token = context.rootGetters["auth/getToken"] || sessionStorage.getItem('auth-token');
 
         const { response } = await api.post(`/${payload.type}`, component, {
             "content-type": "application/json",
@@ -58,7 +58,7 @@ export default {
     },
 
     async removeComponent(context, payload) {
-        const token = context.rootGetters["auth/getToken"];
+        const token = context.rootGetters["auth/getToken"] || sessionStorage.getItem('auth-token');
         const { response } = await api.delete(`/${payload.type}/${payload.uid}`, {
             "content-type": "application/json",
             "Authorization": token
@@ -86,11 +86,14 @@ export default {
     },
 
     async loadComponents(context, payload) {
-        console.log('Store action loadComponents called with payload:', payload);
-        const token = context.rootGetters["auth/getToken"];
-        console.log('Token retrieved:', token ? 'Present' : 'Missing');
+        const token = context.rootGetters["auth/getToken"] || sessionStorage.getItem('auth-token');
         
-        console.log(`Making API call to /${payload.type} with auth token`);
+        if (!token) {
+            console.error('No authentication token available');
+            const error = new Error('Authentication required');
+            throw error;
+        }
+        
         const { response, responseData } = await api.get(`/${payload.type}`, {
             "content-type": "application/json",
             "Authorization": token,
@@ -98,7 +101,6 @@ export default {
             "Pragma": "no-cache",
             "Expires": "0"
         });
-        console.log(`API response for /${payload.type}:`, response.status, response.ok);
 
         if(!response.ok)
         {
@@ -140,7 +142,12 @@ export default {
     },
 
     async loadComponent(context, payload) {
-        const { response, responseData } = await api.get(`/${payload.type}/${payload.uid}`);
+        const token = context.rootGetters["auth/getToken"] || sessionStorage.getItem('auth-token');
+        
+        const { response, responseData } = await api.get(`/${payload.type}/${payload.uid}`, {
+            "content-type": "application/json",
+            "Authorization": token
+        });
 
         if(!response.ok)
         {
@@ -161,7 +168,7 @@ export default {
         const type = payload.type;
         const component = payload.data;
 
-        const token = context.rootGetters["auth/getToken"];
+        const token = context.rootGetters["auth/getToken"] || sessionStorage.getItem('auth-token');
 
         const { response } = await api.update(`/${type}/${component.uid}`, component, {
             "content-type": "application/json",
@@ -199,7 +206,7 @@ export default {
             algorithmType: ''
         };
 
-        const token = context.rootGetters["auth/getToken"];
+        const token = context.rootGetters["auth/getToken"] || sessionStorage.getItem('auth-token');
 
         const { response } = await api.post(`/${payload.type}`, component, {
             "content-type": "application/json",
@@ -228,7 +235,7 @@ export default {
             referenceUid: ''
         };
 
-        const token = context.rootGetters["auth/getToken"];
+        const token = context.rootGetters["auth/getToken"] || sessionStorage.getItem('auth-token');
 
         const { response } = await api.post(`/${payload.type}`, component, {
             "content-type": "application/json",

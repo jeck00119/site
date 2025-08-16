@@ -23,6 +23,7 @@ function getAuthHeaders(): Headers {
 function mergeWithAuthHeaders(headers?: Headers): Headers {
     const authHeaders = getAuthHeaders();
     const defaultHeaders = { 'content-type': 'application/json' };
+    // Put custom headers last so they can override defaults and auth
     return { ...defaultHeaders, ...authHeaders, ...headers };
 }
 
