@@ -57,7 +57,9 @@
   
 <script>
 import { ref, watch, computed, onMounted } from 'vue';
-// import { useAnnotationStore } from '../../../hooks/annotation.js';
+import { useAnnotationStore } from '@/composables/useStore';
+import { logger } from '@/utils/logger';
+import { handleApiError } from '@/utils/errorHandler';
 
 import CameraScene from '../../camera/CameraScene.vue';
 import VueMultiselect from 'vue-multiselect';
@@ -181,13 +183,13 @@ export default {
             return new Promise((resolve) => {
                 fileEntry.file((file) => {
                     if (file.type.startsWith("image/")) {
-                        console.log("Image file dropped:", file.name);
+                        logger.debug("Image file dropped:", file.name);
                         // filenames.value.push(file.name);
                         imageFiles.value.push({data: fileEntry, fileName: file.name});
                         resolve();
                         // readImage(file).then(() => resolve()); // Call the method to read the image and resolve
                     } else {
-                        console.log("Not an image");
+                        logger.debug("Not an image");
                         resolve(); // Resolve immediately if it's not an image
                     }
                 });
@@ -195,7 +197,7 @@ export default {
         }
 
         function readImage(fileEntry) {
-            console.log("aaaaa");
+            logger.debug("Reading image file");
             if (currentFrame.value !== null) {
                 URL.revokeObjectURL(currentFrame.value);
                 currentFrame.value = null;
@@ -217,8 +219,7 @@ export default {
         }
 
         watch(currentIdx, (newValue, _) => {
-            console.log("ssssss");
-            console.log(newValue);
+            logger.debug("Current index changed to:", newValue);
             if (newValue < 0 || newValue >= imageFiles.value.length) {
                 currentFrame.value = null;
             } else {
@@ -270,22 +271,23 @@ export default {
             formData.append('mode', currentTask.value)
             // let result = filenames.value.reduce((o, k, i) => ({...o, [k]: frames.value[i]}), {});
 
-            // console.log(result);
+            // logger.debug(result);
 
             // let payload = {
             //     model: currentModel.value,
             //     images: result
             // };
 
-            console.log(formData);
+            logger.debug("FormData prepared for annotation:", formData);
 
             showSpinner.value = true;
             
             annotationStore.annotate(formData).then(() => {
-                console.log("returned");
+                logger.debug("Annotation completed successfully");
                 showSpinner.value = false;
             }).catch((err) => {
-                console.log(err);
+                logger.error("Annotation failed:", err);
+                handleApiError(err, 'Failed to annotate images');
                 showSpinner.value = false;
             });
         }

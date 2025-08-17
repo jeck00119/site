@@ -133,19 +133,13 @@
         <base-notification
             :show="showNotification"
             :timeout="notificationTimeout"
+            :message="notificationMessage"
+            :icon="notificationIcon"
+            :notificationType="notificationType"
             height="15vh"
             color="#CCA152"
             @close="clearNotification"
-        >
-            <div class="flex-column-center">
-                <div class="flex-center">
-                    <v-icon :name="notificationIcon" scale="2.5" animation="spin"/>
-                </div>
-                <div class="text-wrapper">
-                    {{ notificationMessage }}
-                </div>
-            </div>
-        </base-notification>
+        />
     </div>
 </template>
 
@@ -153,7 +147,8 @@
 import { ref, computed, onMounted } from 'vue';
 import { useAlgorithmsStore, useImageSourcesStore, useConfigurationsStore, useAuthStore, useAuditStore } from '@/composables/useStore';
 
-import useNotification from '../../hooks/notifications.js';
+import useNotification, { NotificationType } from '../../hooks/notifications.js';
+import { ConfigurationMessages, GeneralMessages } from '@/constants/notifications';
 
 export default{
     setup() {
@@ -170,7 +165,7 @@ export default{
         const copyConfigurationFlag = ref(false);
 
         const {showNotification, notificationMessage, notificationIcon, notificationTimeout, 
-            setNotification, clearNotification} = useNotification();
+            notificationType, setNotification, setTypedNotification, clearNotification} = useNotification();
 
         const invalidName = ref(false);
 
@@ -208,7 +203,8 @@ export default{
         });
 
         async function loadConfiguration(id) {
-            setNotification(null, 'Loading configuration. Please wait.', 'fa-cog');
+            // Use centralized loading message
+            setTypedNotification(ConfigurationMessages.LOADING, NotificationType.LOADING);
 
             const configuration = configurations.value.find(config => config.uid === id);
 
@@ -222,11 +218,20 @@ export default{
                 
                 loadConfiguredAlgorithms();
                 loadBasicAlgorithms();
+                
+                // Show success message with configuration name (faster fade)
+                setTypedNotification(
+                    ConfigurationMessages.SELECTED(configuration.name),
+                    NotificationType.SUCCESS,
+                    1000  // 1 second instead of default 5 seconds
+                );
             }catch(err) {
-                setNotification(5000, err, 'bi-exclamation-circle-fill');
+                // Use centralized error message
+                setTypedNotification(
+                    ConfigurationMessages.LOAD_FAILED,
+                    NotificationType.ERROR
+                );
             }
-            
-            clearNotification();
         }
 
         async function removeConfiguration(id) {
@@ -248,7 +253,11 @@ export default{
                         description: `Configuration with uid: ${id} was removed.`
                     });
                 }catch (error) {
-                    setNotification(5000, "Could not remove current configuration.", 'bi-exclamation-circle-fill');
+                    // Use centralized error message
+                    setTypedNotification(
+                        ConfigurationMessages.REMOVE_FAILED,
+                        NotificationType.ERROR
+                    );
                 }
             }
             else
@@ -265,7 +274,11 @@ export default{
                         description: `Configuration with uid: ${id} was removed.`
                     });
                 }catch(err) {
-                    setNotification(5000, "Could not remove configuration.", 'bi-exclamation-circle-fill');
+                    // Use centralized error message
+                    setTypedNotification(
+                        ConfigurationMessages.REMOVE_FAILED,
+                        NotificationType.ERROR
+                    );
                 }
             }
         } 
@@ -304,7 +317,10 @@ export default{
                         description: `Configuration ${newConfigName.value}  was aded.`
                     });
                 }catch(err) {
-                    setNotification(5000, `Could not add configuration ${newConfigName.value}.`, 'bi-exclamation-circle-fill');
+                    setTypedNotification(
+                        ConfigurationMessages.ADD_FAILED(newConfigName.value),
+                        NotificationType.ERROR
+                    );
                 }
             }
 
@@ -327,7 +343,10 @@ export default{
                         description: `Configuration ${newConfigName.value}  was aded.`
                     });
                 }catch(err) {
-                    setNotification(5000, `Could not add configuration ${newConfigName.value}.`, 'bi-exclamation-circle-fill');
+                    setTypedNotification(
+                        ConfigurationMessages.ADD_FAILED(newConfigName.value),
+                        NotificationType.ERROR
+                    );
                 }
             }
             
@@ -353,7 +372,10 @@ export default{
                     description: `Configuration ${configurationSelected.value.name} was modified.`
                 });
             }catch(err) {
-                setNotification(5000, `Could not edit configuration ${configurationSelected.value.name}.`, 'bi-exclamation-circle-fill');
+                setTypedNotification(
+                    ConfigurationMessages.UPDATE_FAILED,
+                    NotificationType.ERROR
+                );
             }
 
             closeDialog();
@@ -423,6 +445,7 @@ export default{
             notificationMessage,
             notificationIcon,
             notificationTimeout,
+            notificationType,
             loadConfiguration,
             removeConfiguration,
             editConfiguration,
@@ -461,6 +484,8 @@ export default{
     margin: 2%;
     width: 45vw;
 }
+
+
 
 .name {
     margin: 2vh 2vw;

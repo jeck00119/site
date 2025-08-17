@@ -1,4 +1,5 @@
 import api from "../../utils/api";
+import { logger } from "../../utils/logger";
 
 export default {
     async startProcessing(_, payload) {
@@ -37,7 +38,7 @@ export default {
 
             context.commit("setExcelBlob", { 'excelBlob': 'blob', 'excelBlobPath': blobURL });
         } catch (error) {
-            console.error('Error getting capability report:', error);
+            logger.error('Error getting capability report', { error });
             throw error;
         }
     },

@@ -53,19 +53,14 @@
         </div>
         <base-notification
             :show="showNotification"
-            height="15vh"
             :timeout="notificationTimeout"
+            :message="notificationMessage"
+            :icon="notificationIcon"
+            :notificationType="notificationType"
+            height="15vh"
+            color="#CCA152"
             @close="clearNotification"
-        >
-            <div class="message-wrapper">
-                <div class="icon-wrapper">
-                    <v-icon :name="notificationIcon" scale="2.5" animation="float" />
-                </div>
-                <div class="text-wrapper">
-                    {{ notificationMessage }}
-                </div>
-            </div>
-        </base-notification>
+        />
     </div>
 </template>
 
@@ -74,7 +69,8 @@ import { onMounted, ref, computed } from 'vue';
 import { useRouter } from 'vue-router';
 
 import { useAuthStore } from '@/composables/useStore';
-import useNotification from '../../../hooks/notifications.js';
+import useNotification, { NotificationType } from '../../../hooks/notifications.js';
+import { AuthMessages, ValidationMessages, GeneralMessages } from '@/constants/notifications';
 import { validateEmail, validatePassword, validateRequired, sanitizeInput } from '../../../utils/validation.js';
 
 export default{
@@ -146,8 +142,8 @@ export default{
             return Object.keys(errors).length === 0;
         };
 
-        const {showNotification, notificationMessage, notificationIcon, notificationTimeout, 
-            setNotification, clearNotification} = useNotification();
+        const {showNotification, notificationMessage, notificationIcon, notificationTimeout, notificationType,
+            setTypedNotification, clearNotification} = useNotification();
 
         // These are already computed refs from the composables
 
@@ -161,7 +157,11 @@ export default{
             if (!isValid) {
                 // Show first validation error
                 const firstError = Object.values(formErrors.value)[0];
-                setNotification(3000, firstError, 'bi-exclamation-circle-fill');
+                setTypedNotification(
+                    firstError,
+                    NotificationType.ERROR,
+                    3000
+                );
                 return;
             }
             
@@ -170,7 +170,11 @@ export default{
             if(existingUsernames.includes(email.value))
             {
                 formErrors.value.email = 'The email provided is already associated with an account.';
-                setNotification(3000, 'The email provided is already associated with an account.', 'bi-exclamation-circle-fill');
+                setTypedNotification(
+                    'The email provided is already associated with an account.',
+                    NotificationType.ERROR,
+                    3000
+                );
                 return;
             }
             {
@@ -182,7 +186,11 @@ export default{
 
                     router.replace('/');
                 }catch(err) {
-                    setNotification(3000, `Something went wrong. Please try again.`, 'bi-exclamation-circle-fill');
+                    setTypedNotification(
+                        GeneralMessages.ERROR_OCCURRED,
+                        NotificationType.ERROR,
+                        3000
+                    );
                 }
             }
         }
@@ -200,6 +208,7 @@ export default{
             notificationMessage,
             notificationIcon,
             notificationTimeout,
+            notificationType,
             signup,
             clearNotification
         }
@@ -324,25 +333,6 @@ input.error {
     color: white;
 }
 
-.message-wrapper {
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
-}
-
-.icon-wrapper {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    margin-bottom: 3%;
-}
-
-.text-wrapper {
-    font-size: 100%;
-    width: 95%;
-    text-align: center;
-}
 
 @keyframes slime {
     0% {border-radius: 52% 48% 49% 51% / 45% 86% 14% 55%;}

@@ -7,7 +7,7 @@ import CoreUI from "@coreui/vue";
 import "@coreui/coreui/dist/css/coreui.css";
 import './style.css';
 
-import UUID from 'vue3-uuid';
+import { v4 as uuidv4 } from 'uuid';
 
 import { library } from '@fortawesome/fontawesome-svg-core';
 // All actually used icons - verified from codebase usage
@@ -19,7 +19,8 @@ import { faHouse, faMagnifyingGlassChart, faScrewdriverWrench, faGear, faGears, 
     faGem, faChartLine, faPlusMinus, faWandMagicSparkles, faCameraRotate, faArrowsLeftRight,
     faExpand, faCrop, faSignature, faFlagCheckered, faNetworkWired, faPlayCircle, faImage,
     faSdCard, faArrowsRotate, faArrowRotateLeft, faArrowRotateRight, faLockOpen, faCubesStacked,
-    faChevronLeft, faChevronRight, faChevronUp, faChevronDown, faList, faPause } from '@fortawesome/free-solid-svg-icons';
+    faChevronLeft, faChevronRight, faChevronUp, faChevronDown, faList, faPause, faSpinner,
+    faCheckCircle, faTimesCircle, faExclamationTriangle, faInfoCircle } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome';
 
 import { OhVueIcon, addIcons } from 'oh-vue-icons';
@@ -145,6 +146,11 @@ library.add(faChevronUp);
 library.add(faChevronDown);
 library.add(faList);
 library.add(faPause);
+library.add(faSpinner);
+library.add(faCheckCircle);
+library.add(faTimesCircle);
+library.add(faExclamationTriangle);
+library.add(faInfoCircle);
 
 
 
@@ -184,7 +190,7 @@ app.component('v-icon', OhVueIcon);
 
 app.use(store);
 app.use(router);
-app.use(UUID);
+// UUID is now used via import { v4 as uuidv4 } from 'uuid' where needed
 app.use(ContextMenu);
 
 app.use(CoreUI);

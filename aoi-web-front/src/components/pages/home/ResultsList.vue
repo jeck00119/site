@@ -199,26 +199,28 @@
                 </div>
             </div>
         </div>
-        <base-notification :show="showNotification" :timeout="notificationTimeout" height="15vh" color="#CCA152" @close="clearNotification">
-            <div class="message-wrapper">
-                <div class="icon-wrapper">
-                    <v-icon :name="notificationIcon" scale="2.5" animation="float" />
-                </div>
-                <div class="text-wrapper">
-                    {{ notificationMessage }}
-                </div>
-            </div>
-        </base-notification>
-        <base-notification :show="showItacNotification" :timeout="itacNotificationTimeout" height="15vh" :color="itacStatusColor" top="77%" left="78%" @close="clearNotificationItac">
-            <div class="message-wrapper">
-                <div class="icon-wrapper">
-                    <v-icon :name="itacStatusIcon" scale="2.5" animation="pulse" />
-                </div>
-                <div class="text-wrapper">
-                    {{ itacStatusMessage }}
-                </div>
-            </div>
-        </base-notification>
+        <base-notification
+            :show="showNotification"
+            :timeout="notificationTimeout"
+            :message="notificationMessage"
+            :icon="notificationIcon"
+            :notificationType="notificationType"
+            height="15vh"
+            color="#CCA152"
+            @close="clearNotification"
+        />
+        <base-notification
+            :show="showItacNotification"
+            :timeout="itacNotificationTimeout"
+            :message="itacStatusMessage"
+            :icon="itacStatusIcon"
+            :notificationType="'info'"
+            height="15vh"
+            :color="itacStatusColor"
+            top="77%"
+            left="78%"
+            @close="clearNotificationItac"
+        />
     </div>
 </template>
 
@@ -226,9 +228,11 @@
 
 import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { useStore } from 'vuex';
-import { uuid } from "vue3-uuid";
+import { v4 as uuidv4 } from "uuid";
+import { logger } from '@/utils/logger';
 
-import useNotification from '../../../hooks/notifications';
+import useNotification, { NotificationType } from '../../../hooks/notifications';
+import { AlgorithmMessages, GeneralMessages } from '@/constants/notifications';
 
 import 'vue3-carousel/dist/carousel.css';
 import { Carousel, Slide, Pagination, Navigation } from 'vue3-carousel';
@@ -273,8 +277,8 @@ export default {
         const disableRunButton = ref(false);
         const disableRunOfflineButton = ref(false);
 
-        const {showNotification, notificationMessage, notificationIcon, notificationTimeout, 
-            setNotification, clearNotification} = useNotification();
+        const {showNotification, notificationMessage, notificationIcon, notificationTimeout, notificationType,
+            setTypedNotification, clearNotification} = useNotification();
 
         const {showNotification: showItacNotification, notificationMessage: itacStatusMessage, notificationIcon: itacStatusIcon, notificationTimeout: itacNotificationTimeout, 
             setNotification: setNotificationItac, clearNotification: clearNotificationItac} = useNotification();
@@ -282,9 +286,9 @@ export default {
         const itacStatusColor = ref('');
 
         onMounted(() => {
-            processId = uuid.v4();
-            cognexStateSocketId = uuid.v4();
-            cameraStateSocketId = uuid.v4();
+            processId = uuidv4();
+            cognexStateSocketId = uuidv4();
+            cameraStateSocketId = uuidv4();
 
             store.dispatch("process/getCapabilityState");
             store.dispatch("process/getOffsetState");
@@ -321,7 +325,7 @@ export default {
                     cameraStateSocketInstance = null;
                 }
             } catch (error) {
-                console.warn('Error during ResultsList component unmounting:', error);
+                logger.warn('Error during ResultsList component unmounting:', error);
             }
         });
 
@@ -418,7 +422,10 @@ export default {
                         //     setNotification(null, 'Waiting for DMC.', 'co-matrix');
                         // }
                         if (data.data === "Inspecting Cable" && firstRun.value) {
-                            setNotification(null, 'Detection model is being loaded. Please wait.', 'io-rocket-sharp');
+                            setTypedNotification(
+                                AlgorithmMessages.MODEL_LOADING,
+                                NotificationType.LOADING
+                            );
                         }
                         else {
                             clearNotification();
@@ -487,7 +494,7 @@ export default {
                     store.commit("process/setProcessStatus", 'IDLE');
 
                     store.dispatch("errors/addError", {
-                        id: uuid.v4(),
+                        id: uuidv4(),
                         title: "Error on running",
                         description: e.message
                     });
@@ -526,7 +533,7 @@ export default {
                     store.commit("process/setProcessStatus", 'IDLE');
 
                     store.dispatch("errors/addError", {
-                        id: uuid.v4(),
+                        id: uuidv4(),
                         title: "Error on running",
                         description: e.message
                     });
@@ -685,6 +692,7 @@ export default {
             notificationIcon,
             notificationMessage,
             notificationTimeout,
+            notificationType,
             showItacNotification,
             itacStatusMessage,
             itacStatusIcon,
@@ -1195,25 +1203,6 @@ table {
     background-color: #524d4d;
 }
 
-.message-wrapper {
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
-}
-
-.icon-wrapper {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    margin-bottom: 3%;
-}
-
-.text-wrapper {
-    font-size: 100%;
-    width: 95%;
-    text-align: center;
-}
 
 .help {
     display: flex;

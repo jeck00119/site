@@ -193,6 +193,7 @@ import { ref, watch } from 'vue';
 import VueMultiselect from 'vue-multiselect';
 
 import AlgorithmParameters from './AlgorithmParameters.vue';
+import { logger } from '@/utils/logger';
 
 export default {
     components: {
@@ -266,7 +267,7 @@ export default {
         });
 
         watch(currentAlgorithmName, (newValue) => {
-            console.log('AlgorithmDebugControl: currentAlgorithmName changed to:', newValue);
+            logger.debug('AlgorithmDebugControl: currentAlgorithmName changed', { newValue });
             context.emit('algorithm-changed', newValue);
         });
 

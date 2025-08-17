@@ -11,5 +11,9 @@ export default {
 
     numberOfErrors(state: ErrorsState): number {
         return state.errors.length;
+    },
+
+    hasErrors(state: ErrorsState): boolean {
+        return state.errors.length > 0;
     }
 };

@@ -58,6 +58,8 @@
 <script>
 import { ref, nextTick, watch, onMounted, onUnmounted } from "vue";
 import { useCncStore } from '@/composables/useStore';
+import { logger } from '@/utils/logger';
+import { handleApiError } from '@/utils/errorHandler';
 
 export default {
   name: "TerminalConsole",
@@ -111,7 +113,8 @@ export default {
         try {
           commandHistory.value = JSON.parse(saved);
         } catch (error) {
-          console.error("Failed to load command history:", error);
+          logger.error("Failed to load command history:", error);
+          handleApiError(error, 'Failed to load command history');
         }
       }
     }
@@ -162,7 +165,8 @@ export default {
         historyIndex.value = -1;
         
       } catch (error) {
-        console.error("Failed to send command:", error);
+        logger.error("Failed to send command:", error);
+        handleApiError(error, 'Failed to send command');
         
       } finally {
         isSending.value = false;

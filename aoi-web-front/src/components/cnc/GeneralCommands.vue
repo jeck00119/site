@@ -193,6 +193,8 @@
 <script>
 import { ref, onMounted, onUnmounted } from "vue";
 import { useCncStore } from '@/composables/useStore';
+import { logger } from '@/utils/logger';
+import { handleApiError } from '@/utils/errorHandler';
 
 export default {
   name: "GeneralCommands",
@@ -239,7 +241,7 @@ export default {
           keyboardSettings.value = { ...defaultKeyboardSettings, ...parsed };
           keyboardControlEnabled.value = parsed.enabled || false;
         } catch (e) {
-          console.warn('Failed to load keyboard settings:', e);
+          logger.warn('Failed to load keyboard settings:', e);
         }
       }
     };
@@ -265,7 +267,8 @@ export default {
         emit('command-executed', { command, success: true });
         
       } catch (error) {
-        console.error(`Failed to execute command ${command}:`, error);
+        logger.error(`Failed to execute command ${command}:`, error);
+        handleApiError(error, `Failed to execute command ${command}`);
         emit('command-executed', { command, success: false, error });
         
       } finally {

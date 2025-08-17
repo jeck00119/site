@@ -8,6 +8,7 @@ import { computed } from 'vue';
 import { useRouter as useVueRouter, useRoute } from 'vue-router';
 import type { Router, RouteLocationNormalized, NavigationGuardNext } from 'vue-router';
 import { useAuthStore } from './useStore';
+import { logger } from '@/utils/logger';
 
 /**
  * Enhanced router composable with auth integration
@@ -35,7 +36,7 @@ export function useRouter() {
         await router.push(path);
       }
     } catch (error) {
-      console.error('Navigation error:', error);
+      logger.error('Navigation error', error);
       throw error;
     }
   };
@@ -134,16 +135,12 @@ export function useRouteGuards() {
     const authStore = useAuthStore();
     const { isAuthenticated, currentUser, userLevel } = authStore;
     
-    console.log('Auth Guard Check for route:', to.path);
-    console.log('User authenticated:', isAuthenticated.value);
-    console.log('Current user:', currentUser.value);
-    console.log('User level:', userLevel.value);
-    console.log('Route meta:', to.meta);
+    // Auth guard debug logs removed to reduce log spam
     
     // Routes that require authentication
     if (to.meta.requiresAuth) {
       if (!isAuthenticated.value) {
-        console.log('Auth required but user not authenticated, redirecting to login');
+        // Redirecting to login - debug removed
         next('/login');
         return;
       }
@@ -152,13 +149,13 @@ export function useRouteGuards() {
     // Routes that require admin access
     if (to.meta.requiresAdmin) {
       if (!isAuthenticated.value) {
-        console.log('Admin access required but user not authenticated, redirecting to login');
+        // Admin access required, redirecting to login - debug removed
         next('/login');
         return;
       }
       
       if (userLevel.value !== 'admin') {
-        console.log('Admin access required but user level is:', userLevel.value, 'currentUser:', currentUser.value);
+        // Admin access required but insufficient privileges - debug removed
         next('/aoi');
         return;
       }
@@ -167,7 +164,7 @@ export function useRouteGuards() {
     // Routes that require unauthenticated user (login, signup)
     if (to.meta.requiresUnauth) {
       if (isAuthenticated.value) {
-        console.log('User already authenticated, redirecting to configurations');
+        // User already authenticated, redirecting - debug removed
         next('/configurations');
         return;
       }

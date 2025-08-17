@@ -61,6 +61,8 @@ import { ref, computed, onMounted } from "vue";
 import { useCncStore } from '@/composables/useStore';
 import useDualPersistence from '@/composables/useDualPersistence';
 import useCncMovement from '@/composables/useCncMovement';
+import { logger } from '@/utils/logger';
+import { handleApiError } from '@/utils/errorHandler';
 
 export default {
   name: "LocationShortcuts",
@@ -99,12 +101,12 @@ export default {
       try {
         await cncStore.fetchLocations(props.axisUid);
       } catch (error) {
-        console.error("[SHORTCUT DEBUG] Failed to fetch locations:", error);
+        logger.error("[SHORTCUT DEBUG] Failed to fetch locations:", error);
         // Fallback: try loading all locations
         try {
           await cncStore.loadLocations();
         } catch (loadError) {
-          console.error("[SHORTCUT DEBUG] Failed to load locations:", loadError);
+          logger.error("[SHORTCUT DEBUG] Failed to load locations:", loadError);
         }
       }
     });
@@ -129,7 +131,8 @@ export default {
       try {
         await cncStore.fetchLocations(props.axisUid);
       } catch (error) {
-        console.error("[SHORTCUT] Failed to fetch locations:", error);
+        logger.error("[SHORTCUT] Failed to fetch locations:", error);
+        handleApiError(error, 'Failed to fetch locations for shortcuts');
       }
       
       currentShortcutButton.value = event.target;
@@ -158,7 +161,7 @@ export default {
           const targetLocation = locations.value.find(loc => loc.uid === shortcut.locationUid);
           
           if (!targetLocation) {
-            console.error('Target location not found:', shortcut.locationUid);
+            logger.error('Target location not found:', shortcut.locationUid);
             return;
           }
           
@@ -175,7 +178,8 @@ export default {
           });
           
         } catch (error) {
-          console.error('[SHORTCUT] Error executing shortcut:', error);
+          logger.error('[SHORTCUT] Error executing shortcut:', error);
+          handleApiError(error, 'Failed to execute shortcut');
         }
       }
     }
@@ -219,7 +223,8 @@ export default {
           });
           
         } catch (error) {
-          console.error("Failed to rename location:", error);
+          logger.error("Failed to rename location:", error);
+          handleApiError(error, 'Failed to rename location');
         }
       }
     }

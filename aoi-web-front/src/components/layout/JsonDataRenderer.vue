@@ -12,7 +12,7 @@
 
 <script>
 import VueJsonPretty from 'vue-json-pretty';
-import JsonViewer from 'vue-json-viewer';
+import JsonViewer from 'vue3-json-viewer';
 
 export default{
     components: {

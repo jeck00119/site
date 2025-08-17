@@ -21,19 +21,14 @@
         </div>
         <base-notification
             :show="showNotification"
-            height="15vh"
             :timeout="notificationTimeout"
+            :message="notificationMessage"
+            :icon="notificationIcon"
+            :notificationType="notificationType"
+            height="15vh"
+            color="#CCA152"
             @close="clearNotification"
-        >
-            <div class="message-wrapper">
-                <div class="icon-wrapper">
-                    <v-icon :name="notificationIcon" scale="2.5" animation="spin"/>
-                </div>
-                <div class="text-wrapper">
-                    {{ notificationMessage }}
-                </div>
-            </div>
-        </base-notification>
+        />
     </div>
 </template>
 
@@ -41,12 +36,13 @@
 import { computed , onMounted, ref } from 'vue';
 import { useAuthStore } from '@/composables/useStore';
 import { validateRequired } from '../../../utils/validation.js';
-import useNotification from '../../../hooks/notifications.js';
+import useNotification, { NotificationType } from '../../../hooks/notifications.js';
+import { AuthMessages, ValidationMessages } from '@/constants/notifications';
 
 export default{
     setup() {
         const authStore = useAuthStore();
-        const { showNotification, notificationMessage, notificationIcon, notificationTimeout, setNotification, clearNotification } = useNotification();
+        const { showNotification, notificationMessage, notificationIcon, notificationTimeout, notificationType, setTypedNotification, clearNotification } = useNotification();
 
         // These are already computed refs from the composables
         const users = authStore.users;
@@ -65,7 +61,11 @@ export default{
             const requiredValidation = validateRequired(role, 'Role');
             
             if (!requiredValidation.isValid) {
-                setNotification(3000, 'Please select a role for the user.', 'bi-exclamation-circle-fill');
+                setTypedNotification(
+                    'Please select a role for the user.',
+                    NotificationType.ERROR,
+                    3000
+                );
                 return;
             }
             
@@ -75,9 +75,17 @@ export default{
                     role: role
                 });
                 
-                setNotification(2000, 'User role updated successfully.', 'bi-check-circle-fill');
+                setTypedNotification(
+                    'User role updated successfully.',
+                    NotificationType.SUCCESS,
+                    2000
+                );
             } catch (error) {
-                setNotification(3000, 'Failed to update user role. Please try again.', 'bi-exclamation-circle-fill');
+                setTypedNotification(
+                    'Failed to update user role. Please try again.',
+                    NotificationType.ERROR,
+                    3000
+                );
             }
         }
 
@@ -94,6 +102,7 @@ export default{
             notificationMessage,
             notificationIcon,
             notificationTimeout,
+            notificationType,
             clearNotification
         }
     }
@@ -145,23 +154,4 @@ export default{
     align-items: center;
 }
 
-.message-wrapper {
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
-}
-
-.icon-wrapper {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    margin-bottom: 3%;
-}
-
-.text-wrapper {
-    font-size: 100%;
-    width: 95%;
-    text-align: center;
-}
 </style>

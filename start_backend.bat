@@ -11,7 +11,7 @@ REM Check if venv exists in root
 if not exist "venv" (
     echo Virtual environment not found! Running setup...
     echo.
-    call python setup.py
+    python setup.py
     if errorlevel 1 (
         echo Setup failed! Please check the errors above.
         pause

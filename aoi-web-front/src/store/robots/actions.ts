@@ -1,4 +1,4 @@
-import { uuid } from "vue3-uuid";
+import { v4 as uuidv4 } from "uuid";
 import { get, post, remove, put } from "../../utils/requests";
 import { ipAddress, port } from "../../url";
 
@@ -55,7 +55,7 @@ export default {
 
     addRobot(context, payload) {
         const robot = {
-            uid: uuid.v4(),
+            uid: uuidv4(),
             name: payload.name,
             type: payload.type,
             ip: payload.ip
@@ -202,7 +202,7 @@ export default {
         const token = context.rootGetters["auth/getToken"] || sessionStorage.getItem('auth-token');
 
         const response = await post(`http://${ipAddress}:${port}/robot/${payload.uid}/save_position`, {
-            uid: uuid.v4(),
+            uid: uuidv4(),
             speed: payload.speed,
             components: payload.components,
             name: payload.name

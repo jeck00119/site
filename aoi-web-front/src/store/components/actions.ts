@@ -1,5 +1,6 @@
-import { uuid } from "vue3-uuid";
+import { v4 as uuidv4 } from "uuid";
 import api from "../../utils/api";
+import { logger } from "../../utils/logger";
 
 export default {
     async addComponent(context, payload) {
@@ -8,7 +9,7 @@ export default {
         if(payload.type === 'custom_component')
         {
             component = {
-                uid: uuid.v4(),
+                uid: uuidv4(),
                 name: payload.name,
                 imageSourceUid: '',
                 algorithms: [],
@@ -18,7 +19,7 @@ export default {
         else
         {
             component = {
-                uid: uuid.v4(),
+                uid: uuidv4(),
                 name: payload.name,
                 imageSourceUid: '',
                 algorithmUid: '',
@@ -89,7 +90,7 @@ export default {
         const token = context.rootGetters["auth/getToken"] || sessionStorage.getItem('auth-token');
         
         if (!token) {
-            console.error('No authentication token available');
+            logger.error('No authentication token available');
             const error = new Error('Authentication required');
             throw error;
         }
@@ -104,7 +105,7 @@ export default {
 
         if(!response.ok)
         {
-            console.error(`loadComponents API error: Status ${response.status} for /${payload.type}`, responseData);
+            logger.error('loadComponents API error', { status: response.status, type: payload.type, responseData });
             const error = new Error(responseData.detail || `Failed to fetch the ${payload.type}s! Status: ${response.status}`);
             throw error;
         }
@@ -199,7 +200,7 @@ export default {
 
     async addReference(context, payload) {
         let component = {
-            uid: uuid.v4(),
+            uid: uuidv4(),
             name: payload.name,
             imageSourceUid: '',
             algorithmUid: '',
@@ -227,7 +228,7 @@ export default {
 
     async addIdentification(context, payload) {
         let component = {
-            uid: uuid.v4(),
+            uid: uuidv4(),
             name: payload.name,
             imageSourceUid: '',
             algorithmUid: '',

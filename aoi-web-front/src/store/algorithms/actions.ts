@@ -1,10 +1,11 @@
-import { uuid } from "vue3-uuid";
+import { v4 as uuidv4 } from "uuid";
 import api from "../../utils/api";
 import { GraphicsRect } from "../../utils/fabric_objects";
 import { get, post, update, postStream } from "../../utils/requests";
 import { ipAddress, port } from "../../url";
 import { DEFAULT_IMAGE_DATA_URI_PREFIX, ImageDataUtils } from "../../utils/imageConstants";
 import * as fabric from "fabric";
+import { logger } from "../../utils/logger";
 
 export default {
     async loadAlgorithms(context) {
@@ -27,7 +28,7 @@ export default {
 
                 for (const algorithmType of responseData.data) {
                     const algorithm = {
-                        uid: uuid.v4(),
+                        uid: uuidv4(),
                         type: algorithmType
                     };
 
@@ -37,7 +38,7 @@ export default {
                 context.commit('setAlgorithms', algorithms);
             }
         } catch (error) {
-            console.error('Failed to load algorithms:', error);
+            logger.error('Failed to load algorithms', { error });
             throw error;
         }
     },
@@ -61,7 +62,7 @@ export default {
                 context.commit('setBasicAlgorithms', responseData.message);
             }
         } catch (error) {
-            console.error('Failed to load basic algorithms:', error);
+            logger.error('Failed to load basic algorithms', { error });
             throw error;
         }
     },
@@ -89,11 +90,11 @@ export default {
                     type: ref.name // For compatibility with existing code
                 }));
 
-                console.log('loadReferenceAlgorithms - loaded algorithms:', algorithms);
+                logger.debug('loadReferenceAlgorithms - loaded algorithms', { algorithms });
                 context.commit('setReferenceAlgorithms', algorithms);
             }
         } catch (error) {
-            console.error('Failed to load reference algorithms:', error);
+            logger.error('Failed to load reference algorithms', { error });
             throw error;
         }
     },
@@ -125,7 +126,7 @@ export default {
                 context.commit('setConfiguredAlgorithms', algorithms);
             }
         } catch (error) {
-            console.error('Failed to load configured algorithms:', error);
+            logger.error('Failed to load configured algorithms', { error });
             throw error;
         }
     },
@@ -239,7 +240,7 @@ export default {
     },
 
     setAlgorithmResult(context, payload) {
-        console.log('DEBUG: setAlgorithmResult called with payload:', payload);
+        logger.debug('setAlgorithmResult called with payload', { payload });
         context.commit('setAlgorithmResult', payload);
     },
 
@@ -288,7 +289,7 @@ export default {
         parameters['golden_position'] = [];
 
         const algorithm = {
-            uid: uuid.v4(),
+            uid: uuidv4(),
             type: payload.type,
             name: '',
             parameters: parameters
@@ -342,7 +343,7 @@ export default {
         parameters['golden_position'] = [];
 
         const algorithm = {
-            uid: uuid.v4(),
+            uid: uuidv4(),
             type: payload.type,
             name: '',
             parameters: parameters
@@ -420,7 +421,7 @@ export default {
                 throw error;
             }
         } catch (error) {
-            console.error('Failed to update configured algorithm:', error);
+            logger.error('Failed to update configured algorithm', { error });
             throw error;
         }
     },
@@ -444,7 +445,7 @@ export default {
                 context.commit('addConfiguredAlgorithm', payload);
             }
         } catch (error) {
-            console.error('Failed to add configured algorithm:', error);
+            logger.error('Failed to add configured algorithm', { error });
             throw error;
         }
     },
@@ -499,7 +500,7 @@ export default {
         } catch (error) {
             // Enhanced error logging
             const logMessage = `Failed to update live algorithm property '${payload.name}': ${(error as Error).message}`;
-            console.error(logMessage, {
+            logger.error(logMessage, {
                 property: payload.name,
                 value: payload.value,
                 valueType: typeof payload.value,
@@ -552,7 +553,7 @@ export default {
         } catch (error) {
             // Enhanced error logging
             const logMessage = `Failed to update reference algorithm property '${payload.name}': ${(error as Error).message}`;
-            console.error(logMessage, {
+            logger.error(logMessage, {
                 property: payload.name,
                 value: payload.value,
                 valueType: typeof payload.value,
@@ -575,7 +576,7 @@ export default {
                 throw error;
             }
         } catch (error) {
-            console.error('Failed to upload resource:', error);
+            logger.error('Failed to upload resource', { error });
             throw error;
         }
     },
@@ -590,7 +591,7 @@ export default {
                 throw error;
             }
         } catch (error) {
-            console.error('Failed to set live algorithm:', error);
+            logger.error('Failed to set live algorithm', { error });
             throw error;
         }
     },
@@ -605,7 +606,7 @@ export default {
                 throw error;
             }
         } catch (error) {
-            console.error('Failed to set reference algorithm:', error);
+            logger.error('Failed to set reference algorithm', { error });
             throw error;
         }
     },
@@ -620,7 +621,7 @@ export default {
                 throw error;
             }
         } catch (error) {
-            console.error('Failed to set live algorithm reference repository:', error);
+            logger.error('Failed to set live algorithm reference repository', { error });
             throw error;
         }
     },
@@ -635,7 +636,7 @@ export default {
                 throw error;
             }
         } catch (error) {
-            console.error('Failed to set live algorithm reference from dict:', error);
+            logger.error('Failed to set live algorithm reference from dict', { error });
             throw error;
         }
     },
@@ -650,7 +651,7 @@ export default {
                 throw error;
             }
         } catch (error) {
-            console.error('Failed to set live algorithm reference:', error);
+            logger.error('Failed to set live algorithm reference', { error });
             throw error;
         }
     },
@@ -665,7 +666,7 @@ export default {
                 throw error;
             }
         } catch (error) {
-            console.error('Failed to reset live algorithm reference:', error);
+            logger.error('Failed to reset live algorithm reference', { error });
             throw error;
         }
     },
@@ -709,7 +710,7 @@ export default {
                 }
             }
         } catch (error) {
-            console.error('Failed to set live algorithm attributes:', error);
+            logger.error('Failed to set live algorithm attributes', { error });
             throw error;
         }
     },
@@ -757,7 +758,7 @@ export default {
                 }
             }
         } catch (error) {
-            console.error('Failed to set live reference algorithm attributes:', error);
+            logger.error('Failed to set live reference algorithm attributes', { error });
             throw error;
         }
     },
@@ -1014,7 +1015,7 @@ export default {
             }
             else
             {
-                console.log('DEBUG: Single process algorithm response data:', responseData);
+                logger.debug('Single process algorithm response data', { responseData });
                 let outputImages = [];
                 
                 // Handle nested response structure: responseData.message.frame
@@ -1030,7 +1031,7 @@ export default {
                     // Handle single frame or undefined case
                     responseData.frame = frameData ? [ImageDataUtils.createJpegDataURI(frameData)] : [];
                 }
-                console.log('DEBUG: Processed algorithm frame data:', responseData.frame);
+                logger.debug('Processed algorithm frame data', { frame: responseData.frame });
                 context.dispatch('setAlgorithmResult', responseData);
             }
         }
@@ -1071,7 +1072,7 @@ export default {
         }
         else
         {
-            console.log('DEBUG: Single process reference response data:', responseData);
+            logger.debug('Single process reference response data', { responseData });
             let outputImages = [];
             
             // Handle nested response structure: responseData.message.frame
@@ -1087,7 +1088,7 @@ export default {
                 // Handle single frame or undefined case
                 responseData.frame = frameData ? [ImageDataUtils.createJpegDataURI(frameData)] : [];
             }
-            console.log('DEBUG: Processed reference frame data:', responseData.frame);
+            logger.debug('Processed reference frame data', { frame: responseData.frame });
             context.dispatch('setAlgorithmResult', responseData);
         }
     },

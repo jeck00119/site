@@ -1,7 +1,8 @@
 import api from "../../utils/api";
 import { handleApiError, getAuthErrorMessage } from "../../utils/errorHandler";
+import { logger } from "../../utils/logger";
 
-import { uuid } from "vue3-uuid";
+import { v4 as uuidv4 } from "uuid";
 
 let timer;
 let expirationCheckInterval;
@@ -19,7 +20,7 @@ function startExpirationCheck(context) {
         if (tokenExpiration) {
             const expiresIn = +tokenExpiration - new Date().getTime();
             if (expiresIn <= 0) {
-                console.warn('Token expired - auto-logout triggered by periodic check');
+                logger.warn('Token expired - auto-logout triggered by periodic check');
                 context.dispatch('autoLogout');
                 clearInterval(expirationCheckInterval);
             }
@@ -42,7 +43,7 @@ export default {
                 context.commit('setUsers', responseData);
             }
         } catch (error) {
-            console.error('Failed to load users:', error);
+            logger.error('Failed to load users', { error });
             throw error;
         }
     },
@@ -58,7 +59,7 @@ export default {
                 context.commit('setAvailableRoles', responseData);
             }
         } catch (error) {
-            console.error('Failed to load available roles:', error);
+            logger.error('Failed to load available roles', { error });
             throw error;
         }
     },
@@ -79,7 +80,7 @@ export default {
                 context.commit('updateUsersRole', payload);
             }
         } catch (error) {
-            console.error('Failed to update user role:', error);
+            logger.error('Failed to update user role', { error });
             throw error;
         }
     },
@@ -87,7 +88,7 @@ export default {
     async addUser(context, payload) {
         try {
             let user = {
-                uid: uuid.v4(),
+                uid: uuidv4(),
                 username: payload.username,
                 password: payload.password,
                 level: ''
@@ -129,7 +130,7 @@ export default {
                 startExpirationCheck(context);
             }
         } catch (error) {
-            console.error('Failed to add user:', error);
+            logger.error('Failed to add user', { error });
             throw error;
         }
     },
@@ -161,7 +162,7 @@ export default {
                 const tokenExpiration = response.headers.get('token-expiration');
                 const userLevel = response.headers.get('level');
 
-                console.log('Login successful - User:', userData, 'Level:', userLevel);
+                logger.info('Login successful', { user: userData, level: userLevel });
 
                 const expiresIn = +tokenExpiration * 1000;
                 const expirationDate = new Date().getTime() + expiresIn;
@@ -183,13 +184,13 @@ export default {
                     }
                 });
                 
-                console.log('User committed to store with level:', userLevel);
+                logger.debug('User committed to store', { level: userLevel });
 
                 // Start periodic expiration check
                 startExpirationCheck(context);
             }
         } catch (error) {
-            console.error('Failed to login:', error);
+            logger.error('Failed to login', { error });
             throw error;
         }
     },

@@ -83,24 +83,25 @@
                 </div>
             </div>
         </div>
-        <base-notification :show="showNotification" :timeout="notificationTimeout" height="15vh" color="#CCA152" @close="clearNotification">
-            <div class="message-wrapper">
-                <div class="icon-wrapper">
-                    <v-icon :name="notificationIcon" scale="2.5" animation="float" />
-                </div>
-                <div class="text-wrapper">
-                    {{ notificationMessage }}
-                </div>
-            </div>
-        </base-notification>
+        <base-notification
+            :show="showNotification"
+            :timeout="notificationTimeout"
+            :message="notificationMessage"
+            :icon="notificationIcon"
+            :notificationType="notificationType"
+            height="15vh"
+            color="#CCA152"
+            @close="clearNotification"
+        />
     </div>
 </template>
 
 <script>
 import { ref, computed, onMounted } from 'vue';
 import { useStore } from 'vuex';
-import useNotification from '../../hooks/notifications';
-import { uuid } from "vue3-uuid";
+import useNotification, { NotificationType } from '../../hooks/notifications';
+import { ItacMessages, ValidationMessages, GeneralMessages } from '@/constants/notifications';
+import { v4 as uuidv4 } from "uuid";
 import { validateRequired, validateIP, validatePort, validateLength, sanitizeInput } from '../../utils/validation.js';
 
 import BaseButtonRectangle from '../base/BaseButtonRectangle.vue';
@@ -114,8 +115,8 @@ export default {
     setup() {
         const store = useStore();
 
-        const {showNotification, notificationMessage, notificationIcon, notificationTimeout, 
-            setNotification, clearNotification} = useNotification();
+        const {showNotification, notificationMessage, notificationIcon, notificationTimeout, notificationType,
+            setTypedNotification, clearNotification} = useNotification();
 
         const currentItac = ref({
             name: '',
@@ -253,7 +254,11 @@ export default {
                     description: `ITAC ${uid} configuration was deleted.`
                 });
             }).catch(() => {
-                setNotification(3000, err, 'bi-exclamation-circle-fill');
+                setTypedNotification(
+                    err || ItacMessages.UPDATE_FAILED,
+                    NotificationType.ERROR,
+                    3000
+                );
             });
         }
 
@@ -264,7 +269,11 @@ export default {
             if (!isValid) {
                 // Show first validation error
                 const firstError = Object.values(formErrors.value)[0];
-                setNotification(3000, firstError, 'bi-exclamation-circle-fill');
+                setTypedNotification(
+                    firstError,
+                    NotificationType.ERROR,
+                    3000
+                );
                 return;
             }
 
@@ -277,9 +286,17 @@ export default {
                         title: 'ITAC Updated',
                         description: `ITAC ${currentItac.value.name} configuration was updated.`
                     });
-                    setNotification('3000', 'ITAC configuration updated.', 'fc-ok');
+                    setTypedNotification(
+                        ItacMessages.UPDATED,
+                        NotificationType.SUCCESS,
+                        3000
+                    );
                 }).catch(() => {
-                    setNotification('3000', 'Error while updating ITAC.', 'bi-exclamation-circle-fill');
+                    setTypedNotification(
+                        ItacMessages.UPDATE_FAILED,
+                        NotificationType.ERROR,
+                        3000
+                    );
                 });
             }
             else {
@@ -295,9 +312,17 @@ export default {
                         description: `ITAC ${currentItac.value.name} configuration was added.`
                     });
 
-                    setNotification('3000', 'ITAC configuration saved.', 'fc-ok');
+                    setTypedNotification(
+                        ItacMessages.SAVED,
+                        NotificationType.SUCCESS,
+                        3000
+                    );
                 }).catch(() => {
-                    setNotification('3000', 'Error while saving ITAC.', 'bi-exclamation-circle-fill');
+                    setTypedNotification(
+                        ItacMessages.UPDATE_FAILED,
+                        NotificationType.ERROR,
+                        3000
+                    );
                 });
             }
         }
@@ -321,7 +346,7 @@ export default {
         }
 
         function generateID() {
-            currentItac.value.uid = uuid.v4();
+            currentItac.value.uid = uuidv4();
         }
 
         function resetItac() {
@@ -356,6 +381,7 @@ export default {
             notificationMessage,
             notificationIcon,
             notificationTimeout,
+            notificationType,
             clearNotification,
             isSelected,
             selectItac,
@@ -511,25 +537,6 @@ label {
     margin-right: 3px;
 }
 
-.message-wrapper {
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
-}
-
-.icon-wrapper {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    margin-bottom: 3%;
-}
-
-.text-wrapper {
-    font-size: 100%;
-    width: 95%;
-    text-align: center;
-}
 
 .listanim-leave-from,
 .listanim-enter-to {

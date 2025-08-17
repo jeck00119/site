@@ -11,7 +11,7 @@ REM Check if node_modules exists
 if not exist "node_modules" (
     echo Node modules not found! Installing dependencies...
     echo.
-    call npm install
+    npm install
     if errorlevel 1 (
         echo Failed to install node modules!
         echo Please ensure Node.js and npm are properly installed.

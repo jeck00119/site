@@ -68,9 +68,25 @@
       "Bash(npm outdated)",
       "Bash(npm audit:*)",
       "WebSearch",
-      "Bash(npx depcheck:*)"
+      "Bash(npx depcheck:*)",
+      "Bash(npm uninstall:*)",
+      "Bash(npm update:*)",
+      "Bash(npm ls:*)",
+      "Bash(bash:*)",
+      "Bash(npm view:*)",
+      "Bash(for:*)",
+      "Bash(do echo \"=== $file ===\")",
+      "Bash(done)",
+      "Bash(do echo \"Processing $file...\")",
+      "Bash(echo \"Found old pattern in $file\")",
+      "Bash(echo:*)",
+      "Bash(do echo \"Checking CSS in $file...\")",
+      "Bash(del check_notifications.py)"
     ],
     "deny": [],
-    "defaultMode": "acceptEdits"
+    "defaultMode": "acceptEdits",
+    "additionalDirectories": [
+      "E:\\e"
+    ]
   }
 }

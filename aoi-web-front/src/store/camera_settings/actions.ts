@@ -1,13 +1,13 @@
 
 import api from "../../utils/api";
-import { uuid } from "vue3-uuid";
+import { v4 as uuidv4 } from "uuid";
 
 
 export default {
 
     async addCamera(context, payload) {
         let camera = {
-                uid: uuid.v4(),
+                uid: uuidv4(),
                 name: payload.name,
                 opencv_index_id: payload.openCvIndexId,
                 camera_type: payload.cameraType
@@ -158,7 +158,7 @@ export default {
     async postCameraSettings(context, payload)
     {
         context.commit("updateCurrentCameraSettings", {"name":"name", "value": payload.name});
-        context.commit("updateCurrentCameraSettings", {"name":"uid", "value": uuid.v4()});
+        context.commit("updateCurrentCameraSettings", {"name":"uid", "value": uuidv4()});
 
         const token = context.rootGetters["auth/getToken"] || sessionStorage.getItem('auth-token');
 

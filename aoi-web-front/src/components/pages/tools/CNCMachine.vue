@@ -21,6 +21,8 @@
 <script>
 import { computed, onMounted, onUnmounted, watch } from 'vue';
 import { useCncStore, useConfigurationsStore } from '@/composables/useStore';
+import { logger } from '@/utils/logger';
+import { handleApiError } from '@/utils/errorHandler';
 
 import cnc from "../../cnc/CNCRefactored.vue";
 
@@ -42,33 +44,34 @@ export default {
     watch(currentConfiguration, async (newConfig) => {
       if (newConfig) {
         try {
-          console.log("CNCMachine: Loading CNCs for configuration", newConfig);
+          logger.debug("CNCMachine: Loading CNCs for configuration", newConfig);
           await cncStore.loadCNCs();
-          console.log("CNCMachine: CNCs loaded, count:", cncStore.cncs.value?.length || 0);
+          logger.debug("CNCMachine: CNCs loaded, count:", cncStore.cncs.value?.length || 0);
         } catch (error) {
-          console.error("CNCMachine: Failed to load CNCs:", error);
+          logger.error("CNCMachine: Failed to load CNCs:", error);
+          handleApiError(error, 'Failed to load CNCs');
         }
       }
     }, { immediate: true });
 
     // Watch the CNCs for changes
     watch(cncStore.cncs, (newCncs) => {
-      console.log("CNCMachine: CNCs changed:", newCncs);
+      logger.debug("CNCMachine: CNCs changed:", newCncs);
     });
 
     onMounted(() => {
       // Configuration should be loaded by the parent component
       // We'll rely on the watcher to trigger CNC loading
-      console.log("CNCMachine: Component mounted, current config:", currentConfiguration.value);
-      console.log("CNCMachine: Current CNCs:", cncStore.cncs.value);
+      logger.debug("CNCMachine: Component mounted, current config:", currentConfiguration.value);
+      logger.debug("CNCMachine: Current CNCs:", cncStore.cncs.value);
     });
 
     onUnmounted(() => {
       try {
         // Clean up any CNC connections if needed
-        console.log("CNCMachine component unmounting");
+        logger.debug("CNCMachine component unmounting");
       } catch (error) {
-        console.warn('Error during CNCMachine component unmounting:', error);
+        logger.warn('Error during CNCMachine component unmounting:', error);
       }
     });
 

@@ -45,19 +45,14 @@
         </div>
         <base-notification
             :show="showNotification"
-            height="15vh"
             :timeout="notificationTimeout"
+            :message="notificationMessage"
+            :icon="notificationIcon"
+            :notificationType="notificationType"
+            height="15vh"
+            color="#CCA152"
             @close="clearNotification"
-        >
-            <div class="message-wrapper">
-                <div class="icon-wrapper">
-                    <v-icon :name="notificationIcon" scale="2.5" animation="float" />
-                </div>
-                <div class="text-wrapper">
-                    {{ notificationMessage }}
-                </div>
-            </div>
-        </base-notification>
+        />
     </div>
 </template>
 
@@ -68,7 +63,8 @@ import { useConfigurationsStore, useAuthStore, useCncStore, useRobotsStore, useP
 import CncSettings from '../../settings/CncSettings.vue';
 import RobotSettings from '../../settings/RobotSettings.vue';
 import ProfilometerSettings from '../../settings/ProfilometerSettings.vue';
-import useNotification from '../../../hooks/notifications';
+import useNotification, { NotificationType } from '../../../hooks/notifications';
+import { ValidationMessages, GeneralMessages } from '@/constants/notifications';
 import { validateRequired, validateIP, validateLength, sanitizeInput } from '../../../utils/validation.js';
 
 export default {
@@ -86,8 +82,8 @@ export default {
         const profilometersStore = useProfilometersStore();
         const logStore = useLogStore();
 
-        const {showNotification, notificationMessage, notificationIcon, notificationTimeout, 
-            setNotification, clearNotification} = useNotification();
+        const {showNotification, notificationMessage, notificationIcon, notificationTimeout, notificationType,
+            setTypedNotification, clearNotification} = useNotification();
 
         // These are already computed refs from the composables, no need to wrap again
         const currentConfiguration = configurationsStore.currentConfiguration;
@@ -106,23 +102,31 @@ export default {
             // Validate CNC name
             const nameValidation = validateRequired(name, 'CNC Name');
             if (!nameValidation.isValid) {
-                setNotification(3000, nameValidation.errors[0], 'bi-exclamation-circle-fill');
+                setTypedNotification(
+                    nameValidation.errors[0],
+                    NotificationType.ERROR,
+                    3000
+                );
                 return;
             }
             
             const lengthValidation = validateLength(name, 1, 50, 'CNC Name');
             if (!lengthValidation.isValid) {
-                setNotification(3000, lengthValidation.errors[0], 'bi-exclamation-circle-fill');
+                setTypedNotification(
+                    lengthValidation.errors[0],
+                    NotificationType.ERROR,
+                    3000
+                );
                 return;
             }
             
             const sanitizedName = sanitizeInput(name);
             cncStore.addCNC(sanitizedName, '', '');
 
-            setNotification(
-                3000, 
+            setTypedNotification(
                 `Added new CNC named ${sanitizedName}. Do not forget to save in order for the changes to take place.`,
-                'bi-exclamation-circle-fill'
+                NotificationType.WARNING,
+                3000
             );
 
             logStore.addEvent(
@@ -173,13 +177,21 @@ export default {
             }
             
             if (errors.length > 0) {
-                setNotification(3000, errors[0], 'bi-exclamation-circle-fill');
+                setTypedNotification(
+                    errors[0],
+                    NotificationType.ERROR,
+                    3000
+                );
                 return;
             }
             
             try {
                 cncStore.saveCNCs();
-                setNotification(2000, 'CNCs configuration saved successfully.', 'bi-check-circle-fill');
+                setTypedNotification(
+                    'CNCs configuration saved successfully.',
+                    NotificationType.SUCCESS,
+                    2000
+                );
 
                 logStore.addEvent(
                     'CNC SETTINGS',
@@ -188,7 +200,11 @@ export default {
                     `CNCs configuration was saved.`
                 );
             } catch(err) {
-                setNotification(3000, err.message || 'Failed to save CNCs configuration.', 'bi-exclamation-circle-fill');
+                setTypedNotification(
+                    err.message || 'Failed to save CNCs configuration.',
+                    NotificationType.ERROR,
+                    3000
+                );
             }
         }
 
@@ -219,23 +235,31 @@ export default {
             // Validate robot name
             const nameValidation = validateRequired(name, 'Robot Name');
             if (!nameValidation.isValid) {
-                setNotification(3000, nameValidation.errors[0], 'bi-exclamation-circle-fill');
+                setTypedNotification(
+                    nameValidation.errors[0],
+                    NotificationType.ERROR,
+                    3000
+                );
                 return;
             }
             
             const lengthValidation = validateLength(name, 1, 50, 'Robot Name');
             if (!lengthValidation.isValid) {
-                setNotification(3000, lengthValidation.errors[0], 'bi-exclamation-circle-fill');
+                setTypedNotification(
+                    lengthValidation.errors[0],
+                    NotificationType.ERROR,
+                    3000
+                );
                 return;
             }
             
             const sanitizedName = sanitizeInput(name);
             robotsStore.addRobot(sanitizedName, '', '');
 
-            setNotification(
-                3000,
+            setTypedNotification(
                 `Added new robot named ${sanitizedName}. Do not forget to save in order for the changes to take place.`,
-                'bi-exclamation-circle-fill'
+                NotificationType.WARNING,
+                3000
             );
 
             logStore.addEvent(
@@ -285,13 +309,21 @@ export default {
             });
             
             if (errors.length > 0) {
-                setNotification(3000, errors[0], 'bi-exclamation-circle-fill');
+                setTypedNotification(
+                    errors[0],
+                    NotificationType.ERROR,
+                    3000
+                );
                 return;
             }
             
             try {
                 robotsStore.saveRobots();
-                setNotification(2000, 'Robots configuration saved successfully.', 'bi-check-circle-fill');
+                setTypedNotification(
+                    'Robots configuration saved successfully.',
+                    NotificationType.SUCCESS,
+                    2000
+                );
 
                 logStore.addEvent(
                     'ROBOT SETTINGS',
@@ -300,7 +332,11 @@ export default {
                     `Robots configuration was saved.`
                 );
             } catch(err) {
-                setNotification(3000, err.message || 'Failed to save robots configuration.', 'bi-exclamation-circle-fill');
+                setTypedNotification(
+                    err.message || 'Failed to save robots configuration.',
+                    NotificationType.ERROR,
+                    3000
+                );
             }
         }
 
@@ -309,7 +345,11 @@ export default {
             if (value && value.trim() !== '') {
                 const ipValidation = validateIP(value);
                 if (!ipValidation.isValid) {
-                    setNotification(3000, ipValidation.errors[0], 'bi-exclamation-circle-fill');
+                    setTypedNotification(
+                        ipValidation.errors[0],
+                        NotificationType.ERROR,
+                        3000
+                    );
                     return;
                 }
             }
@@ -341,23 +381,31 @@ export default {
             // Validate profilometer name
             const nameValidation = validateRequired(name, 'Profilometer Name');
             if (!nameValidation.isValid) {
-                setNotification(3000, nameValidation.errors[0], 'bi-exclamation-circle-fill');
+                setTypedNotification(
+                    nameValidation.errors[0],
+                    NotificationType.ERROR,
+                    3000
+                );
                 return;
             }
             
             const lengthValidation = validateLength(name, 1, 50, 'Profilometer Name');
             if (!lengthValidation.isValid) {
-                setNotification(3000, lengthValidation.errors[0], 'bi-exclamation-circle-fill');
+                setTypedNotification(
+                    lengthValidation.errors[0],
+                    NotificationType.ERROR,
+                    3000
+                );
                 return;
             }
             
             const sanitizedName = sanitizeInput(name);
             profilometersStore.addProfilometer(sanitizedName, '', '', '');
 
-            setNotification(
-                3000,
+            setTypedNotification(
                 `Added new profilometer named ${sanitizedName}. Do not forget to save in order for the changes to take place.`,
-                'bi-exclamation-circle-fill'
+                NotificationType.WARNING,
+                3000
             );
 
             logStore.addEvent(
@@ -389,10 +437,10 @@ export default {
 
             if(ids.includes(''))
             {
-                setNotification(
-                    3000,
-                    `There are profilometers with no ID chosen. Cannot save the changes.`,
-                    'bi-exclamation-circle-fill'
+                setTypedNotification(
+                    'There are profilometers with no ID chosen. Cannot save the changes.',
+                    NotificationType.ERROR,
+                    3000
                 );
 
                 error = true;
@@ -400,10 +448,10 @@ export default {
 
             if(paths.includes(''))
             {
-                setNotification(
-                    3000,
-                    `There are profilometers with no path chosen. Cannot save the changes.`,
-                    'bi-exclamation-circle-fill'
+                setTypedNotification(
+                    'There are profilometers with no path chosen. Cannot save the changes.',
+                    NotificationType.ERROR,
+                    3000
                 );
 
                 error = true;
@@ -411,10 +459,10 @@ export default {
 
             if(types.includes(''))
             {
-                setNotification(
-                    3000,
-                    `There are profilometers with no type chosen. Cannot save the changes.`,
-                    'bi-exclamation-circle-fill'
+                setTypedNotification(
+                    'There are profilometers with no type chosen. Cannot save the changes.',
+                    NotificationType.ERROR,
+                    3000
                 );
 
                 error = true;
@@ -500,6 +548,7 @@ export default {
             notificationIcon,
             notificationMessage,
             notificationTimeout,
+            notificationType,
             removeCNC,
             addCNC,
             saveCNCs,
@@ -539,23 +588,4 @@ export default {
     background-color: rgb(25, 24, 24);
 }
 
-.message-wrapper {
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
-}
-
-.icon-wrapper {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    margin-bottom: 3%;
-}
-
-.text-wrapper {
-    font-size: 100%;
-    width: 95%;
-    text-align: center;
-}
 </style>

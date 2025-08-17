@@ -76,7 +76,7 @@
 <script>
 import { ref, watch, onMounted } from 'vue';
 import { useImageSourcesStore, useAuthStore, useConfigurationsStore } from '@/composables/useStore';
-import { createLogger } from '@/utils/logger';
+import { logger } from '@/utils/logger';
 import { addErrorToStore, handleApiError } from '@/utils/errorHandler';
 import { validateRequired, validateLength } from '@/utils/validation';
 
@@ -91,7 +91,6 @@ export default {
     emits: ['load-current-image-source', 'delete-source'],
 
     setup(_, context) {
-        const logger = createLogger('ImageSourcesList');
         
         // Use centralized store composables
         const { imageSources, selectImageSource, dispatch: dispatchImageSources } = useImageSourcesStore();

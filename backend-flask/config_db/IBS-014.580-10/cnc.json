@@ -56,14 +56,6 @@
                         },
                         {
                             "feedrate": 1500,
-                            "locationUid": "4264366a-6ecb-4b45-a5ee-6faaa1dd4359",
-                            "name": "test1",
-                            "x": 0,
-                            "y": 0,
-                            "z": 0
-                        },
-                        {
-                            "feedrate": 1500,
                             "locationUid": "82003131-843d-42a5-a4c0-5c0529a75869",
                             "name": "pos3",
                             "x": 0,
@@ -74,6 +66,14 @@
                             "feedrate": 1500,
                             "locationUid": "cae08b94-e07d-4eef-b7dc-a009498a9e97",
                             "name": "Home_Zero",
+                            "x": 0,
+                            "y": 0,
+                            "z": 0
+                        },
+                        {
+                            "feedrate": 1500,
+                            "locationUid": "4264366a-6ecb-4b45-a5ee-6faaa1dd4359",
+                            "name": "test1",
                             "x": 0,
                             "y": 0,
                             "z": 0

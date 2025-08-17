@@ -97,29 +97,24 @@
         <base-notification
             :show="showNotification"
             :timeout="notificationTimeout"
+            :message="notificationMessage"
+            :icon="notificationIcon"
+            :notificationType="notificationType"
             height="15vh"
             color="#CCA152"
             @close="clearNotification"
-        >
-            <div class="message-wrapper">
-                <div class="icon-wrapper">
-                    <v-icon :name="notificationIcon" scale="2.5" animation="spin"/>
-                </div>
-                <div class="text-wrapper">
-                    {{ notificationMessage }}
-                </div>
-            </div>
-        </base-notification>
+        />
     </div>
 </template>
 
 <script>
 import VueMultiselect from 'vue-multiselect';
 
-import useNotification from '../../../hooks/notifications';
+import useNotification, { NotificationType } from '../../../hooks/notifications';
+import { CameraMessages, GeneralMessages } from '@/constants/notifications';
 import { ref, onMounted, onUnmounted, computed, watch } from 'vue';
 import { useStereoCalibrationStore, useImageSourcesStore } from '@/composables/useStore';
-import { uuid } from 'vue3-uuid';
+import { v4 as uuidv4 } from "uuid";
 
 import CameraScene from '../../camera/CameraScene.vue';
 import { ipAddress, port } from '../../../url';
@@ -167,8 +162,8 @@ export default {
         const stereoCalibrationStore = useStereoCalibrationStore();
         const imageSourcesStore = useImageSourcesStore();
 
-        const {showNotification, notificationMessage, notificationIcon, notificationTimeout, 
-            setNotification, clearNotification} = useNotification();
+        const {showNotification, notificationMessage, notificationIcon, notificationTimeout, notificationType,
+            setTypedNotification, clearNotification} = useNotification();
 
         // These are already computed refs from the composables
 
@@ -259,7 +254,10 @@ export default {
                         webSocketInstance.send(JSON.stringify({
                             command: "calibrate"
                         }));
-                        setNotification(null, 'Calibrating...', 'fa-cog');
+                        setTypedNotification(
+                            CameraMessages.CALIBRATING,
+                            NotificationType.LOADING
+                        );
                         clearInterval(timer);
                     }
                 }
@@ -275,7 +273,7 @@ export default {
 
         function connectToWs() 
         {
-            wsUid = uuid.v4();
+            wsUid = uuidv4();
             const firstImageSourceObj = imageSources.value.find(imageSource => imageSource.name === firstImageSource.value);
             const secondImageSourceObj = imageSources.value.find(imageSource => imageSource.name === secondImageSource.value);
             const wsUrl = `ws://${ipAddress}:${port}/stereo_calibration/${firstImageSourceObj.uid}/${secondImageSourceObj.uid}/ws/${wsUid}`;
@@ -328,7 +326,11 @@ export default {
             else if(data.details === "calibError")
             {
                 clearNotification();
-                setNotification(3000, "Calibration failed. Please try again.", 'bi-exclamation-circle-fill');
+                setTypedNotification(
+                    CameraMessages.CALIBRATION_FAILED,
+                    NotificationType.ERROR,
+                    3000
+                );
                 showFrames.value = true;
                 currentImageIdx.value = 0;
 
@@ -336,7 +338,11 @@ export default {
             }
             else if(data.details === "originDone")
             {
-                setNotification(3000, "World frame origin set successfully.", 'fc-ok');
+                setTypedNotification(
+                    'World frame origin set successfully.',
+                    NotificationType.SUCCESS,
+                    3000
+                );
             }
         }
 
@@ -361,7 +367,7 @@ export default {
         {
             webSocketInstance.send(JSON.stringify({
                 "command": "save",
-                "uid": uuid.v4()
+                "uid": uuidv4()
             }));
             
             showFrames.value = false;
@@ -398,6 +404,7 @@ export default {
             notificationMessage,
             notificationIcon,
             notificationTimeout,
+            notificationType,
             showFrames,
             currentCalibFrameFirstSrc,
             currentCalibFrameSecondSrc,
@@ -603,25 +610,6 @@ button[disabled]{
     justify-content: space-between;
 }
 
-.message-wrapper {
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
-}
-
-.icon-wrapper {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    margin-bottom: 3%;
-}
-
-.text-wrapper {
-    font-size: 100%;
-    width: 95%;
-    text-align: center;
-}
 
 .backdrop {
     position: fixed;

@@ -58,19 +58,14 @@
         </base-dialog>
         <base-notification
             :show="showNotification"
-            height="15vh"
             :timeout="notificationTimeout"
+            :message="notificationMessage"
+            :icon="notificationIcon"
+            :notificationType="notificationType"
+            height="15vh"
+            color="#CCA152"
             @close="clearNotification"
-        >
-            <div class="message-wrapper">
-                <div class="icon-wrapper">
-                    <v-icon :name="notificationIcon" scale="2.5" animation="pulse"/>
-                </div>
-                <div class="text-wrapper">
-                    {{ notificationMessage }}
-                </div>
-            </div>
-        </base-notification>
+        />
     </div>
 </template>
 
@@ -78,7 +73,7 @@
 // Vue and utilities
 import { ref, computed, watch, onBeforeUnmount, onMounted } from 'vue';
 import { useStore } from 'vuex';
-import { uuid } from "vue3-uuid";
+import { v4 as uuidv4 } from "uuid";
 import * as fabric from 'fabric';
 
 // Component imports
@@ -102,7 +97,9 @@ import {
 } from '@/composables/useStore';
 import { api } from '@/utils/api';
 import { addErrorToStore, handleApiError } from '@/utils/errorHandler';
-import { createLogger } from '@/utils/logger';
+import { logger } from '@/utils/logger';
+import useNotification, { NotificationType } from '@/hooks/notifications';
+import { AlgorithmMessages, GeneralMessages } from '@/constants/notifications';
 
 export default {
     components: {
@@ -114,7 +111,6 @@ export default {
 
     setup() {
         // CENTRALIZED LOGGING
-        const logger = createLogger('AlgorithmDebug');
         logger.lifecycle('setup', 'Initializing AlgorithmDebug with centralized patterns');
 
         // CENTRALIZED STORE COMPOSABLES - All using modern patterns
@@ -165,24 +161,17 @@ export default {
         // CENTRALIZED WEBSOCKET MANAGEMENT
         let liveProcessSocket = null;
 
-        // CENTRALIZED NOTIFICATION SYSTEM (migrate from old hook)
-        const showNotification = ref(false);
-        const notificationMessage = ref('');
-        const notificationIcon = ref('');
-        const notificationTimeout = ref(3000);
-
-        const setNotification = (timeout, message, icon) => {
-            notificationTimeout.value = timeout || 3000;
-            notificationMessage.value = message || '';
-            notificationIcon.value = icon || 'info';
-            showNotification.value = true;
-        };
-
-        const clearNotification = () => {
-            showNotification.value = false;
-            notificationMessage.value = '';
-            notificationIcon.value = '';
-        };
+        // CENTRALIZED NOTIFICATION SYSTEM
+        const {
+            showNotification,
+            notificationMessage,
+            notificationIcon,
+            notificationTimeout,
+            notificationColor,
+            notificationType,
+            setTypedNotification,
+            clearNotification
+        } = useNotification();
 
         // CENTRALIZED COMPUTED PROPERTIES - Using centralized store composables
         const algorithms = computed(() => {
@@ -199,10 +188,7 @@ export default {
                 result = [];
             }
             
-            logger.debug('algorithms computed:', { 
-                count: result.length,
-                algorithms: result
-            });
+            // Algorithm computed - debug removed to reduce log spam
             
             return result;
         });
@@ -251,10 +237,7 @@ export default {
                 result = [];
             }
             
-            logger.debug('algorithmAttributes computed:', { 
-                count: result.length,
-                attributes: result 
-            });
+            // Algorithm attributes computed - debug removed to reduce log spam
             
             return result;
         });
@@ -423,7 +406,10 @@ export default {
             } catch (error) {
                 logger.error('Failed to load algorithm', error);
                 addErrorToStore(errorsStore, 'Algorithm Load Error', error);
-                setNotification(5000, `Failed to load algorithm: ${error.message}`, 'bi-exclamation-circle-fill');
+                setTypedNotification(
+                    error.message || AlgorithmMessages.LOAD_FAILED,
+                    NotificationType.ERROR
+                );
             }
         }
         
@@ -510,10 +496,7 @@ export default {
             // Extract only the type names for the dropdown
             const result = algorithms.map(alg => alg?.type).filter(type => type);
             
-            logger.debug('referenceAlgorithms computed:', { 
-                count: result.length,
-                types: result
-            });
+            // Reference algorithms computed - debug removed to reduce log spam
             
             return result;
         });
@@ -912,7 +895,11 @@ export default {
                     
                     if (response.ok) {
                         logger.info('Algorithm processed successfully via centralized API');
-                        setNotification(2000, 'Algorithm processed successfully', 'bi-check-circle-fill');
+                        setTypedNotification(
+                            AlgorithmMessages.EXECUTED,
+                            NotificationType.SUCCESS,
+                            2000
+                        );
                     } else {
                         throw new Error(`Algorithm processing failed: ${response.statusText}`);
                     }
@@ -920,7 +907,10 @@ export default {
             } catch (error) {
                 logger.error('Failed to process algorithm', error);
                 addErrorToStore(errorsStore, 'Algorithm Processing Error', error);
-                setNotification(5000, `Algorithm processing failed: ${error.message}`, 'bi-exclamation-circle-fill');
+                setTypedNotification(
+                    error.message || AlgorithmMessages.EXECUTION_FAILED,
+                    NotificationType.ERROR
+                );
             }
         }
 
@@ -953,7 +943,7 @@ export default {
                 }
 
                 let url = null;
-                let id = uuid.v4();
+                let id = uuidv4();
 
                 const baseUrl = await api.getBaseUrl();
                 const wsBaseUrl = baseUrl.replace('http', 'ws');
@@ -1015,11 +1005,15 @@ export default {
                 }).catch((err) => {
                     logger.error('Failed to process reference algorithm with camera', err);
                     errorsStore.addError({
-                        id: uuid.v4(),
+                        id: uuidv4(),
                         title: 'Reference Algorithm Debug Error',
                         description: err
                     });
-                    setNotification(3000, err, 'bi-exclamation-circle-fill');
+                    setTypedNotification(
+                        err || AlgorithmMessages.EXECUTION_FAILED,
+                        NotificationType.ERROR,
+                        3000
+                    );
                 });
             }
             else {
@@ -1028,11 +1022,15 @@ export default {
                 }).catch((err) => {
                     logger.error('Failed to process reference algorithm with static image', err);
                     errorsStore.addError({
-                        id: uuid.v4(),
+                        id: uuidv4(),
                         title: 'Reference Algorithm Debug Error',
                         description: err
                     });
-                    setNotification(3000, err, 'bi-exclamation-circle-fill');
+                    setTypedNotification(
+                        err || AlgorithmMessages.EXECUTION_FAILED,
+                        NotificationType.ERROR,
+                        3000
+                    );
                 });
             }
         }
@@ -1061,7 +1059,7 @@ export default {
             });
 
                 let url = null;
-                let id = uuid.v4();
+                let id = uuidv4();
 
                 const baseUrl = await api.getBaseUrl();
                 const wsBaseUrl = baseUrl.replace('http', 'ws');
@@ -1173,73 +1171,18 @@ export default {
             circleRefPoint.value = c;
         }
 
-        // COMPREHENSIVE ALGORITHM DEBUG FUNCTION
+        // Simplified algorithm debug function - comprehensive debug removed to reduce log spam
         async function debugAlgorithms() {
             try {
-                logger.debug('=== COMPREHENSIVE ALGORITHM DEBUG ===');
-                logger.debug('Debugging all algorithm types...');
-                
-                // Debug generic algorithms (from /algorithm/types)
-                const genericAlgorithms = algorithmsStore.algorithms.value;
-                logger.debug('=== GENERIC ALGORITHMS (/algorithm/types) ===');
-                logger.debug('Generic algorithms count:', Array.isArray(genericAlgorithms) ? genericAlgorithms.length : 'not an array');
-                logger.debug('Generic algorithms actual values:', Array.isArray(genericAlgorithms) ? genericAlgorithms : 'undefined or not array');
-                if (Array.isArray(genericAlgorithms) && genericAlgorithms.length > 0) {
-                    logger.debug('First generic algorithm:', {
-                        algorithm: genericAlgorithms[0],
-                        keys: Object.keys(genericAlgorithms[0]),
-                        type: genericAlgorithms[0].type,
-                        uid: genericAlgorithms[0].uid
-                    });
-                }
-                
-                // Debug configured algorithms (from /algorithm)
+                // Only log essential algorithm loading information
                 const configuredAlgorithms = algorithmsStore.configuredAlgorithms.value;
-                logger.debug('=== CONFIGURED ALGORITHMS (/algorithm) ===');
-                logger.debug('Configured algorithms count:', Array.isArray(configuredAlgorithms) ? configuredAlgorithms.length : 'not an array');
-                logger.debug('Configured algorithms actual values:', Array.isArray(configuredAlgorithms) ? configuredAlgorithms : 'undefined or not array');
-                if (configuredAlgorithms.length > 0) {
-                    logger.debug('First configured algorithm DETAILED:', {
-                        algorithm: configuredAlgorithms[0],
-                        keys: Object.keys(configuredAlgorithms[0]),
-                        uid: configuredAlgorithms[0].uid,
-                        type: configuredAlgorithms[0].type,
-                        name: configuredAlgorithms[0].name,
-                        parameters: configuredAlgorithms[0].parameters,
-                        stringified: JSON.stringify(configuredAlgorithms[0])
-                    });
-                    
-                    // Check all configured algorithms
-                    configuredAlgorithms.forEach((alg, index) => {
-                        logger.debug(`Configured algorithm ${index}:`, {
-                            uid: alg.uid,
-                            type: alg.type,
-                            name: alg.name,
-                            hasParameters: !!alg.parameters,
-                            parametersKeys: alg.parameters ? Object.keys(alg.parameters) : 'none'
-                        });
-                    });
+                const configurationsCount = Array.isArray(configuredAlgorithms) ? configuredAlgorithms.length : 0;
+                
+                if (configurationsCount > 0) {
+                    logger.info(`[ALGORITHM-DEBUG] Loaded ${configurationsCount} configured algorithms for current configuration`);
+                } else {
+                    logger.debug('No configured algorithms found for current configuration');
                 }
-                
-                // Debug reference algorithms
-                const referenceAlgorithms = algorithmsStore.referenceAlgorithms.value;
-                logger.debug('=== REFERENCE ALGORITHMS (/algorithm/reference/types) ===');
-                logger.debug('Reference algorithms count:', Array.isArray(referenceAlgorithms) ? referenceAlgorithms.length : 'not an array');
-                logger.debug('Reference algorithms structure:', referenceAlgorithms);
-                
-                // Compare what we're using in the UI
-                logger.debug('=== UI DATA SOURCES ===');
-                logger.debug('Using for dropdown:', algorithmsStore.configuredAlgorithms.value);
-                logger.debug('Current selected algorithm name:', currentAlgorithmName.value);
-                logger.debug('Current algorithm attributes:', algorithmsStore.algorithmAttributes.value);
-                logger.debug('Current algorithm parameters:', parameters.value);
-                
-                // Debug the current configuration
-                const currentConfig = configurationsStore.currentConfiguration.value;
-                logger.debug('=== CONFIGURATION DEBUG ===');
-                logger.debug('Current configuration:', currentConfig);
-                
-                logger.debug('=== END COMPREHENSIVE DEBUG ===');
                 
             } catch (error) {
                 logger.error('Failed to load algorithms:', error);
@@ -1333,7 +1276,7 @@ export default {
                 } catch (error) {
                     logger.error('Failed to auto-load configuration', error);
                     errorsStore.addError({
-                        id: uuid.v4(),
+                        id: uuidv4(),
                         title: 'Configuration Load Error',
                         description: error
                     });
@@ -1346,7 +1289,7 @@ export default {
                 } catch (error) {
                     logger.error('Failed to load image sources', error);
                     errorsStore.addError({
-                        id: uuid.v4(),
+                        id: uuidv4(),
                         title: 'Image Sources Load Error',
                         description: error
                     });
@@ -1405,6 +1348,7 @@ export default {
             notificationMessage,
             notificationIcon,
             notificationTimeout,
+            notificationType,
             showSelectReferenceDialog,
             referenceToSave,
             currentReferencePointIdx,
@@ -1412,7 +1356,6 @@ export default {
             hole,
             circleRefPoint,
             closeSelectReferenceDialog,
-            setNotification,
             clearNotification,
             referenceChanged,
             algorithmChanged,
@@ -1539,25 +1482,6 @@ button {
     height: 5.5vh;
 }
 
-.message-wrapper {
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
-}
-
-.icon-wrapper {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    margin-bottom: 3%;
-}
-
-.text-wrapper {
-    font-size: 100%;
-    width: 95%;
-    text-align: center;
-}
 
 .choices::-webkit-scrollbar {
     width: 10px;

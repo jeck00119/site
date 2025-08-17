@@ -46,19 +46,13 @@
         <base-notification
             :show="showNotification"
             :timeout="notificationTimeout"
+            :message="notificationMessage"
+            :icon="notificationIcon"
+            :notificationType="notificationType"
             height="15vh"
             color="#CCA152"
             @close="clearNotification"
-        >
-            <div class="message-wrapper">
-                <div class="icon-wrapper">
-                    <v-icon :name="notificationIcon" scale="2.5" animation="pulse"/>
-                </div>
-                <div class="text-wrapper">
-                    {{ notificationMessage }}
-                </div>
-            </div>
-        </base-notification>
+        />
     </div>
 </template>
 
@@ -66,7 +60,9 @@
 import { computed, nextTick, onMounted, onUnmounted, ref, toRef, watch } from 'vue';
 import { useImageSourcesStore, useConfigurationsStore } from '@/composables/useStore';
 import { ipAddress, port } from '../../../url.js';
-import useNotification from '../../../hooks/notifications';
+import useNotification, { NotificationType } from '../../../hooks/notifications';
+import { GeneralMessages } from '@/constants/notifications';
+import { logger } from '@/utils/logger';
 
 import ImageSourcesList from '../../image_sources/ImageSourcesList.vue';
 import ImageSourceSettings from '../../image_sources/ImageSourceSettings.vue';
@@ -88,8 +84,8 @@ export default{
         const imageSourcesStore = useImageSourcesStore();
         const configurationsStore = useConfigurationsStore();
 
-        const {showNotification, notificationMessage, notificationIcon, notificationTimeout, 
-            setNotification, clearNotification} = useNotification();
+        const {showNotification, notificationMessage, notificationIcon, notificationTimeout, notificationType,
+            setTypedNotification, clearNotification} = useNotification();
 
         const feedLocation = ref('');
 
@@ -111,33 +107,33 @@ export default{
 
         const sources = computed(() => {
             const result = imageSourcesStore.imageSources.value || [];
-            console.log('ImageSources - sources computed, result:', result);
+            logger.debug('ImageSources - sources computed', { result });
             return result;
         });
 
         // Debug reactive updates - moved after variable declarations
         watch(currentSourceType, (newValue, oldValue) => {
-            console.log('ImageSources - currentSourceType watcher fired - old:', oldValue, 'new:', newValue);
+            logger.debug('ImageSources - currentSourceType watcher fired', { oldValue, newValue });
         }, { immediate: true });
 
         // Also watch currentImageSource for debugging
         watch(currentImageSource, (newValue, oldValue) => {
-            console.log('ImageSources - currentImageSource watcher fired');
-            console.log('ImageSources - currentImageSource changed from:', oldValue);
-            console.log('ImageSources - currentImageSource changed to:', newValue);
+            logger.debug('ImageSources - currentImageSource watcher fired');
+            logger.debug('ImageSources - currentImageSource changed', { oldValue });
+            logger.debug('ImageSources - currentImageSource changed to', { newValue });
             if (newValue && newValue.image_source_type) {
-                console.log('ImageSources - newValue.image_source_type:', newValue.image_source_type);
+                logger.debug('ImageSources - newValue.image_source_type:', newValue.image_source_type);
             }
         }, { immediate: true });
 
         // Debug computed to trace template binding
         const debugCurrentSourceType = computed(() => {
-            console.log('ImageSources - debugCurrentSourceType computed - currentSourceType.value:', currentSourceType.value);
+            logger.debug('ImageSources - debugCurrentSourceType computed - currentSourceType.value:', currentSourceType.value);
             return currentSourceType.value;
         });
 
         function fpsChanged(newFps){
-            console.log('ImageSources - fpsChanged called with:', newFps);
+            logger.debug('ImageSources - fpsChanged called with:', newFps);
             imageSourcesStore.setCurrentImageSourceProp("fps", newFps);
 
             if(newFps != null && newFps != 0){
@@ -148,10 +144,10 @@ export default{
                     newFeedLocation = `ws://${ipAddress}:${port}/image_source/` + currentImageSource.value.uid + '/' +  currentImageSource.value.camera_uid + '/' + String(newFps) + `/ws`;
                 }
                 
-                console.log('ImageSources - updating feedLocation from:', feedLocation.value);
-                console.log('ImageSources - updating feedLocation to:', newFeedLocation);
+                logger.debug('ImageSources - updating feedLocation from:', feedLocation.value);
+                logger.debug('ImageSources - updating feedLocation to:', newFeedLocation);
                 feedLocation.value = newFeedLocation;
-                console.log('ImageSources - feedLocation.value is now:', feedLocation.value);
+                logger.debug('ImageSources - feedLocation.value is now:', feedLocation.value);
             }
         }
         
@@ -172,47 +168,47 @@ export default{
         }
 
         async function loadCurrentImageSource(id) {
-            console.log('loadCurrentImageSource called with id:', id);
+            logger.debug('loadCurrentImageSource called with id:', id);
             try{
                 if(id)
                 {
-                    console.log('Loading image source:', id);
+                    logger.debug('Loading image source:', id);
                     await imageSourcesStore.loadCurrentImageSource(id);
-                    console.log('Image source loaded, currentImageSource:', currentImageSource.value);
+                    logger.debug('Image source loaded, currentImageSource:', currentImageSource.value);
                     
                     // TEST: Add a simple log to see if we reach this point
-                    console.log('CHECKPOINT 1: Before getImageGeneratorById');
-                    console.log('ImageSources - image_generator_uid:', currentImageSource.value.image_generator_uid);
+                    logger.debug('CHECKPOINT 1: Before getImageGeneratorById');
+                    logger.debug('ImageSources - image_generator_uid:', currentImageSource.value.image_generator_uid);
                     
                     // Only try to get image generator if UID is not empty
                     let gen = null;
                     if (currentImageSource.value.image_generator_uid && currentImageSource.value.image_generator_uid !== '') {
                         try {
                             gen = imageSourcesStore.getImageGeneratorById(currentImageSource.value.image_generator_uid);
-                            console.log('ImageSources - found image generator:', gen);
+                            logger.debug('ImageSources - found image generator:', gen);
                         } catch (error) {
-                            console.error('ImageSources - error getting image generator:', error);
+                            logger.error('ImageSources - error getting image generator:', error);
                             gen = null;
                         }
                     } else {
-                        console.log('ImageSources - image_generator_uid is empty, skipping');
+                        logger.debug('ImageSources - image_generator_uid is empty, skipping');
                     }
                     imageSourcesStore.setCurrentImageGenerator(gen);
 
-                    console.log('CHECKPOINT 2: Before currentSourceType assignment');
-                    console.log('ImageSources - currentImageSource.value.image_source_type:', currentImageSource.value.image_source_type);
-                    console.log('ImageSources - currentSourceType.value before:', currentSourceType.value);
+                    logger.debug('CHECKPOINT 2: Before currentSourceType assignment');
+                    logger.debug('ImageSources - currentImageSource.value.image_source_type:', currentImageSource.value.image_source_type);
+                    logger.debug('ImageSources - currentSourceType.value before:', currentSourceType.value);
                     
                     currentSourceId.value = currentImageSource.value.uid;
-                    console.log('CHECKPOINT 3: After currentSourceId assignment');
+                    logger.debug('CHECKPOINT 3: After currentSourceId assignment');
                     
                     currentSourceType.value = currentImageSource.value.image_source_type;
-                    console.log('CHECKPOINT 4: After currentSourceType assignment');
-                    console.log('ImageSources - currentSourceType.value after:', currentSourceType.value);
+                    logger.debug('CHECKPOINT 4: After currentSourceType assignment');
+                    logger.debug('ImageSources - currentSourceType.value after:', currentSourceType.value);
                     
                     // Ensure Vue's reactivity system processes the change
                     await nextTick();
-                    console.log('CHECKPOINT 5: After nextTick, currentSourceType.value:', currentSourceType.value);
+                    logger.debug('CHECKPOINT 5: After nextTick, currentSourceType.value:', currentSourceType.value);
 
                     if(currentImageSource.value.image_source_type === "static"){
                         feedLocation.value = `ws://${ipAddress}:${port}/image_source/` + currentSourceId.value + '/' +  currentImageSource.value.image_generator_uid + '/' + currentImageSource.value.fps + `/ws`;
@@ -263,27 +259,43 @@ export default{
 
         function onSaveSrcStatus(status){
             if(status){
-                setNotification(3000, "Source saved successfully!", 'fc-ok');
+                setTypedNotification(
+                    'Source saved successfully!',
+                    NotificationType.SUCCESS,
+                    3000
+                );
             }else{
-                setNotification(3000, "Failed to save source!", 'bi-exclamation-circle-fill');
+                setTypedNotification(
+                    'Failed to save source!',
+                    NotificationType.ERROR,
+                    3000
+                );
             }
         }
 
         function onSaveSettingsStatus(status){
             if(status){
-                setNotification(3000, "Settings saved successfully!", 'fc-ok');
+                setTypedNotification(
+                    'Settings saved successfully!',
+                    NotificationType.SUCCESS,
+                    3000
+                );
             }else{
-                setNotification(3000, "Failed to save settings!", 'bi-exclamation-circle-fill');
+                setTypedNotification(
+                    'Failed to save settings!',
+                    NotificationType.ERROR,
+                    3000
+                );
             }
         }
 
         onMounted(async () => {
-            console.log('ImageSources - component mounted, loading image sources');
+            logger.debug('ImageSources - component mounted, loading image sources');
             try {
                 await imageSourcesStore.loadImageSources();
-                console.log('ImageSources - image sources loaded');
+                logger.debug('ImageSources - image sources loaded');
             } catch (error) {
-                console.error('ImageSources - error loading image sources:', error);
+                logger.error('ImageSources - error loading image sources:', error);
             }
         });
 
@@ -294,7 +306,7 @@ export default{
                 imageSourcesStore.setCurrentImageSource(null);
                 imageSourcesStore.setCurrentImageGenerator(null);
             } catch (error) {
-                console.warn('Error during ImageSources component unmounting:', error);
+                logger.warn('Error during ImageSources component unmounting:', error);
             }
         });
         
@@ -316,6 +328,7 @@ export default{
             notificationMessage,
             notificationIcon,
             notificationTimeout,
+            notificationType,
             changeCameraStatus,
             loadCurrentImageSource,
             deleteSource,
@@ -413,24 +426,5 @@ p{
     visibility:hidden;
 }
 
-.message-wrapper {
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
-}
-
-.icon-wrapper {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    margin-bottom: 3%;
-}
-
-.text-wrapper {
-    font-size: 100%;
-    width: 95%;
-    text-align: center;
-}
 
 </style>

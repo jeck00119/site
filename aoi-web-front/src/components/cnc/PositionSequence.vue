@@ -124,6 +124,8 @@ import { ref, computed, onMounted, watch, nextTick } from "vue";
 import { useCncStore } from '@/composables/useStore';
 import useDualPersistence from '@/composables/useDualPersistence';
 import useCncMovement from '@/composables/useCncMovement';
+import { logger } from '@/utils/logger';
+import { handleApiError } from '@/utils/errorHandler';
 
 export default {
   name: "PositionSequence",
@@ -235,7 +237,8 @@ export default {
         }
         
       } catch (error) {
-        console.error('[SEQUENCE] Error executing sequence:', error);
+        logger.error('[SEQUENCE] Error executing sequence:', error);
+        handleApiError(error, 'Failed to execute sequence');
         stopSequence();
       }
     }
@@ -292,7 +295,8 @@ export default {
       try {
         await cncStore.fetchLocations(props.axisUid);
       } catch (error) {
-        console.error("[SEQUENCE] Failed to fetch locations:", error);
+        logger.error("[SEQUENCE] Failed to fetch locations:", error);
+        handleApiError(error, 'Failed to fetch locations for sequence');
       }
     });
     

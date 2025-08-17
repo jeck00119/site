@@ -1,7 +1,8 @@
 import { ref, computed } from "vue";
-import { uuid } from "vue3-uuid";
+import { v4 as uuidv4 } from "uuid";
 import { useStore, useWebSocket, useAlgorithmsStore, useErrorsStore } from '@/composables/useStore';
 import { DEFAULT_IMAGE_DATA_URI_PREFIX, ImageDataUtils } from '@/utils/imageConstants';
+import { logger } from '@/utils/logger';
 
 import graphic from '../utils/graphics.js';
 
@@ -79,7 +80,7 @@ export default function useAlgorithms(algorithmUid: any, referenceUid: any, curr
         {
             outputImages = Array.isArray(result.frame) ? result.frame : [result.frame];
         }
-        console.log('DEBUG: outputImages computed:', outputImages.length, 'images');
+        logger.debug('outputImages computed:', { count: outputImages.length });
         return outputImages;
     });
 
@@ -228,7 +229,7 @@ export default function useAlgorithms(algorithmUid: any, referenceUid: any, curr
             type: moduleName
         }).catch((err: any) => {    
             store.dispatch("errors/addError", {
-                id: uuid.v4(),
+                id: uuidv4(),
                 title: "Component Run Error",
                 description: err
             });
@@ -252,7 +253,7 @@ export default function useAlgorithms(algorithmUid: any, referenceUid: any, curr
                 id: referenceUid
             });
 
-            let id = uuid.v4();
+            let id = uuidv4();
 
             let url = `ws://${ipAddress}:${port}/algorithm/live_algorithm_result/${currentImageSourceId}/${id}/ws`;
 

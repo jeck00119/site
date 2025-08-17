@@ -59,26 +59,23 @@
         </div>
         <base-notification
             :show="showNotification"
-            height="15vh"
             :timeout="notificationTimeout"
+            :message="notificationMessage"
+            :icon="notificationIcon"
+            :notificationType="notificationType"
+            height="15vh"
+            color="#CCA152"
             @close="clearNotification"
-        >
-            <div class="message-wrapper">
-                <div class="icon-wrapper">
-                    <v-icon :name="notificationIcon" scale="2.5" animation="float" />
-                </div>
-                <div class="text-wrapper">
-                    {{ notificationMessage }}
-                </div>
-            </div>
-        </base-notification>
+        />
     </div>
 </template>
 
 <script>
 import { ref, computed, onMounted } from 'vue';
 import { useLogStore } from '@/composables/useStore';
-import useNotification from '../../../hooks/notifications.js';
+import useNotification, { NotificationType } from '../../../hooks/notifications.js';
+import { GeneralMessages } from '@/constants/notifications';
+import { logger } from '@/utils/logger';
 
 import VueMultiselect from 'vue-multiselect';
 
@@ -101,8 +98,8 @@ export default {
             left: '0px',
         });
 
-        const {showNotification, notificationMessage, notificationIcon, notificationTimeout, 
-            setNotification, clearNotification} = useNotification();
+        const {showNotification, notificationMessage, notificationIcon, notificationTimeout, notificationType,
+            setTypedNotification, clearNotification} = useNotification();
         
         const logStore = useLogStore();
 
@@ -145,7 +142,11 @@ export default {
             try {
                 logStore.removeEvent(timestamp);
             }catch(err) {
-                setNotification(3000, err, 'bi-exclamation-circle-fill');
+                setTypedNotification(
+                    err || GeneralMessages.ERROR_OCCURRED,
+                    NotificationType.ERROR,
+                    3000
+                );
             }
         }
 
@@ -185,8 +186,12 @@ export default {
             try {
                 await logStore.loadEvents();
             } catch (error) {
-                console.error('Failed to load events:', error);
-                setNotification(3000, 'Failed to load events', 'bi-exclamation-circle-fill');
+                logger.error('Failed to load events', { error });
+                setTypedNotification(
+                    'Failed to load events',
+                    NotificationType.ERROR,
+                    3000
+                );
             }
         });
 
@@ -203,6 +208,7 @@ export default {
             notificationIcon,
             notificationMessage,
             notificationTimeout,
+            notificationType,
             removeEvent,
             showCurrentDetails,
             hideCurrentDetails,
@@ -355,25 +361,6 @@ ul {
     align-items: flex-start;
 }
 
-.message-wrapper {
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
-}
-
-.icon-wrapper {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    margin-bottom: 3%;
-}
-
-.text-wrapper {
-    font-size: 100%;
-    width: 95%;
-    text-align: center;
-}
 </style>
 
 <!-- <style>

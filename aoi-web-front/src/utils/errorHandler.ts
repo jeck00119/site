@@ -4,7 +4,7 @@
  * Provides consistent error processing following existing codebase patterns
  */
 
-import { uuid } from "vue3-uuid";
+import { v4 as uuidv4 } from "uuid";
 import type { Store } from "vuex";
 
 interface ErrorDetails {
@@ -79,18 +79,27 @@ export function createStandardError(
  * @param store - Vuex store instance
  * @param title - Error title
  * @param error - Error message or Error object
+ * @param type - Error type (error, warning, info)
  */
 export function addErrorToStore(
     store: Store<any>,
     title: string,
-    error: string | Error
+    error: string | Error,
+    type: 'error' | 'warning' | 'info' = 'error'
 ): void {
     const errorMessage = error instanceof Error ? error.message : error;
+    const fullMessage = title ? `${title}: ${errorMessage}` : errorMessage;
     
     store.dispatch("errors/addError", {
-        id: uuid.v4(),
-        title: title,
-        description: errorMessage
+        id: uuidv4(),
+        message: fullMessage,
+        type: type,
+        timestamp: Date.now(),
+        details: error instanceof Error ? { 
+            name: error.name, 
+            stack: error.stack,
+            statusCode: (error as any).statusCode 
+        } : { originalTitle: title }
     });
 }
 

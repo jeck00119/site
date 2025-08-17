@@ -11,7 +11,7 @@ if not exist "venv" (
     echo [SETUP] First time setup detected...
     echo [SETUP] Running initial configuration...
     echo.
-    call python setup.py
+    python setup.py
     if errorlevel 1 (
         echo [ERROR] Setup failed! Please check the errors above.
         echo.
@@ -27,7 +27,7 @@ if not exist "aoi-web-front\node_modules" (
     echo [SETUP] Installing frontend dependencies...
     echo.
     cd aoi-web-front
-    call npm install
+    npm install
     if errorlevel 1 (
         echo [ERROR] Failed to install frontend dependencies!
         cd ..

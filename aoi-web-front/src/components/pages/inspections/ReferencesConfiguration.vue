@@ -94,16 +94,16 @@
         <div class="results-container" v-else>
             <json-data-container width="auto" height="29vh" :data="data" @closed="showResults = false"></json-data-container>
         </div>
-        <base-notification :show="showNotification" :timeout="5000" height="15vh">
-            <div class="message-wrapper">
-                <div class="icon-wrapper">
-                    <v-icon :name="notificationIcon" scale="2.5" animation="float" />
-                </div>
-                <div class="text-wrapper">
-                    {{ notificationMessage }}
-                </div>
-            </div>
-        </base-notification>
+        <base-notification
+            :show="showNotification"
+            :timeout="notificationTimeout"
+            :message="notificationMessage"
+            :icon="notificationIcon"
+            :notificationType="notificationType"
+            height="15vh"
+            color="#CCA152"
+            @close="clearNotification"
+        />
         <base-dialog
             :show="showSelectReferenceDialog"
             title="Multiple potential references found. Choose one."
@@ -136,8 +136,8 @@ import { useStore } from 'vuex';
 import { useConfigurationsStore, useAlgorithmsStore, useComponentsStore, useGraphicsStore, useAuthStore, useLogStore } from '@/composables/useStore';
 // // import { useAuthStore } from '../../../hooks/auth.js';
 // // import { useLogStore } from '../../../hooks/log.js';
-import { uuid } from "vue3-uuid";
-import { createLogger } from '@/utils/logger';
+import { v4 as uuidv4 } from "uuid";
+import { logger } from '@/utils/logger';
 
 import graphic from '../../../utils/graphics.js';
 
@@ -148,7 +148,8 @@ import AlgorithmResultTable from '../../layout/AlgorithmResultTable.vue';
 import MaskScene from '../../layout/MaskScene.vue';
 import JsonDataContainer from '../../layout/JsonDataRenderer.vue';
 import { ipAddress, port } from '../../../url';
-import useNotification from '../../../hooks/notifications.ts';
+import useNotification, { NotificationType } from '../../../hooks/notifications.ts';
+import { ComponentMessages, ConfigurationMessages, GeneralMessages } from '@/constants/notifications';
 import { useWebSocket } from '@/composables/useStore';
 import { DEFAULT_IMAGE_DATA_URI_PREFIX, ImageDataUtils } from '../../../utils/imageConstants';
 
@@ -163,7 +164,6 @@ export default{
     },
 
     setup() {
-        const logger = createLogger('ReferencesConfiguration');
         const moduleName = 'reference';
 
         const showMasks = ref(false);
@@ -202,8 +202,8 @@ export default{
         // WebSocket state
         let liveProcessSocketInstance = null;
 
-        const {showNotification, notificationMessage, notificationIcon, notificationTimeout, 
-            setNotification, clearNotification} = useNotification();
+        const {showNotification, notificationMessage, notificationIcon, notificationTimeout, notificationType,
+            setTypedNotification, clearNotification} = useNotification();
 
         const store = useStore();
         const algorithmsStore = useAlgorithmsStore();
@@ -428,7 +428,11 @@ export default{
             }
             catch(err) {
                 logger.error('Failed to load reference component', err);
-                setNotification(3000, "Error while trying to load component.", 'bi-exclamation-circle-fill');
+                setTypedNotification(
+                    ComponentMessages.LOAD_FAILED,
+                    NotificationType.ERROR,
+                    3000
+                );
             }
         };
 
@@ -440,7 +444,11 @@ export default{
                 });
                 currentComponent.value = null;
             }catch(err) {
-                setNotification(3000, "Error while trying to remove component.", 'bi-exclamation-circle-fill');
+                setTypedNotification(
+                    ComponentMessages.REMOVE_FAILED,
+                    NotificationType.ERROR,
+                    3000
+                );
             }
         }
 
@@ -465,7 +473,11 @@ export default{
                     description: `New ` + moduleName +  ` added: ${name}`
                 });
             }catch(err) {
-                setNotification(3000, "Error while trying to add component.", 'bi-exclamation-circle-fill');
+                setTypedNotification(
+                    ComponentMessages.ADD_FAILED,
+                    NotificationType.ERROR,
+                    3000
+                );
             }
         }
 
@@ -497,7 +509,11 @@ export default{
                     type: moduleName
                 });
             }catch(err) {
-                setNotification(3000, err, 'bi-exclamation-circle-fill');
+                setTypedNotification(
+                    err || ComponentMessages.UPDATE_FAILED,
+                    NotificationType.ERROR,
+                    3000
+                );
             }
         }
 
@@ -521,7 +537,7 @@ export default{
                     value: currentReferencePointIdx.value
                 });
 
-                let id = uuid.v4();
+                let id = uuidv4();
                 let url = `ws://${ipAddress}:${port}/algorithm/live_reference/${currentImageSourceId.value}/${id}/ws`;
 
                 liveProcessSocketInstance = useWebSocket(url, {
@@ -744,9 +760,17 @@ export default{
                             description: `${currentComponent.value.name} was modified.`
                         });
 
-                        setNotification(3000, "Configuration saved.", 'fc-ok');
+                        setTypedNotification(
+                            ConfigurationMessages.SAVED,
+                            NotificationType.SUCCESS,
+                            3000
+                        );
                     }).catch(() => {
-                        setNotification(3000, "Error while trying to save component.", 'bi-exclamation-circle-fill');
+                        setTypedNotification(
+                            ComponentMessages.UPDATE_FAILED,
+                            NotificationType.ERROR,
+                            3000
+                        );
                     });
                 }
                 else
@@ -759,13 +783,25 @@ export default{
                             description: `${currentComponent.value.name} was modified.`
                         });
 
-                        setNotification(3000, "Configuration saved.", 'fc-ok');
+                        setTypedNotification(
+                            ConfigurationMessages.SAVED,
+                            NotificationType.SUCCESS,
+                            3000
+                        );
                     }).catch(() => {
-                        setNotification(3000, "Error while trying to save component.", 'bi-exclamation-circle-fill');
+                        setTypedNotification(
+                            ComponentMessages.UPDATE_FAILED,
+                            NotificationType.ERROR,
+                            3000
+                        );
                     });
                 }
             }).catch(() => {
-                setNotification(3000, "Error while trying to save component.", 'bi-exclamation-circle-fill');
+                setTypedNotification(
+                    ComponentMessages.UPDATE_FAILED,
+                    NotificationType.ERROR,
+                    3000
+                );
             });
         }
 
@@ -902,6 +938,7 @@ export default{
             notificationIcon,
             notificationMessage,
             notificationTimeout,
+            notificationType,
             showSelectReferenceDialog,
             referenceToSave,
             currentReferencePointIdx,

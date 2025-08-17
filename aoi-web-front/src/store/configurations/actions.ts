@@ -1,4 +1,4 @@
-import { uuid } from "vue3-uuid";
+import { v4 as uuidv4 } from "uuid";
 import { get, post, update, remove } from "../../utils/requests";
 import { ipAddress, port } from "../../url";
 
@@ -74,7 +74,7 @@ export default {
     },
 
     async addConfiguration(context, payload) {
-        payload.uid = uuid.v4();
+        payload.uid = uuidv4();
 
         const token = context.rootGetters["auth/getToken"] || sessionStorage.getItem('auth-token');
 
@@ -95,7 +95,7 @@ export default {
     },
 
     async copyConfiguration(context, payload) {
-        payload.config.uid = uuid.v4();
+        payload.config.uid = uuidv4();
 
         const token = context.rootGetters["auth/getToken"] || sessionStorage.getItem('auth-token');
 

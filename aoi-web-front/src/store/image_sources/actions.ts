@@ -1,6 +1,7 @@
 import { ipAddress, port } from "../../url";
-import { uuid } from "vue3-uuid";
+import { v4 as uuidv4 } from "uuid";
 import { get, post, update, remove, upload_image } from "../../utils/requests";
+import { logger } from "../../utils/logger";
 
 
 export default {
@@ -41,9 +42,9 @@ export default {
     },
 
     async loadCurrentImageSource(context, payload) {
-        console.log('Store loadCurrentImageSource called with payload:', payload);
+        logger.debug('Store loadCurrentImageSource called', { payload });
         const { response, responseData } = await get(`http://${ipAddress}:${port}/image_source/${payload.uid}`);
-        console.log('API response:', response.status, responseData);
+        logger.debug('API response received', { status: response.status, responseData });
 
         if(!response.ok)
         {
@@ -52,7 +53,7 @@ export default {
         }
         else
         {
-            console.log('Setting current image source:', responseData);
+            logger.debug('Setting current image source', { responseData });
             // Handle both wrapped ({message: data}) and direct object responses
             const sourceData = responseData.message || responseData;
             
@@ -68,7 +69,7 @@ export default {
         const newSource = {
             name: payload.name,
             image_source_type: payload.type,
-            uid: uuid.v4(),
+            uid: uuidv4(),
             camera_settings_uid: '',
             camera_uid: '',
             image_generator_uid: '',
@@ -149,7 +150,7 @@ export default {
     async addImageGenerator(context){
 
         const newGenerator = {
-            uid: uuid.v4(),
+            uid: uuidv4(),
             dir_path: ""
         }
 

@@ -5,6 +5,7 @@
 
 import { ref } from 'vue';
 import { useCncStore } from '@/composables/useStore';
+import { logger } from '@/utils/logger';
 
 interface Position {
   x: number;
@@ -51,7 +52,7 @@ export function useCncMovement(axisUid: string) {
       const checkIdle = () => {
         // Check if we've exceeded the timeout
         if (Date.now() - startTime > timeoutMs) {
-          console.warn('[CNC-MOVEMENT] Timeout waiting for CNC to become idle, continuing anyway');
+          logger.warn('[CNC-MOVEMENT] Timeout waiting for CNC to become idle, continuing anyway');
           resolve(); // Continue instead of rejecting to avoid stopping operations
           return;
         }
@@ -127,7 +128,7 @@ export function useCncMovement(axisUid: string) {
       // Calculate movement deltas
       const { deltaX, deltaY, deltaZ } = calculateMovementDeltas(currentPos, targetLocation);
 
-      console.log(`[CNC-MOVEMENT] Moving to ${targetLocation.name || 'position'}:`, {
+      logger.info(`[CNC-MOVEMENT] Moving to ${targetLocation.name || 'position'}`, {
         from: currentPos,
         to: { x: targetLocation.x, y: targetLocation.y, z: targetLocation.z },
         deltas: { deltaX, deltaY, deltaZ },
@@ -159,10 +160,10 @@ export function useCncMovement(axisUid: string) {
         }
       }
 
-      console.log(`[CNC-MOVEMENT] Successfully moved to ${targetLocation.name || 'position'}`);
+      logger.info(`[CNC-MOVEMENT] Successfully moved to ${targetLocation.name || 'position'}`);
     } catch (err) {
       const errorMessage = `Error moving to position ${targetLocation.name || 'unknown'}: ${err}`;
-      console.error('[CNC-MOVEMENT]', errorMessage);
+      logger.error('[CNC-MOVEMENT]', errorMessage);
       error.value = errorMessage;
       throw new Error(errorMessage);
     } finally {
@@ -184,7 +185,7 @@ export function useCncMovement(axisUid: string) {
     try {
       for (let i = 0; i < positions.length; i++) {
         const position = positions[i];
-        console.log(`[CNC-MOVEMENT] Executing sequence step ${i + 1}/${positions.length}:`, position.name);
+        logger.info(`[CNC-MOVEMENT] Executing sequence step ${i + 1}/${positions.length}`, { position: position.name });
         
         await executeMovementToPosition(position, options);
         
@@ -194,9 +195,9 @@ export function useCncMovement(axisUid: string) {
         }
       }
       
-      console.log('[CNC-MOVEMENT] Sequence completed successfully');
+      logger.info('[CNC-MOVEMENT] Sequence completed successfully');
     } catch (err) {
-      console.error('[CNC-MOVEMENT] Sequence execution failed:', err);
+      logger.error('[CNC-MOVEMENT] Sequence execution failed', err);
       throw err;
     }
   };
@@ -223,9 +224,9 @@ export function useCncMovement(axisUid: string) {
     try {
       await cncStore.abort({ cncUid: axisUid });
       isMoving.value = false;
-      console.log('[CNC-MOVEMENT] Emergency stop executed');
+      logger.info('[CNC-MOVEMENT] Emergency stop executed');
     } catch (err) {
-      console.error('[CNC-MOVEMENT] Failed to execute emergency stop:', err);
+      logger.error('[CNC-MOVEMENT] Failed to execute emergency stop', err);
       throw err;
     }
   };

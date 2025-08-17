@@ -7,6 +7,7 @@
 
 import { computed, ref, watch } from 'vue';
 import { useStore as useVuexStore } from 'vuex';
+import { logger } from '@/utils/logger';
 
 /**
  * Base store composable with common functionality
@@ -74,7 +75,7 @@ export function useCncStore(axisUid = null) {
   
   // Additional CNC management actions
   const loadCNCs = () => {
-    console.log('CNC Composable: loadCNCs called, dispatching to store');
+    logger.debug('CNC Composable: loadCNCs called, dispatching to store');
     return dispatch('cnc/loadCNCs', {});
   };
   const loadCNCTypes = () => dispatch('cnc/loadCNCTypes', {});
@@ -549,6 +550,7 @@ export function useAlgorithmsStore() {
     updateCurrentBasicAlgorithmAttributes: (payload) => dispatch('algorithms/updateCurrentBasicAlgorithmAttributes', payload),
     updateCurrentAlgorithmAttributes: (payload) => dispatch('algorithms/updateCurrentAlgorithmAttributes', payload),
     updateCurrentReferenceAlgorithmAttributes: (payload) => dispatch('algorithms/updateCurrentReferenceAlgorithmAttributes', payload),
+    updateCurrentAlgorithmGraphics: (data) => dispatch('algorithms/updateCurrentAlgorithmGraphics', data),
     uploadResource: (formData) => dispatch('algorithms/uploadResource', formData),
     
     // Reset actions
@@ -575,19 +577,19 @@ export function useComponentsStore() {
   return {
     components, currentComponent, references,
     loadComponents: (payload) => {
-      console.log('useComponentsStore.loadComponents called with payload:', payload);
-      console.log('Store modules available:', Object.keys(store.state));
-      console.log('Components module exists:', !!store.state.components);
+      logger.debug('useComponentsStore.loadComponents called', { payload });
+      logger.debug('Store modules available', { modules: Object.keys(store.state) });
+      logger.debug('Components module exists', { exists: !!store.state.components });
       try {
         return dispatch('components/loadComponents', payload).then(result => {
-          console.log('useComponentsStore.loadComponents dispatch completed for:', payload.type);
+          logger.debug('useComponentsStore.loadComponents dispatch completed', { type: payload.type });
           return result;
         }).catch(error => {
-          console.error('useComponentsStore.loadComponents dispatch failed for:', payload.type, error);
+          logger.error('useComponentsStore.loadComponents dispatch failed', { type: payload.type, error });
           throw error;
         });
       } catch (syncError) {
-        console.error('useComponentsStore.loadComponents synchronous error:', syncError);
+        logger.error('useComponentsStore.loadComponents synchronous error', syncError);
         throw syncError;
       }
     },

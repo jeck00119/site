@@ -92,7 +92,7 @@
 import { ref, computed } from 'vue';
 import { useAlgorithmsStore } from '@/composables/useStore';
 
-import { uuid } from "vue3-uuid";
+import { v4 as uuidv4 } from "uuid";
 
 export default {
     props: ['type', 'algorithmIdx' ,'algorithmAttributes', 'parameters', 'height'],
@@ -208,7 +208,7 @@ export default {
             getParameterDisplayName,
             updateValue,
             filesDropped,
-            generateID: uuid.v4()
+            generateID: uuidv4()
         }
     }
 }

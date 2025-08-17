@@ -171,6 +171,7 @@ import { ref, computed, watch, toRef } from 'vue';
 import { useImageSourcesStore } from '@/composables/useStore';
 
 import AlgorithmParameters from '../layout/AlgorithmParameters.vue';
+import { logger } from '@/utils/logger';
 
 export default {
     components: {
@@ -187,7 +188,7 @@ export default {
 
         // Debug: Log availableAlgorithms prop changes
         watch(() => props.availableAlgorithms, (newValue) => {
-            console.log('ComponentControl - availableAlgorithms changed:', {
+            logger.debug('ComponentControl - availableAlgorithms changed', {
                 length: newValue?.length || 0,
                 algorithms: newValue
             });

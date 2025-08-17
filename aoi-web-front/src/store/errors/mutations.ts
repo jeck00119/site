@@ -10,5 +10,9 @@ export default {
 
     addError(state: ErrorsState, payload: ErrorItem): void {
         state.errors.push(payload);
+    },
+
+    clearAllErrors(state: ErrorsState): void {
+        state.errors = [];
     }
 };

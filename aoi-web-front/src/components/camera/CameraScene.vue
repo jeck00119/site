@@ -10,7 +10,7 @@ import { ref, watch, onMounted, toRef, onUnmounted, onBeforeUnmount, nextTick } 
 
 import { useWebSocket, useFabricCanvas, useGraphicsStore, useErrorsStore, useImageSourcesStore } from '@/composables/useStore';
 import { DEFAULT_IMAGE_DATA_URI_PREFIX, ImageDataUtils } from '@/utils/imageConstants';
-import { createLogger } from '@/utils/logger';
+import { logger } from '@/utils/logger';
 import { addErrorToStore } from '@/utils/errorHandler';
 import { canvasRegistry } from '@/utils/canvasRegistry';
 
@@ -23,7 +23,6 @@ export default {
         const imageSource = ref(null);
         const canvasContainer = ref(null);
         const canvasElement = ref(null);
-        const logger = createLogger('CameraScene');
         const { setCanvas } = useGraphicsStore();
         const { addError } = useErrorsStore();
         const { dispatch: dispatchImageSources, store } = useImageSourcesStore();

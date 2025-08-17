@@ -77,29 +77,25 @@
         <base-notification
             :show="showNotification"
             :timeout="notificationTimeout"
+            :message="notificationMessage"
+            :icon="notificationIcon"
+            :notificationType="notificationType"
             height="15vh"
             color="#CCA152"
             @close="clearNotification"
-        >
-            <div class="message-wrapper">
-                <div class="icon-wrapper">
-                    <v-icon :name="notificationIcon" scale="2.5" animation="spin"/>
-                </div>
-                <div class="text-wrapper">
-                    {{ notificationMessage }}
-                </div>
-            </div>
-        </base-notification>
+        />
     </div>
 </template>
 
 <script>
 import VueMultiselect from 'vue-multiselect';
 
-import useNotification from '../../../hooks/notifications';
+import useNotification, { NotificationType } from '../../../hooks/notifications';
+import { CameraMessages, GeneralMessages } from '@/constants/notifications';
 import { ref, onMounted, onUnmounted, computed, watch } from 'vue';
 import { useCameraCalibrationStore, useImageSourcesStore } from '@/composables/useStore';
-import { uuid } from 'vue3-uuid';
+import { logger } from '@/utils/logger';
+import { v4 as uuidv4 } from "uuid";
 
 import CameraScene from '../../camera/CameraScene.vue';
 import { ipAddress, port } from '../../../url';
@@ -142,8 +138,8 @@ export default {
         let wsUid = null;
         let webSocketInstance = null;
 
-        const {showNotification, notificationMessage, notificationIcon, notificationTimeout, 
-            setNotification, clearNotification} = useNotification();
+        const {showNotification, notificationMessage, notificationIcon, notificationTimeout, notificationType,
+            setTypedNotification, clearNotification} = useNotification();
 
         // These are already computed refs from the composables
 
@@ -174,7 +170,7 @@ export default {
                 
                 feedLocation.value = wsUrl;
                 showCamera.value = true;
-                console.log('CameraCalibration - WebSocket URL with FPS:', wsUrl, 'FPS:', fps);
+                logger.debug('CameraCalibration - WebSocket URL with FPS:', wsUrl, 'FPS:', fps);
             }
             else
             {
@@ -198,7 +194,7 @@ export default {
             return imageSource?.fps;
         }, (newFps, oldFps) => {
             if (newFps !== oldFps && newFps != null && currentImageSource.value) {
-                console.log('CameraCalibration - FPS changed, updating WebSocket URL', { newFps, oldFps });
+                logger.debug('CameraCalibration - FPS changed, updating WebSocket URL', { newFps, oldFps });
                 // Trigger the currentImageSource watcher to update the WebSocket URL
                 const imageSource = imageSources.value.find(imageSource => imageSource.name === currentImageSource.value);
                 if (imageSource) {
@@ -214,7 +210,7 @@ export default {
                     }
                     
                     feedLocation.value = wsUrl;
-                    console.log('CameraCalibration - Updated WebSocket URL for FPS change:', wsUrl);
+                    logger.debug('CameraCalibration - Updated WebSocket URL for FPS change:', wsUrl);
                 }
             }
         });
@@ -252,7 +248,10 @@ export default {
                         webSocketInstance.send(JSON.stringify({
                             command: "calibrate"
                         }));
-                        setNotification(null, 'Calibrating...', 'fa-cog');
+                        setTypedNotification(
+                            CameraMessages.CALIBRATING,
+                            NotificationType.LOADING
+                        );
                         clearInterval(timer);
                     }
                 }
@@ -261,7 +260,7 @@ export default {
 
         function connectToWs() 
         {
-            wsUid = uuid.v4();
+            wsUid = uuidv4();
             const imageSource = imageSources.value.find(imageSource => imageSource.name === currentImageSource.value);
             const wsUrl = `ws://${ipAddress}:${port}/camera_calibration/${imageSource.uid}/ws/${wsUid}`;
             
@@ -304,7 +303,11 @@ export default {
             else if(data.details === "calibError")
             {
                 clearNotification();
-                setNotification(3000, "Calibration failed. Please try again.", 'bi-exclamation-circle-fill');
+                setTypedNotification(
+                    CameraMessages.CALIBRATION_FAILED,
+                    NotificationType.ERROR,
+                    3000
+                );
                 showFrames.value = true;
                 currentImageIdx.value = 0;
 
@@ -333,7 +336,7 @@ export default {
         {
             webSocketInstance.send(JSON.stringify({
                 "command": "save",
-                "uid": uuid.v4()
+                "uid": uuidv4()
             }));
             webSocketInstance.send(JSON.stringify({
                 "command": "stop",
@@ -374,6 +377,7 @@ export default {
             notificationMessage,
             notificationIcon,
             notificationTimeout,
+            notificationType,
             showFrames,
             currentCalibFrameSrc,
             currentRMSE,
@@ -572,25 +576,6 @@ button[disabled]{
     width: 70%;
 }
 
-.message-wrapper {
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
-}
-
-.icon-wrapper {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    margin-bottom: 3%;
-}
-
-.text-wrapper {
-    font-size: 100%;
-    width: 95%;
-    text-align: center;
-}
 
 .backdrop {
     position: fixed;

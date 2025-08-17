@@ -130,6 +130,7 @@
 <script>
 import { ref, watch, computed, onMounted } from 'vue';
 import { useRobotsStore, useComponentsStore, useConfigurationsStore, useImageSourcesStore } from '@/composables/useStore';
+import { logger } from '@/utils/logger';
 
 import CameraScene from '../../camera/CameraScene.vue';
 import VueMultiselect from 'vue-multiselect';
@@ -226,7 +227,7 @@ export default {
                 
                 feedLocation.value = wsUrl;
                 showCamera.value = true;
-                console.log('RobotControl - WebSocket URL with FPS:', wsUrl, 'FPS:', fps);
+                logger.debug('RobotControl - WebSocket URL with FPS:', wsUrl, 'FPS:', fps);
             }
             else
             {
@@ -237,7 +238,7 @@ export default {
         // Watch for FPS changes in the current image source to trigger WebSocket reconnection
         watch(() => currentImageSource.value?.fps, (newFps, oldFps) => {
             if (newFps !== oldFps && newFps != null && currentImageSource.value) {
-                console.log('RobotControl - FPS changed, updating WebSocket URL', { newFps, oldFps });
+                logger.debug('RobotControl - FPS changed, updating WebSocket URL', { newFps, oldFps });
                 
                 const fps = newFps;
                 let wsUrl;
@@ -251,7 +252,7 @@ export default {
                 }
                 
                 feedLocation.value = wsUrl;
-                console.log('RobotControl - Updated WebSocket URL for FPS change:', wsUrl);
+                logger.debug('RobotControl - Updated WebSocket URL for FPS change:', wsUrl);
             }
         });
 

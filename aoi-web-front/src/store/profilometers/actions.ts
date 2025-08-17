@@ -1,4 +1,4 @@
-import { uuid } from "vue3-uuid";
+import { v4 as uuidv4 } from "uuid";
 import { get, post } from "../../utils/requests";
 import { ipAddress, port } from "../../url";
 
@@ -41,7 +41,7 @@ export default {
 
     addProfilometer(context, payload) {
         const profilometer = {
-            uid: uuid.v4(),
+            uid: uuidv4(),
             name: payload.name,
             type: payload.type,
             id: payload.id,

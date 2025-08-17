@@ -1,3 +1,5 @@
+import logger from './logger';
+
 // Type definitions for HTTP requests
 type Headers = Record<string, string>;
 
@@ -34,8 +36,8 @@ function handle401Unauthorized(url: string) {
         return false; // Let the auth flow handle these
     }
     
-    console.warn('401 Unauthorized for URL:', url);
-    console.warn('Token expired or invalid, logging out automatically');
+    logger.warn('401 Unauthorized for URL', { url });
+    logger.warn('Token expired or invalid, logging out automatically');
     
     // Clear session immediately
     sessionStorage.removeItem('auth-token');
@@ -140,7 +142,7 @@ async function postStream<T = any>(url: string, payload?: any, headers?: Headers
 
         return handleResponse<T>(response, url);
     } catch (error) {
-        console.error('PostStream request failed:', error);
+        logger.error('PostStream request failed', error);
         throw error;
     }
 }

@@ -33,7 +33,7 @@ export default defineConfig(() => {
             'vendor-vue': ['vue', 'vue-router', 'vuex'],
             'vendor-ui': ['@coreui/vue', '@fortawesome/fontawesome-svg-core', '@fortawesome/free-solid-svg-icons', '@fortawesome/vue-fontawesome'],
             'vendor-icons': ['oh-vue-icons'],
-            'vendor-utils': ['vue3-uuid', '@imengyu/vue3-context-menu', 'exceljs', 'fabric'],
+            'vendor-utils': ['uuid', '@imengyu/vue3-context-menu', 'exceljs', 'fabric'],
             
             // Application modules
             'cnc-module': [

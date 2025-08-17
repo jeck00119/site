@@ -10,7 +10,7 @@
 <script>
 import { ref, computed } from 'vue';
 import { useErrorsStore } from '@/composables/useStore';
-import { createLogger } from '@/utils/logger';
+import { logger } from '@/utils/logger';
 
 import TheErrorList from './TheErrorList.vue';
 
@@ -20,7 +20,6 @@ export default {
     },
 
     setup() {
-        const logger = createLogger('TheErrorListButton');
         
         // Use centralized errors store composable
         const { errors, hasErrors } = useErrorsStore();
@@ -38,7 +37,7 @@ export default {
             listVisible.value = false;
         }
         
-        logger.lifecycle('mounted', 'TheErrorListButton component mounted');
+        // Component mounted - debug removed to reduce log spam
 
         return {
             listVisible,

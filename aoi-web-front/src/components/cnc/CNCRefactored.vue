@@ -130,6 +130,8 @@ import { ref, onMounted, onUnmounted, computed } from "vue";
 import { useRouter } from "vue-router";
 import api from "../../utils/api.js";
 import { useCncStore, useWebSocket, useLoadingState } from '@/composables/useStore';
+import { logger } from '@/utils/logger';
+import { handleApiError, addErrorToStore } from '@/utils/errorHandler';
 
 
 // Import child components
@@ -201,7 +203,7 @@ export default {
       try {
         cleanup();
       } catch (error) {
-        console.warn('Error during CNCRefactored component unmounting:', error);
+        logger.warn('Error during CNCRefactored component unmounting:', error);
       }
     });
 
@@ -217,7 +219,8 @@ export default {
         await cncStore.dispatch('cnc/fetchLocations', props.axisUid);
 
       } catch (error) {
-        console.error("Failed to initialize CNC component:", error);
+        logger.error("Failed to initialize CNC component:", error);
+        handleApiError(error, 'Failed to initialize CNC component');
       }
     }
 
@@ -241,7 +244,8 @@ export default {
         });
 
       } catch (error) {
-        console.error("Failed to connect to WebSocket:", error);
+        logger.error("Failed to connect to WebSocket:", error);
+        handleApiError(error, 'Failed to connect to WebSocket');
         webSocketState.value = "Error";
       }
     }
@@ -265,7 +269,7 @@ export default {
         }
 
       } catch (error) {
-        console.error("Error during WebSocket cleanup:", error);
+        logger.error("Error during WebSocket cleanup:", error);
       }
     }
 
@@ -273,7 +277,7 @@ export default {
     function onCncSocketOpen() {
       // WebSocket is connected, but hardware might not be
       // Don't set state to "Connected" here - wait for hardware confirmation
-      console.log("WebSocket connection opened for CNC:", props.axisUid);
+      logger.info("WebSocket connection opened for CNC:", props.axisUid);
       if (socketInstance) {
         socketInstance.send("eses");
       }
@@ -292,7 +296,7 @@ export default {
         const msg = JSON.parse(event.data);
         handleSingleMessage(msg);
       } catch (error) {
-        console.error("Failed to parse WebSocket message:", error);
+        logger.error("Failed to parse WebSocket message:", error);
       }
     }
 
@@ -337,7 +341,7 @@ export default {
           break;
 
         default:
-          console.log("Unhandled WebSocket message:", msg);
+          logger.debug("Unhandled WebSocket message:", msg);
       }
     }
 
@@ -406,7 +410,7 @@ export default {
     }
 
     function onAxisMoved(data) {
-      console.log(`Axis ${data.axis} moved ${data.direction} by ${data.step}`);
+      logger.debug(`Axis ${data.axis} moved ${data.direction} by ${data.step}`);
     }
 
     function onCommandExecuted(data) {
@@ -422,7 +426,7 @@ export default {
     }
 
     function onShortcutConfigured(data) {
-      console.log("Shortcut configured:", data);
+      logger.debug("Shortcut configured:", data);
     }
 
     function onSequenceExecuted(data) {
@@ -479,7 +483,8 @@ export default {
         addToConsole("CNC initialization attempt completed");
         
       } catch (error) {
-        console.error("Failed to initialize CNC:", error);
+        logger.error("Failed to initialize CNC:", error);
+        handleApiError(error, 'Failed to initialize CNC');
         addToConsole(`Connection failed: ${error.message}`);
         // Set state to disconnected on error
         webSocketState.value = "Disconnected";
@@ -499,7 +504,8 @@ export default {
         addToConsole("CNC disconnection and deinitialization completed");
         
       } catch (error) {
-        console.error("Failed to disconnect and deinitialize CNC:", error);
+        logger.error("Failed to disconnect and deinitialize CNC:", error);
+        handleApiError(error, 'Failed to disconnect and deinitialize CNC');
         addToConsole(`Disconnection failed: ${error.message}`);
       }
     }

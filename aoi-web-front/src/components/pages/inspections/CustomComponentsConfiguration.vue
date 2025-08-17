@@ -117,24 +117,24 @@
                 </base-action-button>
             </div>
         </div>
-        <base-notification :show="showNotification" :timeout="notificationTimeout" height="15vh" color="#CCA152" @close="clearNotification">
-            <div class="message-wrapper">
-                <div class="icon-wrapper">
-                    <v-icon :name="notificationIcon" scale="2.5" animation="float" />
-                </div>
-                <div class="text-wrapper">
-                    {{ notificationMessage }}
-                </div>
-            </div>
-        </base-notification>
+        <base-notification
+            :show="showNotification"
+            :timeout="notificationTimeout"
+            :message="notificationMessage"
+            :icon="notificationIcon"
+            :notificationType="notificationType"
+            height="15vh"
+            color="#CCA152"
+            @close="clearNotification"
+        />
     </div>
 </template>
 
 <script>
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue';
 import { useStore } from 'vuex';
-import { uuid } from "vue3-uuid";
-import { createLogger } from '@/utils/logger';
+import { v4 as uuidv4 } from "uuid";
+import { logger } from '@/utils/logger';
 
 import * as fabric from 'fabric';
 
@@ -149,7 +149,8 @@ import JsonDataContainer from '../../layout/JsonDataRenderer.vue';
 import graphic from '../../../utils/graphics';
 import { ipAddress, port } from '../../../url';
 import useComponents from '../../../hooks/components.ts';
-import useNotification from '../../../hooks/notifications.ts';
+import useNotification, { NotificationType } from '../../../hooks/notifications.ts';
+import { ComponentMessages, ConfigurationMessages, GeneralMessages } from '@/constants/notifications';
 import { useWebSocket, useFabricCanvas, useLoadingState } from '@/composables/useStore';
 import { DEFAULT_IMAGE_DATA_URI_PREFIX, ImageDataUtils } from '../../../utils/imageConstants';
 
@@ -165,13 +166,12 @@ export default{
     setup(){
         const moduleName = 'custom_component';
         const store = useStore();
-        const logger = createLogger('CustomComponentsConfiguration');
 
         // Initialize loading state composable
         const { isLoading, setLoading, withLoading } = useLoadingState();
         
-        const {showNotification, notificationMessage, notificationIcon, notificationTimeout, 
-            setNotification, clearNotification} = useNotification();
+        const {showNotification, notificationMessage, notificationIcon, notificationTimeout, notificationType,
+            setTypedNotification, clearNotification} = useNotification();
 
         // playground variables
         const playgroundMode = ref(false);
@@ -916,7 +916,11 @@ export default{
                 logger.info('Component saved successfully', { name });
             }catch(err) {
                 logger.error('Failed to save component', err);
-                setNotification(3000, "Error while trying to save component.", 'bi-exclamation-circle-fill');
+                setTypedNotification(
+                    ComponentMessages.UPDATE_FAILED,
+                    NotificationType.ERROR,
+                    3000
+                );
             }
             
         }
@@ -984,7 +988,11 @@ export default{
             } catch(err) {
                 logger.error('Failed to load component', err);
                 addErrorToStore(store, 'Component Load Error', err);
-                setNotification(3000, "Error while trying to load component.", 'bi-exclamation-circle-fill');
+                setTypedNotification(
+                    ComponentMessages.LOAD_FAILED,
+                    NotificationType.ERROR,
+                    3000
+                );
             }
             
         };
@@ -1069,7 +1077,7 @@ export default{
                     }
                 }
 
-                let id = uuid.v4();
+                let id = uuidv4();
                 let url = `ws://${ipAddress}:${port}/algorithm/basic/live_algorithm_result/${currentImageSourceId.value}/${id}/ws`;
 
                 liveProcessSocketInstance = useWebSocket(url, {
@@ -1191,10 +1199,18 @@ export default{
                     description: `${currentComponent.value.name} was modified.`
                 });
 
-                setNotification(3000, "Configuration saved.", 'fc-ok');
+                setTypedNotification(
+                    ConfigurationMessages.SAVED,
+                    NotificationType.SUCCESS,
+                    3000
+                );
             }).catch(err => {
                 logger.error('Failed to save configuration', err);
-                setNotification(3000, "Error while trying to save component.", 'bi-exclamation-circle-fill');
+                setTypedNotification(
+                    ComponentMessages.UPDATE_FAILED,
+                    NotificationType.ERROR,
+                    3000
+                );
             });
         }
 
@@ -1426,6 +1442,7 @@ export default{
             notificationIcon,
             notificationMessage,
             notificationTimeout,
+            notificationType,
             updateGraphics,
             switchMode,
             onDragStart,
@@ -1631,23 +1648,4 @@ export default{
     background-color: rgb(21, 20, 20);
 }
 
-.message-wrapper {
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
-}
-
-.icon-wrapper {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    margin-bottom: 3%;
-}
-
-.text-wrapper {
-    font-size: 100%;
-    width: 95%;
-    text-align: center;
-}
 </style>

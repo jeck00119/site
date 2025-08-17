@@ -54,19 +54,14 @@
         </div>
         <base-notification
             :show="showNotification"
-            height="15vh"
             :timeout="notificationTimeout"
+            :message="notificationMessage"
+            :icon="notificationIcon"
+            :notificationType="notificationType"
+            height="15vh"
+            color="#CCA152"
             @close="clearNotification"
-        >
-            <div class="message-wrapper">
-                <div class="icon-wrapper">
-                    <v-icon :name="notificationIcon" scale="2.5" animation="spin"/>
-                </div>
-                <div class="text-wrapper">
-                    {{ notificationMessage }}
-                </div>
-            </div>
-        </base-notification>
+        />
     </div>
 </template>
 
@@ -75,13 +70,14 @@ import { onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 
 import { useAuthStore, useFormState } from '@/composables/useStore';
-import useNotification from '../../../hooks/notifications.js';
+import useNotification, { NotificationType } from '../../../hooks/notifications.js';
+import { AuthMessages, ValidationMessages, GeneralMessages } from '@/constants/notifications';
 import { validateEmail, validatePassword, validateRequired, sanitizeInput } from '../../../utils/validation.js';
 
 export default{
     setup() {
-        const {showNotification, notificationMessage, notificationIcon, notificationTimeout, 
-            setNotification, clearNotification} = useNotification();
+        const {showNotification, notificationMessage, notificationIcon, notificationTimeout, notificationType,
+            setTypedNotification, clearNotification} = useNotification();
 
         const authStore = useAuthStore();
         const router = useRouter();
@@ -157,7 +153,11 @@ export default{
             if (!isValid) {
                 // Show first validation error
                 const firstError = Object.values(formErrors.value)[0];
-                setNotification(3000, firstError, 'bi-exclamation-circle-fill');
+                setTypedNotification(
+                    firstError,
+                    NotificationType.ERROR,
+                    3000
+                );
                 return;
             }
             {
@@ -178,7 +178,11 @@ export default{
                 }catch(e) {
                     // Display the specific error message from the backend
                     const errorMessage = e.message || 'Something went wrong. Please try again.';
-                    setNotification(3000, errorMessage, 'bi-exclamation-circle-fill');
+                    setTypedNotification(
+                        errorMessage,
+                        NotificationType.ERROR,
+                        3000
+                    );
                 }
             }
         }
@@ -195,6 +199,7 @@ export default{
             notificationMessage,
             notificationIcon,
             notificationTimeout,
+            notificationType,
             login,
             clearNotification
         }
@@ -332,25 +337,6 @@ input.error {
     color: white;
 }
 
-.message-wrapper {
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
-}
-
-.icon-wrapper {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    margin-bottom: 3%;
-}
-
-.text-wrapper {
-    font-size: 100%;
-    width: 95%;
-    text-align: center;
-}
 
 @keyframes slime-left {
     0% {border-radius: 12% 88% 46% 54% / 54% 34% 66% 46%;}

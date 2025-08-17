@@ -1,5 +1,6 @@
 import { get, post, postStream } from "../../utils/requests";
 import { ipAddress, port } from "../../url";
+import { logger } from "../../utils/logger";
 
 export default {
     async loadAvailableModels(context) {
@@ -27,7 +28,7 @@ export default {
             'Authorization': token
         });
 
-        console.log(response);
+        logger.debug('Annotation response received', { status: response.status, ok: response.ok });
 
         if(!response.ok)
         {

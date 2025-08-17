@@ -174,6 +174,8 @@
 <script>
 import { ref, computed } from "vue";
 import { useCncStore, useLoadingState } from '@/composables/useStore';
+import { logger } from '@/utils/logger';
+import { handleApiError, addErrorToStore } from '@/utils/errorHandler';
 
 export default {
   name: "LocationManagement",
@@ -246,8 +248,8 @@ export default {
           z: props.currentPosition.z,
         };
         
-        console.log("Attempting to save location with data:", locationData);
-        console.log("Save type:", saveType.value);
+        logger.debug("Attempting to save location with data:", locationData);
+        logger.debug("Save type:", saveType.value);
         
         await cncStore.dispatch('cnc/postLocation', [
           locationData,
@@ -269,16 +271,16 @@ export default {
           closeSaveDialog();
         
         } catch (error) {
-          console.error("Failed to save location:", error);
-          console.error("Error details:", {
+          logger.error("Failed to save location:", error);
+          logger.error("Error details:", {
             message: error.message,
             stack: error.stack,
             locationData: locationData,
             saveType: saveType.value
           });
+          handleApiError(error, 'Failed to save location');
           
-          // Show error to user instead of silent failure
-          alert(`Failed to save location: ${error.message}`);
+          // Error already handled by handleApiError
           
         } finally {
           isSaving.value = false;
@@ -307,7 +309,8 @@ export default {
           closeDeleteDialog();
           
         } catch (error) {
-          console.error("Failed to delete location:", error);
+          logger.error("Failed to delete location:", error);
+          handleApiError(error, 'Failed to delete location');
           
         } finally {
           isDeleting.value = false;

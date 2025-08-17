@@ -22,9 +22,9 @@
 <script>
 import { computed, onMounted, onUnmounted, watch, ref, nextTick } from 'vue';
 import { useRouter } from 'vue-router'; 
-import { uuid } from 'vue3-uuid';
+import { v4 as uuidv4 } from 'uuid';
 import { useWebSocket, useAuthStore, useConfigurationsStore, useAlgorithmsStore, useImageSourcesStore, useComponentsStore } from '@/composables/useStore';
-import { createLogger } from '@/utils/logger';
+import { logger } from '@/utils/logger';
 import { addErrorToStore } from '@/utils/errorHandler';
 
 import TheNavigator from './components/layout/TheNavigator.vue';
@@ -39,7 +39,6 @@ export default {
   setup() {
     const router = useRouter();
     const route = router.currentRoute;
-    const logger = createLogger('App');
     const navIsOpen = ref(false);
     const bodyContainer = ref(null);
     
@@ -73,7 +72,7 @@ export default {
 
     function connectToSocket() {
       try {
-        ws_uid = uuid.v4();
+        ws_uid = uuidv4();
         // Use secure WebSocket protocol based on current page protocol
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
         const wsUrl = `${protocol}//${ipAddress}:${port}/configurations/configuration_changes/${ws_uid}/ws`;
@@ -152,9 +151,7 @@ export default {
           loadComponents({ type: 'component' }).then(() => logger.debug('Components loaded successfully')).catch(err => logger.error('Failed to load components:', err)),
           loadComponents({ type: 'reference' }).then(() => logger.debug('Reference components loaded successfully')).catch(err => logger.error('Failed to load reference components:', err))
         ];
-        logger.debug('All promises created, waiting for resolution...');
-        
-        logger.debug('Waiting for all data loading promises to resolve...');
+        // Loading data promises - debug removed to reduce log spam
         await Promise.all(promises);
         
         logger.info('All data loaded successfully for configuration');
@@ -201,7 +198,7 @@ export default {
 
     function onNavVisibilityChanged(isVisible) {
       navIsOpen.value = isVisible;
-      logger.debug('Navigation visibility changed', { isVisible });
+      // Navigation visibility changed - debug removed to reduce log spam
     }
 
     tryLogin();
@@ -226,9 +223,13 @@ export default {
         if (contentHeight <= viewportHeight - footerHeight) {
           // Short content - only need minimal clearance
           bottomPadding = Math.max(20, footerHeight * 0.3); // 20px minimum or 30% of footer
+          // Hide scrollbar when all content is visible
+          document.body.style.overflowY = 'hidden';
         } else {
           // Long content - need enough space to scroll past footer
           bottomPadding = footerHeight + 20; // Footer height + 20px buffer
+          // Show scrollbar when content overflows
+          document.body.style.overflowY = 'auto';
         }
         
         // Apply the calculated padding
@@ -238,13 +239,7 @@ export default {
         const totalHeight = Math.max(contentHeight + bottomPadding, viewportHeight);
         bodyContainerEl.style.minHeight = `${totalHeight}px`;
         
-        logger.debug('Adjusted layout', { 
-          contentHeight, 
-          viewportHeight, 
-          footerHeight, 
-          bottomPadding, 
-          totalHeight 
-        });
+        // Layout adjusted - debug removed to reduce log spam
       }
     }
 
@@ -263,7 +258,7 @@ export default {
     });
 
     onMounted(() => {
-      logger.lifecycle('mounted', 'App component mounted');
+      // App component mounted - debug removed to reduce log spam
       onLoad();
       
       // Adjust height initially and on resize
@@ -320,7 +315,7 @@ export default {
 
 .route-wrapper {
   width: 95%;
-  margin: 0 auto;
+  margin: 0 0 0 5%; /* Push content to the right to avoid burger menu while maintaining full width */
   padding: 0; /* JavaScript will set bottom padding dynamically */
   overflow: visible;
 }

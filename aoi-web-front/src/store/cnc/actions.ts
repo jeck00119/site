@@ -1,5 +1,6 @@
-import { uuid } from "vue3-uuid";
+import { v4 as uuidv4 } from "uuid";
 import api from "../../utils/api";
+import logger from "../../utils/logger";
 
 export default {
     async loadPorts(context, _) {
@@ -17,31 +18,31 @@ export default {
     },
 
     async loadCNCs(context, _) {
-        console.log('CNC Store: loadCNCs action called');
+        logger.debug('CNC Store: loadCNCs action called');
         try {
             const token = context.rootGetters["auth/getToken"] || sessionStorage.getItem('auth-token');
-            console.log('CNC Store: Token retrieved:', token ? 'Present' : 'Missing');
+            logger.debug('CNC Store: Token retrieved', { tokenPresent: !!token });
             
             const { response, responseData } = await api.get('/cnc', {
                 "Authorization": token
             });
             
-            console.log('CNC Store: API response status:', response.status, response.ok);
-            console.log('CNC Store: Response data:', responseData);
+            logger.debug('CNC Store: API response status', { status: response.status, ok: response.ok });
+            logger.debug('CNC Store: Response data', responseData);
 
             if(!response.ok)
             {
                 const error = new Error(responseData.detail || `Failed to fetch CNCs! Status: ${response.status}`);
-                console.error('CNC Store: API call failed:', error.message);
+                logger.error('CNC Store: API call failed', error);
                 throw error;
             }
             else
             {
-                console.log('CNC Store: Committing CNCs to store:', responseData);
+                logger.debug('CNC Store: Committing CNCs to store', responseData);
                 context.commit('loadCNCs', responseData);
             }
         } catch (error) {
-            console.error('CNC Store: Exception in loadCNCs:', error);
+            logger.error('CNC Store: Exception in loadCNCs', error);
             throw error;
         }
     },
@@ -70,7 +71,7 @@ export default {
 
     addCNC(context, payload) {
         const cnc = {
-            uid: uuid.v4(),
+            uid: uuidv4(),
             name: payload.name,
             type: payload.type,
             port: payload.port
@@ -95,7 +96,7 @@ export default {
 
             if(!response.ok) {
                 const errorMessage = data?.message || 'Failed to save CNCs - some CNCs may have connection issues';
-                console.warn('CNC Save Warning:', errorMessage);
+                logger.warn('CNC Save Warning', { message: errorMessage });
                 // Don't throw error - allow operation to continue
                 // The individual CNC connection errors will be handled via WebSocket callbacks
                 return { success: false, message: errorMessage };
@@ -103,7 +104,7 @@ export default {
             
             return { success: true };
         } catch (error) {
-            console.error('CNC Save Error:', error);
+            logger.error('CNC Save Error', error);
             // Don't throw error - allow operation to continue gracefully
             return { success: false, message: (error as Error).message || 'Failed to save CNCs' };
         }
@@ -129,7 +130,7 @@ export default {
     },
 
     async postLocation(context, payload){
-        payload[0].uid = uuid.v4();
+        payload[0].uid = uuidv4();
         const saveType = payload[1];
 
         switch(saveType){
@@ -149,16 +150,16 @@ export default {
 
         const token = context.rootGetters["auth/getToken"] || sessionStorage.getItem('auth-token');
         
-        console.log("CNC postLocation - token:", token ? 'Present' : 'Missing');
-        console.log("CNC postLocation - payload:", payload[0]);
+        logger.debug('CNC postLocation - token', { tokenPresent: !!token });
+        logger.debug('CNC postLocation - payload', payload[0]);
 
         const {response, responseData} = await api.post('/location', payload[0], {
             'content-type': 'application/json',
             'Authorization': token
         });
         
-        console.log("CNC postLocation - response:", response.status, response.ok);
-        console.log("CNC postLocation - responseData:", responseData);
+        logger.debug('CNC postLocation - response', { status: response.status, ok: response.ok });
+        logger.debug('CNC postLocation - responseData', responseData);
     },
 
     async loadLocations(context,_){
@@ -208,11 +209,11 @@ export default {
             const { response, responseData } = await api.get(`/cnc/${payload.cncUid}/__API__/${payload.location}/move_to_location?block=${payload.block}&timeout=${payload.timeout}`);
             if (!response.ok) {
                 const error = new Error(responseData.detail || `Failed to move CNC ${payload.cncUid} to location ${payload.location}`);
-                console.error('CNC Move to Location Error:', (error as Error).message);
+                logger.error('CNC Move to Location Error', error);
                 throw error;
             }
         } catch (error) {
-            console.error('CNC Move to Location Exception:', (error as Error).message);
+            logger.error('CNC Move to Location Exception', error);
             throw error;
         }
     },
@@ -222,11 +223,11 @@ export default {
             const { response, responseData } = await api.get(`/cnc/${payload.cncUid}/__API__/${payload.command}`);
             if (!response.ok) {
                 const error = new Error(responseData.detail || `Failed to execute command '${payload.command}' on CNC ${payload.cncUid}`);
-                console.error('CNC Command Error:', (error as Error).message);
+                logger.error('CNC Command Error', error);
                 throw error;
             }
         } catch (error) {
-            console.error('CNC Command Exception:', (error as Error).message);
+            logger.error('CNC Command Exception', error);
             throw error;
         }
     },
@@ -236,11 +237,11 @@ export default {
             const { response, responseData } = await api.get(`/cnc/${payload.cncUid}/__API__/${payload.axis}/plus?feed_rate=${payload.feedrate}&step=${payload.step}`);
             if (!response.ok) {
                 const error = new Error(responseData.detail || `Failed to move CNC ${payload.cncUid} axis ${payload.axis} plus by ${payload.step} steps`);
-                console.error('CNC Axis Plus Error:', (error as Error).message);
+                logger.error('CNC Axis Plus Error', error);
                 throw error;
             }
         } catch (error) {
-            console.error('CNC Axis Plus Exception:', (error as Error).message);
+            logger.error('CNC Axis Plus Exception', error);
             throw error;
         }
     },
@@ -250,11 +251,11 @@ export default {
             const { response, responseData } = await api.get(`/cnc/${payload.cncUid}/__API__/${payload.axis}/minus?feed_rate=${payload.feedrate}&step=${payload.step}`);
             if (!response.ok) {
                 const error = new Error(responseData.detail || `Failed to move CNC ${payload.cncUid} axis ${payload.axis} minus by ${payload.step} steps`);
-                console.error('CNC Axis Minus Error:', (error as Error).message);
+                logger.error('CNC Axis Minus Error', error);
                 throw error;
             }
         } catch (error) {
-            console.error('CNC Axis Minus Exception:', (error as Error).message);
+            logger.error('CNC Axis Minus Exception', error);
             throw error;
         }
     },
@@ -264,11 +265,11 @@ export default {
             const {response, responseData} = await api.get(`/cnc/${payload.cncUid}/__API__/terminal?command=${payload.command}`);
             if (!response.ok) {
                 const error = new Error(responseData.detail || `Failed to send terminal command '${payload.command}' to CNC ${payload.cncUid}`);
-                console.error('CNC Terminal Error:', (error as Error).message);
+                logger.error('CNC Terminal Error', error);
                 throw error;
             }
         } catch (error) {
-            console.error('CNC Terminal Exception:', (error as Error).message);
+            logger.error('CNC Terminal Exception', error);
             throw error;
         }
     },
@@ -280,11 +281,11 @@ export default {
                 // Extract detailed error message from backend response
                 const errorMessage = responseData?.detail || responseData?.message || `Failed to initialize CNC ${payload.cncUid}`;
                 const error = new Error(errorMessage);
-                console.error('CNC Initialize Error:', (error as Error).message);
+                logger.error('CNC Initialize Error', error);
                 throw error;
             }
         } catch (error) {
-            console.error('CNC Initialize Exception:', (error as Error).message);
+            logger.error('CNC Initialize Exception', error);
             throw error;
         }
     },
@@ -294,11 +295,11 @@ export default {
             const { response, responseData } = await api.post(`/cnc/${payload.cncUid}/deinitialize`);
             if (!response.ok) {
                 const error = new Error(responseData.detail || `Failed to deinitialize CNC ${payload.cncUid}`);
-                console.error('CNC Deinitialize Error:', (error as Error).message);
+                logger.error('CNC Deinitialize Error', error);
                 throw error;
             }
         } catch (error) {
-            console.error('CNC Deinitialize Exception:', (error as Error).message);
+            logger.error('CNC Deinitialize Exception', error);
             throw error;
         }
     },
@@ -307,10 +308,10 @@ export default {
         try {
             const { response, responseData } = await api.post(`/cnc/${payload.uid}/ws/close`);
             if(!response.ok) {
-                console.warn(`Socket for CNC ${payload.uid} may already be closed or doesn't exist:`, responseData?.detail || 'Unknown error');
+                logger.warn(`Socket for CNC ${payload.uid} may already be closed or doesn't exist`, { detail: responseData?.detail || 'Unknown error' });
             }
         } catch (error) {
-            console.warn(`Error closing socket for CNC ${payload.uid}:`, (error as Error).message);
+            logger.warn(`Error closing socket for CNC ${payload.uid}`, error);
         }
     },
 

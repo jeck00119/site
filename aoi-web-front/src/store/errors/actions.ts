@@ -15,5 +15,9 @@ export default {
 
     addError(context: ErrorsActionContext, payload: ErrorItem): void {
         context.commit('addError', payload);
+    },
+
+    clearErrors(context: ErrorsActionContext): void {
+        context.commit('clearAllErrors');
     }
 };

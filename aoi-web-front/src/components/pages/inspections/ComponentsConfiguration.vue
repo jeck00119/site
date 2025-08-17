@@ -49,22 +49,24 @@
         <div class="results-container" v-else>
             <json-data-container width="auto" height="29vh" :data="data" @closed="showResults = false"></json-data-container>
         </div>
-        <base-notification :show="showNotification" :timeout="notificationTimeout" height="15vh" color="#CCA152" @close="clearNotification">
-            <div class="message-wrapper">
-                <div class="icon-wrapper">
-                    <v-icon :name="notificationIcon" scale="2.5" animation="float" />
-                </div>
-                <div class="text-wrapper">
-                    {{ notificationMessage }}
-                </div>
-            </div>
-        </base-notification>
+        <base-notification
+            :show="showNotification"
+            :timeout="notificationTimeout"
+            :message="notificationMessage"
+            :icon="notificationIcon"
+            :notificationType="notificationType"
+            height="15vh"
+            color="#CCA152"
+            @close="clearNotification"
+        />
     </div>
 </template>
 
 <script>
 import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue';
-import { uuid } from "vue3-uuid";
+import { v4 as uuidv4 } from "uuid";
+import { logger } from '@/utils/logger';
+import { handleApiError } from '@/utils/errorHandler';
 
 import { useAuthStore, useConfigurationsStore, useComponentsStore, useAlgorithmsStore, useGraphicsStore, useAuditStore } from '@/composables/useStore';
 import graphic from '../../../utils/graphics.js';
@@ -79,7 +81,8 @@ import { ipAddress, port } from '../../../url';
 import useAlgorithms from '../../../hooks/algorithms.js';
 import useComponents from '../../../hooks/components.js';
 import useGraphics from '../../../hooks/graphics.js';
-import useNotification from '../../../hooks/notifications';
+import useNotification, { NotificationType } from '../../../hooks/notifications';
+import { ComponentMessages, ConfigurationMessages, GeneralMessages } from '@/constants/notifications';
 
 export default {
     components: {
@@ -102,8 +105,8 @@ export default {
         const currentImageSourceId = ref('');
         const currentReferenceId = ref('');
 
-        const {showNotification, notificationMessage, notificationIcon, notificationTimeout, 
-            setNotification, clearNotification} = useNotification();
+        const {showNotification, notificationMessage, notificationIcon, notificationTimeout, notificationType,
+            setTypedNotification, clearNotification} = useNotification();
 
         // Initialize centralized store composables
         const authStore = useAuthStore();
@@ -148,7 +151,9 @@ export default {
                 {
                     await load(id);
 
-                    currentReferenceId.value = currentComponent.value.referenceUid;
+                    // Extract UID string from reference object if needed
+                    const refUid = currentComponent.value.referenceUid;
+                    currentReferenceId.value = typeof refUid === 'object' && refUid?.uid ? refUid.uid : (refUid || '');
 
                     if (currentComponent.value.algorithmUid) {
                         setAlgorithmConfigured();
@@ -190,8 +195,13 @@ export default {
                     showCamera.value = false;
                 }
             }catch(err) {
-                console.error('ComponentsConfiguration.loadComponent error:', err);
-                setNotification(3000, "Error while trying to load component.", 'bi-exclamation-circle-fill');
+                logger.error('ComponentsConfiguration.loadComponent error:', err);
+                handleApiError(err, 'Failed to load component');
+                setTypedNotification(
+                    ComponentMessages.LOAD_FAILED,
+                    NotificationType.ERROR,
+                    3000
+                );
             }
             
         }
@@ -207,7 +217,11 @@ export default {
                     description: `New ` + moduleName + ` added: ${name}`
                 });
             }catch(err) {
-                setNotification(3000, err, 'bi-exclamation-circle-fill');
+                setTypedNotification(
+                    err || ComponentMessages.ADD_FAILED,
+                    NotificationType.ERROR,
+                    3000
+                );
             }
         }
 
@@ -231,7 +245,8 @@ export default {
         }
 
         function updateReference(referenceId) {
-            currentReferenceId.value = referenceId;
+            // Extract UID string from reference object if needed
+            currentReferenceId.value = typeof referenceId === 'object' && referenceId?.uid ? referenceId.uid : (referenceId || '');
         }
 
         function downloadAlgorithm() {
@@ -241,9 +256,7 @@ export default {
         function saveComponent(payload) {
             const data = graphic.getGraphicsProps(graphicItems.value, canvas.value);
 
-            // TODO: Add updateCurrentAlgorithmGraphics to algorithmsStore
-            // algorithmsStore.updateCurrentAlgorithmGraphics(data);
-            algorithmsStore.dispatch('algorithms/updateCurrentAlgorithmGraphics', data);
+            algorithmsStore.updateCurrentAlgorithmGraphics(data);
 
             const component = {
                 uid: currentComponent.value.uid,
@@ -266,14 +279,26 @@ export default {
                                 details: [currentComponent.value, component, currentAlgorithmInitial.value, currentAlgorithm.value.parameters]
                             });
 
-                            setNotification(3000, "Configuration saved.", 'fc-ok');
+                            setTypedNotification(
+                                ConfigurationMessages.SAVED,
+                                NotificationType.SUCCESS,
+                                3000
+                            );
                         }
                     ).catch(err => {
-                        setNotification(3000, "Error while trying to save component.", 'bi-exclamation-circle-fill');
+                        setTypedNotification(
+                            ComponentMessages.UPDATE_FAILED,
+                            NotificationType.ERROR,
+                            3000
+                        );
                     });
                 }
             ).catch(err => {
-                setNotification(3000, "Error while trying to save component.", 'bi-exclamation-circle-fill');
+                setTypedNotification(
+                    ComponentMessages.UPDATE_FAILED,
+                    NotificationType.ERROR,
+                    3000
+                );
             });
         }
 
@@ -282,7 +307,6 @@ export default {
                 componentsRetrieving.value = true;
 
                 componentsStore.loadComponents({ type: moduleName });
-                // TODO: Handle reference loading separately if needed
             }
         });
 
@@ -290,10 +314,6 @@ export default {
             algorithmsStore.setCurrentAlgorithm(null);
             algorithmsStore.setCurrentAlgorithmAttributes([]);
             algorithmsStore.setAlgorithmResult(null);
-            // TODO: Add setComponents to componentsStore
-            // componentsStore.setComponents([]);
-            // componentsStore.setReferences([]);
-            // componentsStore.setCurrentComponent(null);
             graphicsStore.resetGraphicsItems();
         });
 
@@ -324,6 +344,7 @@ export default {
             notificationIcon,
             notificationMessage,
             notificationTimeout,
+            notificationType,
             updateGraphics,
             loadComponent,
             remove,
@@ -472,24 +493,5 @@ button[disabled] {
     background-color: rgb(21, 20, 20);
 }
 
-.message-wrapper {
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
-}
-
-.icon-wrapper {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    margin-bottom: 3%;
-}
-
-.text-wrapper {
-    font-size: 100%;
-    width: 95%;
-    text-align: center;
-}
 
 </style>

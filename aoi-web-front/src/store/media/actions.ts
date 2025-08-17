@@ -1,4 +1,5 @@
 import api from "../../utils/api";
+import { logger } from "../../utils/logger";
 
 export default {
     async loadEvents(context) {
@@ -12,7 +13,7 @@ export default {
                 context.commit('setEvents', responseData);
             }
         } catch (error) {
-            console.error('Failed to load media events:', error);
+            logger.error('Failed to load media events', { error });
             throw error;
         }
     },
@@ -28,7 +29,7 @@ export default {
                 context.commit('setChannels', responseData);
             }
         } catch (error) {
-            console.error('Failed to load media channels:', error);
+            logger.error('Failed to load media channels', { error });
             throw error;
         }
     },
@@ -44,7 +45,7 @@ export default {
                 context.commit('setFiles', responseData);
             }
         } catch (error) {
-            console.error('Failed to load media files:', error);
+            logger.error('Failed to load media files', { error });
             throw error;
         }
     },
@@ -65,7 +66,7 @@ export default {
                 context.commit('addChannel');
             }
         } catch (error) {
-            console.error('Failed to add media channel:', error);
+            logger.error('Failed to add media channel', { error });
             throw error;
         }
     },
@@ -84,7 +85,7 @@ export default {
                 throw error;
             }
         } catch (error) {
-            console.error('Failed to add media event:', error);
+            logger.error('Failed to add media event', { error });
             throw error;
         }
     }

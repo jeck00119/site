@@ -188,30 +188,31 @@
                 </div>
             </template>
         </base-dialog>
-        <base-notification :show="showNotification" :timeout="5000" height="15vh">
-            <div class="message-wrapper">
-                <div class="icon-wrapper">
-                    <v-icon :name="notificationIcon" scale="2.5" animation="float" />
-                </div>
-                <div class="text-wrapper">
-                    {{ notificationMessage }}
-                </div>
-            </div>
-        </base-notification>
+        <base-notification
+            :show="showNotification"
+            :timeout="notificationTimeout"
+            :message="notificationMessage"
+            :icon="notificationIcon"
+            :notificationType="notificationType"
+            height="15vh"
+            color="#CCA152"
+            @close="clearNotification"
+        />
     </div>
 </template>
 
 <script>
 import { ref, computed, onMounted } from 'vue';
 import { useInspectionListStore, useAuthStore, useConfigurationsStore, useLogStore } from '@/composables/useStore';
-import { createLogger } from '@/utils/logger';
+import { logger } from '@/utils/logger';
 import { addErrorToStore, handleApiError } from '@/utils/errorHandler';
 import { validateRequired } from '@/utils/validation';
 
 import ExcelJS from 'exceljs';
 
 import UploadInspectionList from '../../inspection_list/UploadInspectionList.vue';
-import useNotification from '../../../hooks/notifications.ts';
+import useNotification, { NotificationType } from '../../../hooks/notifications.ts';
+import { FileMessages, GeneralMessages } from '@/constants/notifications';
 
 export default{
     components: {
@@ -219,7 +220,6 @@ export default{
     },
 
     setup() {
-        const logger = createLogger('InspectionList');
         
         // Use centralized store composables
         const { inspectionList, currentInspection, loadInspectionList, updateInspectionList } = useInspectionListStore();
@@ -264,8 +264,8 @@ export default{
         const measUnitTypes = ref(['mm', 'N/A']);
         const measTpTypes = ref(['B']);
 
-        const {showNotification, notificationMessage, notificationIcon, notificationTimeout, 
-            setNotification, clearNotification} = useNotification();
+        const {showNotification, notificationMessage, notificationIcon, notificationTimeout, notificationType,
+            setTypedNotification, clearNotification} = useNotification();
 
         function toggleUploadVisibility() {
             showUpload.value = !showUpload.value;
@@ -320,7 +320,11 @@ export default{
             } catch (error) {
                 logger.error('Failed to read Excel file', error);
                 handleApiError(null, null, 'Excel file reading');
-                setNotification(3000, 'Error reading Excel file: ' + error.message, 'bi-exclamation-circle-fill');
+                setTypedNotification(
+                    'Error reading Excel file: ' + error.message,
+                    NotificationType.ERROR,
+                    3000
+                );
             }
 
             showUpload.value = false;
@@ -400,7 +404,11 @@ export default{
                 window.URL.revokeObjectURL(url);
             } catch (error) {
                 logger.error('Failed to export Excel file', error);
-                setNotification(3000, 'Error exporting Excel file: ' + error.message, 'bi-exclamation-circle-fill');
+                setTypedNotification(
+                    'Error exporting Excel file: ' + error.message,
+                    NotificationType.ERROR,
+                    3000
+                );
             }
         }
 
@@ -643,7 +651,11 @@ export default{
                 logger.info('Inspection list saved successfully');
             } catch(err) {
                 logger.error('Failed to save inspection list', err);
-                setNotification(3000, err.message || err, 'bi-exclamation-circle-fill');
+                setTypedNotification(
+                    err.message || err || GeneralMessages.ERROR_OCCURRED,
+                    NotificationType.ERROR,
+                    3000
+                );
             }
         }
 
@@ -686,6 +698,7 @@ export default{
             notificationIcon,
             notificationMessage,
             notificationTimeout,
+            notificationType,
             exportInspectionList,
             toggleUploadVisibility,
             onInspectionListUploaded,

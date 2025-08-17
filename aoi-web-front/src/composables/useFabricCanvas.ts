@@ -7,6 +7,7 @@
 
 import { ref, onUnmounted, watch } from 'vue';
 import * as fabric from 'fabric';
+import { logger } from '@/utils/logger';
 
 interface CanvasOptions {
   selection?: boolean;
@@ -66,7 +67,7 @@ export function useFabricCanvas(canvasId: string, options: CanvasOptions = {}): 
    */
   const initCanvas = () => {
     if (isInitialized.value) {
-      console.warn(`Canvas ${canvasId} is already initialized`);
+      logger.warn(`Canvas ${canvasId} is already initialized`);
       return;
     }
     
@@ -93,7 +94,7 @@ export function useFabricCanvas(canvasId: string, options: CanvasOptions = {}): 
       }
       
     } catch (error) {
-      console.error(`Failed to initialize canvas ${canvasId}:`, error);
+      logger.error(`Failed to initialize canvas ${canvasId}`, error);
       throw error;
     }
   };
@@ -280,7 +281,7 @@ export function useFabricCanvas(canvasId: string, options: CanvasOptions = {}): 
         canvas.value.dispose();
         
       } catch (error) {
-        console.warn(`Error disposing canvas ${canvasId}:`, error);
+        logger.warn(`Error disposing canvas ${canvasId}`, error);
       } finally {
         canvas.value = null;
         isInitialized.value = false;

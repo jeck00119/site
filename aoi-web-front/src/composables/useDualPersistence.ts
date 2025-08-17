@@ -6,6 +6,7 @@
 
 import { ref } from 'vue';
 import api from '@/utils/api';
+import { logger } from '@/utils/logger';
 
 interface PersistenceOptions {
   localStoragePrefix?: string;
@@ -48,7 +49,7 @@ export function useDualPersistence<T>(
     try {
       localStorage.setItem(storageKey, JSON.stringify(data));
     } catch (err) {
-      console.error(`[${resourceType.toUpperCase()}] Failed to save to localStorage:`, err);
+      logger.error(`[${resourceType.toUpperCase()}] Failed to save to localStorage`, err);
     }
 
     // Save to backend if enabled
@@ -56,10 +57,10 @@ export function useDualPersistence<T>(
       try {
         const resourceData = createResourceData(data, resourceId);
         await api.post(`/cnc/${axisUid}/${resourceType}`, resourceData);
-        console.log(`[${resourceType.toUpperCase()}] Saved to backend successfully`);
+        logger.info(`[${resourceType.toUpperCase()}] Saved to backend successfully`);
         error.value = null;
       } catch (err) {
-        console.error(`[${resourceType.toUpperCase()}] Failed to save to backend:`, err);
+        logger.error(`[${resourceType.toUpperCase()}] Failed to save to backend`, err);
         error.value = `Failed to save ${resourceType} to database`;
         // Don't throw - localStorage save succeeded
       }
@@ -74,13 +75,13 @@ export function useDualPersistence<T>(
     isLoading.value = true;
     error.value = null;
 
-    console.log(`[${resourceType.toUpperCase()}] Loading ${resourceType} for CNC:`, axisUid);
+    logger.info(`[${resourceType.toUpperCase()}] Loading ${resourceType} for CNC`, { axisUid });
 
     // Try to load from backend first
     if (syncToBackend) {
       try {
         const response = await api.get(`/cnc/${axisUid}/${resourceType}`);
-        console.log(`[${resourceType.toUpperCase()}] Backend response:`, response.data);
+        logger.debug(`[${resourceType.toUpperCase()}] Backend response`, response.data);
 
         if (response.data && response.data.length > 0) {
           // Find the specific resource or take the first one
@@ -88,33 +89,33 @@ export function useDualPersistence<T>(
             r.uid === `${resourceType}-${axisUid}-${resourceId}`
           ) || response.data[0];
           
-          console.log(`[${resourceType.toUpperCase()}] Found resource:`, targetResource);
+          logger.debug(`[${resourceType.toUpperCase()}] Found resource`, targetResource);
 
           if (targetResource && targetResource.items) {
             // Update localStorage with backend data
             localStorage.setItem(storageKey, JSON.stringify(targetResource.items));
-            console.log(`[${resourceType.toUpperCase()}] Loaded from backend successfully, items:`, 
+            logger.info(`[${resourceType.toUpperCase()}] Loaded from backend successfully, items:`, 
               Array.isArray(targetResource.items) ? targetResource.items.length : 'N/A');
             
             isLoading.value = false;
             return targetResource.items as T;
           }
         }
-        console.log(`[${resourceType.toUpperCase()}] No ${resourceType} found in backend`);
+        logger.debug(`[${resourceType.toUpperCase()}] No ${resourceType} found in backend`);
       } catch (err) {
-        console.error(`[${resourceType.toUpperCase()}] Failed to load from backend:`, err);
+        logger.error(`[${resourceType.toUpperCase()}] Failed to load from backend`, err);
         error.value = `Failed to load ${resourceType} from database`;
       }
     }
 
     // Fallback to localStorage
     const saved = localStorage.getItem(storageKey);
-    console.log(`[${resourceType.toUpperCase()}] Checking localStorage, found:`, saved ? 'YES' : 'NO');
+    logger.debug(`[${resourceType.toUpperCase()}] Checking localStorage, found`, { found: saved ? 'YES' : 'NO' });
 
     if (saved) {
       try {
         const parsedData = JSON.parse(saved) as T;
-        console.log(`[${resourceType.toUpperCase()}] Loaded from localStorage, items:`, 
+        logger.info(`[${resourceType.toUpperCase()}] Loaded from localStorage, items:`, 
           Array.isArray(parsedData) ? parsedData.length : 'N/A');
 
         // Try to sync localStorage data to backend if it has content
@@ -127,12 +128,12 @@ export function useDualPersistence<T>(
         isLoading.value = false;
         return parsedData;
       } catch (err) {
-        console.error(`[${resourceType.toUpperCase()}] Failed to parse localStorage data:`, err);
+        logger.error(`[${resourceType.toUpperCase()}] Failed to parse localStorage data`, err);
         error.value = `Failed to load ${resourceType} from local storage`;
       }
     }
 
-    console.log(`[${resourceType.toUpperCase()}] No data found, returning null`);
+    logger.debug(`[${resourceType.toUpperCase()}] No data found, returning null`);
     isLoading.value = false;
     return null;
   };
@@ -150,9 +151,9 @@ export function useDualPersistence<T>(
     if (syncToBackend) {
       try {
         await api.delete(`/cnc/${axisUid}/${resourceType}/${resourceType}-${axisUid}-${resourceId}`);
-        console.log(`[${resourceType.toUpperCase()}] Cleared from backend successfully`);
+        logger.info(`[${resourceType.toUpperCase()}] Cleared from backend successfully`);
       } catch (err) {
-        console.error(`[${resourceType.toUpperCase()}] Failed to clear from backend:`, err);
+        logger.error(`[${resourceType.toUpperCase()}] Failed to clear from backend`, err);
         error.value = `Failed to clear ${resourceType} from database`;
       }
     }

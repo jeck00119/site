@@ -26,7 +26,7 @@
 <script>
 import { computed, onMounted } from "vue";
 import { useCncStore } from '@/composables/useStore';
-import { createLogger } from '@/utils/logger';
+import { logger } from '@/utils/logger';
 
 export default {
   name: "PositionDisplay",
@@ -41,7 +41,6 @@ export default {
     }
   },
   setup(props) {
-    const logger = createLogger('PositionDisplay');
     
     // Use centralized CNC store composable
     const { pos } = useCncStore(props.axisUid);

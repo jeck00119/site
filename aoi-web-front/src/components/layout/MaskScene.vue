@@ -52,7 +52,7 @@ import * as fabric from 'fabric';
 import { ref, onMounted, onBeforeUnmount, toRef, watch } from 'vue';
 
 import { ipAddress, port } from '../../url';
-import { uuid } from 'vue3-uuid';
+import { v4 as uuidv4 } from "uuid";
 import { useWebSocket, useFabricCanvas } from '@/composables/useStore';
 import { DEFAULT_IMAGE_DATA_URI_PREFIX, ImageDataUtils } from '../../utils/imageConstants';
 
@@ -88,7 +88,7 @@ export default {
         const imageSourceId = toRef(props, 'imageSourceId');
 
         // Initialize WebSocket connection
-        const wsUid = uuid.v4();
+        const wsUid = uuidv4();
         const wsUrl = `ws://${ipAddress}:${port}/mask/${wsUid}/crop_roi/ws`;
         const { socket, isConnected, connect, disconnect, send } = useWebSocket(wsUrl, {
             autoConnect: false,

@@ -32,7 +32,7 @@
 <script>
 import { ref, computed } from 'vue';
 import { useErrorsStore } from '@/composables/useStore';
-import { createLogger } from '@/utils/logger';
+import { logger } from '@/utils/logger';
 
 export default {
 props: {
@@ -54,7 +54,6 @@ props: {
 emits: ['close'],
 
 setup(props, context) {
-    const logger = createLogger('TheErrorList');
     
     // Use centralized errors store composable
     const { errors, hasErrors, removeError: removeErrorFromStore } = useErrorsStore();
@@ -74,7 +73,7 @@ setup(props, context) {
 
     const hasValues = computed(() => hasErrors.value);
     
-    logger.lifecycle('mounted', 'TheErrorList component mounted');
+    // Component mounted - debug removed to reduce log spam
 
     return {
         errors,

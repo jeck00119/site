@@ -50,7 +50,7 @@
 <script>
 import { ref, computed, watch, onMounted } from "vue";
 import { useCncStore } from '@/composables/useStore';
-import { createLogger } from '@/utils/logger';
+import { logger } from '@/utils/logger';
 
 export default {
   name: "FeedrateState",
@@ -66,7 +66,6 @@ export default {
   },
   emits: ['connect-requested', 'disconnect-requested'],
   setup(props, { emit }) {
-    const logger = createLogger('FeedrateState');
     const isConnecting = ref(false);
     
     // Use centralized CNC store composable

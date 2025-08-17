@@ -1,6 +1,7 @@
 import { ref, computed, type Ref, type ComputedRef } from "vue";
 import { useStore } from "vuex";
 import type { Store } from "vuex";
+import { logger } from '@/utils/logger';
 
 export interface Component {
     uid: string;
@@ -54,7 +55,7 @@ export default function useComponents(moduleName: string): ComponentsHookReturn 
             const component = store.getters["components/getCurrentComponent"];
             currentComponent.value = component;
         } catch (error) {
-            console.error(`Failed to load component ${id}:`, error);
+            logger.error(`Failed to load component ${id}`, error);
             throw error;
         } finally {
             componentLoading.value = false;

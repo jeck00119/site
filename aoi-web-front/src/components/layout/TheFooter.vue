@@ -32,7 +32,7 @@
 <script>
 import { computed } from 'vue';
 import { useAuthStore, useConfigurationsStore } from '@/composables/useStore';
-import { createLogger } from '@/utils/logger';
+import { logger } from '@/utils/logger';
 import TheErrorListButton from './TheErrorListButton.vue';
 import { useRoute, useRouter } from 'vue-router';
 
@@ -51,7 +51,6 @@ export default {
     setup(props) {
         const router = useRouter();
         const route = useRoute();
-        const logger = createLogger('TheFooter');
 
         // Use centralized store composables
         const { currentUser, logout: authLogout } = useAuthStore();
@@ -65,7 +64,7 @@ export default {
             router.replace('/login');
         }
         
-        logger.lifecycle('mounted', 'TheFooter component mounted');
+        // Component mounted - debug removed to reduce log spam
 
         return {
             currentConfiguration,
