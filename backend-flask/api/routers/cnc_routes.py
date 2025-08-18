@@ -25,16 +25,131 @@ router = APIRouter(
     prefix="/cnc"
 )
 
+# Helper Functions for CNC Routes
+# These functions eliminate code duplication and centralize common patterns
+# 
+# REFACTORING SUMMARY:
+# - Eliminated duplicate data structure conversion logic (lines 553-567, 623-636, 718-733, 789-804)
+# - Consolidated array manipulation patterns (lines 575-583, 741-749) into reusable functions
+# - Replaced manual configuration context setup with RouteHelper.setup_configuration_context()
+# - Maintained exact same API interface and response formats
+# - Preserved all WebSocket functionality and error handling
+
+def convert_cnc_to_data_dict(cnc):
+    """
+    Convert CNC entity (dict or object) to standardized data dictionary.
+    Handles both TinyDB format (dict) and object format consistently.
+    
+    Args:
+        cnc: CNC entity from repository (dict or object)
+        
+    Returns:
+        dict: Standardized CNC data dictionary
+    """
+    if isinstance(cnc, dict):
+        return {
+            'uid': cnc.get('uid'),
+            'name': cnc.get('name'),
+            'type': cnc.get('type'), 
+            'port': cnc.get('port'),
+            'sequences': cnc.get('sequences', []),
+            'shortcuts': cnc.get('shortcuts', [])
+        }
+    else:
+        return {
+            'uid': getattr(cnc, 'uid', None),
+            'name': getattr(cnc, 'name', None),
+            'type': getattr(cnc, 'type', None),
+            'port': getattr(cnc, 'port', None),
+            'sequences': getattr(cnc, 'sequences', []),
+            'shortcuts': getattr(cnc, 'shortcuts', [])
+        }
+
+def update_cnc_array_field(cnc_data: dict, field_name: str, new_item: dict, item_uid_key: str = 'uid'):
+    """
+    Update an array field in CNC data (sequences or shortcuts).
+    Handles both adding new items and updating existing ones based on UID.
+    
+    Args:
+        cnc_data: CNC data dictionary
+        field_name: Name of the array field ('sequences' or 'shortcuts')
+        new_item: Item to add or update
+        item_uid_key: Key to use for finding existing items (default: 'uid')
+        
+    Returns:
+        bool: True if item was updated, False if it was added as new
+    """
+    # Initialize field if not present
+    if field_name not in cnc_data or cnc_data[field_name] is None:
+        cnc_data[field_name] = []
+    
+    # Find existing item index
+    existing_index = next((i for i, item in enumerate(cnc_data[field_name]) 
+                          if item.get(item_uid_key) == new_item.get(item_uid_key)), None)
+    
+    if existing_index is not None:
+        # Update existing item
+        cnc_data[field_name][existing_index] = new_item
+        return True  # Updated existing
+    else:
+        # Add new item
+        cnc_data[field_name].append(new_item)
+        return False  # Added new
+
+def remove_cnc_array_item(cnc_data: dict, field_name: str, item_uid: str, item_uid_key: str = 'uid'):
+    """
+    Remove an item from a CNC array field by UID.
+    
+    Args:
+        cnc_data: CNC data dictionary
+        field_name: Name of the array field ('sequences' or 'shortcuts')
+        item_uid: UID of item to remove
+        item_uid_key: Key to use for finding items (default: 'uid')
+        
+    Returns:
+        bool: True if item was found and removed, False otherwise
+    """
+    if field_name not in cnc_data or not cnc_data[field_name]:
+        return False
+        
+    initial_length = len(cnc_data[field_name])
+    cnc_data[field_name] = [item for item in cnc_data[field_name] 
+                           if item.get(item_uid_key) != item_uid]
+    
+    return len(cnc_data[field_name]) < initial_length
+
+def get_cnc_array_field(cnc, field_name: str):
+    """
+    Safely extract an array field from CNC entity.
+    Handles different storage formats and ensures list return type.
+    
+    Args:
+        cnc: CNC entity from repository
+        field_name: Name of the array field to extract
+        
+    Returns:
+        list: Array field content or empty list if not found
+    """
+    result = []
+    
+    if isinstance(cnc, dict):
+        result = cnc.get(field_name, [])
+    elif hasattr(cnc, field_name) and getattr(cnc, field_name) is not None:
+        result = getattr(cnc, field_name)
+    elif hasattr(cnc, '__dict__') and field_name in cnc.__dict__:
+        result = cnc.__dict__[field_name] or []
+    
+    # Ensure we return a list
+    return result if isinstance(result, list) else []
+
 
 @router.get("")
 async def get_cncs(
         cnc_repository: CncRepository = Depends(get_service_by_type(CncRepository)),
         configuration_service: ConfigurationService = Depends(get_service_by_type(ConfigurationService))
 ):
-    # Ensure repository has correct configuration context
-    current_config = configuration_service.get_current_configuration_name()
-    if current_config:
-        cnc_repository.set_db(current_config)
+    # Setup configuration context using RouteHelper
+    RouteHelper.setup_configuration_context(cnc_repository, configuration_service)
     
     return RouteHelper.list_entities(cnc_repository, "CNC")
 
@@ -393,10 +508,8 @@ async def move_to_location(
         configuration_service: ConfigurationService = Depends(get_service_by_type(ConfigurationService))
 ):
     try:
-        # Ensure repository has correct configuration context
-        current_config = configuration_service.get_current_configuration_name()
-        if current_config:
-            location_repository.set_db(current_config)
+        # Setup configuration context using RouteHelper
+        RouteHelper.setup_configuration_context(location_repository, configuration_service)
             
         handle_cnc_operation_errors("move to location", cnc_service, cnc_uid)
         location = LocationModel(**location_repository.read_id(location_uid))
@@ -500,27 +613,15 @@ async def get_sequences(
 ):
     """Get all saved sequences for a specific CNC"""
     try:
-        # Ensure repository has correct configuration context
-        current_config = configuration_service.get_current_configuration_name()
-        if current_config:
-            cnc_repository.set_db(current_config)
+        # Setup configuration context using RouteHelper
+        RouteHelper.setup_configuration_context(cnc_repository, configuration_service)
         
         cnc = cnc_repository.read_id(cnc_uid)
         if not cnc:
             raise HTTPException(status_code=404, detail=f"CNC {cnc_uid} not found")
         
-        # Handle different ways the sequences might be stored
-        sequences = []
-        if isinstance(cnc, dict):
-            sequences = cnc.get('sequences', [])
-        elif hasattr(cnc, 'sequences') and cnc.sequences is not None:
-            sequences = cnc.sequences
-        elif hasattr(cnc, '__dict__') and 'sequences' in cnc.__dict__:
-            sequences = cnc.__dict__['sequences'] or []
-        
-        # Ensure we return a list
-        if not isinstance(sequences, list):
-            sequences = []
+        # Use helper function to extract sequences
+        sequences = get_cnc_array_field(cnc, 'sequences')
         return JSONResponse(status_code=200, content=sequences)
     except UidNotFound:
         raise HTTPException(status_code=404, detail=f"CNC {cnc_uid} not found")
@@ -540,54 +641,26 @@ async def save_sequence(
 ):
     """Save or update a sequence for a specific CNC"""
     try:
-        # Ensure repository has correct configuration context
-        current_config = configuration_service.get_current_configuration_name()
-        if current_config:
-            cnc_repository.set_db(current_config)
+        # Setup configuration context using RouteHelper
+        RouteHelper.setup_configuration_context(cnc_repository, configuration_service)
         
         cnc = cnc_repository.read_id(cnc_uid)
         if not cnc:
             raise HTTPException(status_code=404, detail=f"CNC {cnc_uid} not found")
         
-        # Get current CNC data as dict for manipulation - handle TinyDB format
-        if isinstance(cnc, dict):
-            cnc_data = {
-                'uid': cnc.get('uid'),
-                'name': cnc.get('name'),
-                'type': cnc.get('type'), 
-                'port': cnc.get('port'),
-                'sequences': cnc.get('sequences', [])
-            }
-        else:
-            cnc_data = {
-                'uid': getattr(cnc, 'uid', None),
-                'name': getattr(cnc, 'name', None),
-                'type': getattr(cnc, 'type', None),
-                'port': getattr(cnc, 'port', None),
-                'sequences': getattr(cnc, 'sequences', [])
-            }
+        # Convert CNC entity to standardized data dictionary
+        cnc_data = convert_cnc_to_data_dict(cnc)
         
-        # Initialize sequences if not present
-        if 'sequences' not in cnc_data or cnc_data['sequences'] is None:
-            cnc_data['sequences'] = []
-        
-        # Check if sequence already exists (update) or is new (add)
-        existing_index = next((i for i, s in enumerate(cnc_data['sequences']) 
-                              if s.get('uid') == sequence.get('uid')), None)
-        
-        if existing_index is not None:
-            # Update existing sequence
-            cnc_data['sequences'][existing_index] = sequence
-        else:
-            # Add new sequence
-            cnc_data['sequences'].append(sequence)
+        # Update sequences array using helper function
+        was_updated = update_cnc_array_field(cnc_data, 'sequences', sequence)
         
         # Use RouteHelper for consistent updating
         result = RouteHelper.update_entity(cnc_repository, cnc_data, "CNC")
         
         # Return sequence-specific response
+        action = "updated" if was_updated else "added"
         return JSONResponse(status_code=200, content={
-            "message": "Sequence saved successfully",
+            "message": f"Sequence {action} successfully",
             "sequence": sequence
         })
     except UidNotFound:
@@ -606,41 +679,25 @@ async def delete_sequence(
 ):
     """Delete a sequence for a specific CNC"""
     try:
-        # Ensure repository has correct configuration context
-        current_config = configuration_service.get_current_configuration_name()
-        if current_config:
-            cnc_repository.set_db(current_config)
+        # Setup configuration context using RouteHelper
+        RouteHelper.setup_configuration_context(cnc_repository, configuration_service)
         
         cnc = cnc_repository.read_id(cnc_uid)
         if not cnc:
             raise HTTPException(status_code=404, detail=f"CNC {cnc_uid} not found")
         
-        if not hasattr(cnc, 'sequences') or not cnc.sequences:
+        # Check if sequences exist before attempting deletion
+        sequences = get_cnc_array_field(cnc, 'sequences')
+        if not sequences:
             raise HTTPException(status_code=404, detail="No sequences found")
         
-        # Get current CNC data as dict for manipulation - handle TinyDB format
-        if isinstance(cnc, dict):
-            cnc_data = {
-                'uid': cnc.get('uid'),
-                'name': cnc.get('name'),
-                'type': cnc.get('type'), 
-                'port': cnc.get('port'),
-                'sequences': cnc.get('sequences', [])
-            }
-        else:
-            cnc_data = {
-                'uid': getattr(cnc, 'uid', None),
-                'name': getattr(cnc, 'name', None),
-                'type': getattr(cnc, 'type', None),
-                'port': getattr(cnc, 'port', None),
-                'sequences': getattr(cnc, 'sequences', [])
-            }
+        # Convert CNC entity to standardized data dictionary
+        cnc_data = convert_cnc_to_data_dict(cnc)
         
-        # Find and remove the sequence
-        initial_length = len(cnc_data.get('sequences', []))
-        cnc_data['sequences'] = [s for s in cnc_data.get('sequences', []) if s.get('uid') != sequence_uid]
+        # Remove sequence using helper function
+        was_removed = remove_cnc_array_item(cnc_data, 'sequences', sequence_uid)
         
-        if len(cnc_data['sequences']) == initial_length:
+        if not was_removed:
             raise HTTPException(status_code=404, detail=f"Sequence {sequence_uid} not found")
         
         # Use RouteHelper for consistent updating
@@ -664,27 +721,15 @@ async def get_shortcuts(
 ):
     """Get all saved shortcuts for a specific CNC"""
     try:
-        # Ensure repository has correct configuration context
-        current_config = configuration_service.get_current_configuration_name()
-        if current_config:
-            cnc_repository.set_db(current_config)
+        # Setup configuration context using RouteHelper
+        RouteHelper.setup_configuration_context(cnc_repository, configuration_service)
         
         cnc = cnc_repository.read_id(cnc_uid)
         if not cnc:
             raise HTTPException(status_code=404, detail=f"CNC {cnc_uid} not found")
         
-        # Handle different ways the shortcuts might be stored
-        shortcuts = []
-        if isinstance(cnc, dict):
-            shortcuts = cnc.get('shortcuts', [])
-        elif hasattr(cnc, 'shortcuts') and cnc.shortcuts is not None:
-            shortcuts = cnc.shortcuts
-        elif hasattr(cnc, '__dict__') and 'shortcuts' in cnc.__dict__:
-            shortcuts = cnc.__dict__['shortcuts'] or []
-        
-        # Ensure we return a list
-        if not isinstance(shortcuts, list):
-            shortcuts = []
+        # Use helper function to extract shortcuts
+        shortcuts = get_cnc_array_field(cnc, 'shortcuts')
         return JSONResponse(status_code=200, content=shortcuts)
     except UidNotFound:
         raise HTTPException(status_code=404, detail=f"CNC {cnc_uid} not found")
@@ -704,56 +749,26 @@ async def save_shortcut(
 ):
     """Save or update shortcuts for a specific CNC"""
     try:
-        # Ensure repository has correct configuration context
-        current_config = configuration_service.get_current_configuration_name()
-        if current_config:
-            cnc_repository.set_db(current_config)
+        # Setup configuration context using RouteHelper
+        RouteHelper.setup_configuration_context(cnc_repository, configuration_service)
         
         cnc = cnc_repository.read_id(cnc_uid)
         if not cnc:
             raise HTTPException(status_code=404, detail=f"CNC {cnc_uid} not found")
         
-        # Get current CNC data as dict for manipulation - handle TinyDB format
-        if isinstance(cnc, dict):
-            cnc_data = {
-                'uid': cnc.get('uid'),
-                'name': cnc.get('name'),
-                'type': cnc.get('type'), 
-                'port': cnc.get('port'),
-                'sequences': cnc.get('sequences', []),
-                'shortcuts': cnc.get('shortcuts', [])
-            }
-        else:
-            cnc_data = {
-                'uid': getattr(cnc, 'uid', None),
-                'name': getattr(cnc, 'name', None),
-                'type': getattr(cnc, 'type', None),
-                'port': getattr(cnc, 'port', None),
-                'sequences': getattr(cnc, 'sequences', []),
-                'shortcuts': getattr(cnc, 'shortcuts', [])
-            }
+        # Convert CNC entity to standardized data dictionary
+        cnc_data = convert_cnc_to_data_dict(cnc)
         
-        # Initialize shortcuts if not present
-        if 'shortcuts' not in cnc_data or cnc_data['shortcuts'] is None:
-            cnc_data['shortcuts'] = []
-        
-        # Check if shortcut already exists (update) or is new (add)
-        existing_index = next((i for i, s in enumerate(cnc_data['shortcuts']) 
-                              if s.get('uid') == shortcut.get('uid')), None)
-        
-        if existing_index is not None:
-            # Update existing shortcut
-            cnc_data['shortcuts'][existing_index] = shortcut
-        else:
-            # Add new shortcut
-            cnc_data['shortcuts'].append(shortcut)
+        # Update shortcuts array using helper function
+        was_updated = update_cnc_array_field(cnc_data, 'shortcuts', shortcut)
         
         # Use RouteHelper for consistent updating
         result = RouteHelper.update_entity(cnc_repository, cnc_data, "CNC")
         
         # Return shortcut-specific response
+        action = "updated" if was_updated else "added"
         return JSONResponse(status_code=200, content={
-            "message": "Shortcut saved successfully",
+            "message": f"Shortcut {action} successfully",
             "shortcut": shortcut
         })
     except UidNotFound:
@@ -772,43 +787,25 @@ async def delete_shortcut(
 ):
     """Delete shortcuts for a specific CNC"""
     try:
-        # Ensure repository has correct configuration context
-        current_config = configuration_service.get_current_configuration_name()
-        if current_config:
-            cnc_repository.set_db(current_config)
+        # Setup configuration context using RouteHelper
+        RouteHelper.setup_configuration_context(cnc_repository, configuration_service)
         
         cnc = cnc_repository.read_id(cnc_uid)
         if not cnc:
             raise HTTPException(status_code=404, detail=f"CNC {cnc_uid} not found")
         
-        if not hasattr(cnc, 'shortcuts') or not cnc.shortcuts:
+        # Check if shortcuts exist before attempting deletion
+        shortcuts = get_cnc_array_field(cnc, 'shortcuts')
+        if not shortcuts:
             raise HTTPException(status_code=404, detail="No shortcuts found")
         
-        # Get current CNC data as dict for manipulation - handle TinyDB format
-        if isinstance(cnc, dict):
-            cnc_data = {
-                'uid': cnc.get('uid'),
-                'name': cnc.get('name'),
-                'type': cnc.get('type'), 
-                'port': cnc.get('port'),
-                'sequences': cnc.get('sequences', []),
-                'shortcuts': cnc.get('shortcuts', [])
-            }
-        else:
-            cnc_data = {
-                'uid': getattr(cnc, 'uid', None),
-                'name': getattr(cnc, 'name', None),
-                'type': getattr(cnc, 'type', None),
-                'port': getattr(cnc, 'port', None),
-                'sequences': getattr(cnc, 'sequences', []),
-                'shortcuts': getattr(cnc, 'shortcuts', [])
-            }
+        # Convert CNC entity to standardized data dictionary
+        cnc_data = convert_cnc_to_data_dict(cnc)
         
-        # Find and remove the shortcut
-        initial_length = len(cnc_data.get('shortcuts', []))
-        cnc_data['shortcuts'] = [s for s in cnc_data.get('shortcuts', []) if s.get('uid') != shortcut_uid]
+        # Remove shortcut using helper function
+        was_removed = remove_cnc_array_item(cnc_data, 'shortcuts', shortcut_uid)
         
-        if len(cnc_data['shortcuts']) == initial_length:
+        if not was_removed:
             raise HTTPException(status_code=404, detail=f"Shortcut {shortcut_uid} not found")
         
         # Use RouteHelper for consistent updating

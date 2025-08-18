@@ -89,6 +89,42 @@
           @terminal-cleared="onTerminalCleared"
         />
       </div>
+
+      <!-- Camera Feed Section -->
+      <div class="camera-section">
+        <div class="camera-header">
+          <h3>Camera Feed</h3>
+          <select 
+            class="camera-dropdown" 
+            v-model="selectedCamera" 
+            @change="onCameraSourceChanged(selectedCamera)"
+          >
+            <option value="none">No Camera</option>
+            <option 
+              v-for="camera in availableCameras" 
+              :key="camera.uid || camera.id" 
+              :value="camera.uid || camera.id"
+            >
+              {{ camera.name || camera.uid || camera.id }}
+            </option>
+          </select>
+        </div>
+        <div class="camera-feed">
+          <CameraScene
+            width="100%"
+            height="100%"
+            :show="showCameraFeed"
+            :camera-feed="true"
+            :feed-location="feedLocation"
+            :canvas-id="`cnc-camera-${axisUid}`"
+            :graphics="[]"
+            v-if="selectedCamera && selectedCamera !== 'none'"
+          />
+          <div class="camera-placeholder" v-else>
+            <p>No camera selected</p>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- Cross-platform Port Error Dialog -->
@@ -130,7 +166,7 @@
 import { ref, onMounted, onUnmounted, computed } from "vue";
 import { useRouter } from "vue-router";
 import api from "../../utils/api.js";
-import { useCncStore, useWebSocket, useLoadingState } from '@/composables/useStore';
+import { useCncStore, useWebSocket, useLoadingState, useImageSourcesStore } from '@/composables/useStore';
 import { logger } from '@/utils/logger';
 import { handleApiError, addErrorToStore } from '@/utils/errorHandler';
 
@@ -144,6 +180,7 @@ import LocationTabs from "./LocationTabs.vue";
 import FeedrateState from "./FeedrateState.vue";
 import StepsControl from "./StepsControl.vue";
 import TerminalConsole from "./TerminalConsole.vue";
+import CameraScene from "../camera/CameraScene.vue";
 
 export default {
   name: "CNCRefactored",
@@ -155,7 +192,8 @@ export default {
     LocationTabs,
     FeedrateState,
     StepsControl,
-    TerminalConsole
+    TerminalConsole,
+    CameraScene
   },
   props: {
     axisName: {
@@ -171,6 +209,7 @@ export default {
     const router = useRouter();
     const cncStore = useCncStore(props.axisUid);
     const { isLoading, setLoading, withLoading } = useLoadingState();
+    const imageSourcesStore = useImageSourcesStore();
 
     // Reactive state
     const selectedFeedrate = ref(1500);
@@ -186,6 +225,11 @@ export default {
     
     // Tab state tracking
     const isSequenceTabActive = ref(false);
+    
+    // Camera state
+    const selectedCamera = ref(null);
+    const feedLocation = ref('');
+    const showCameraFeed = ref(false);
 
     // WebSocket connection
     let socketInstance = null;
@@ -196,6 +240,12 @@ export default {
     // Computed property for connection state
     const isConnected = computed(() => webSocketState.value === "Connected");
     const isReadyForCommands = computed(() => isConnected.value && connectionReady.value);
+    
+    // Available camera sources (show both dynamic and static sources)
+    const availableCameras = computed(() => {
+      const sources = imageSourcesStore.imageSources.value || [];
+      return sources; // Show all sources, not just dynamic
+    });
 
     // Lifecycle hooks
     onMounted(() => {
@@ -220,6 +270,17 @@ export default {
 
         // Fetch locations using composable
         await cncStore.dispatch('cnc/fetchLocations', props.axisUid);
+        
+        // Load available image sources for camera dropdown
+        await imageSourcesStore.loadImageSources();
+        logger.info("Camera sources loaded:", imageSourcesStore.imageSources.value);
+        logger.info("Available cameras:", availableCameras.value);
+        
+        // Debug: Log the first camera object structure
+        if (availableCameras.value.length > 0) {
+          logger.info("First camera object structure:", availableCameras.value[0]);
+          logger.info("Camera properties:", Object.keys(availableCameras.value[0]));
+        }
 
       } catch (error) {
         logger.error("Failed to initialize CNC component:", error);
@@ -573,6 +634,73 @@ export default {
       isSequenceTabActive.value = tabIndex === 1; // 1 is the sequence tab
     }
     
+    // Camera handling methods
+    async function onCameraSourceChanged(sourceId) {
+      try {
+        if (sourceId && sourceId !== 'none') {
+          selectedCamera.value = sourceId;
+          
+          // Fetch the full image source details from the backend
+          try {
+            const response = await api.get(`/image_source/${sourceId}`);
+            const fullImageSource = response.data;
+            
+            // Construct WebSocket URL based on image source type (like AlgorithmDebug does)
+            const wsBaseUrl = `ws://${window.location.hostname}:8000`;
+            let wsUrl;
+            const fps = fullImageSource.fps || 1; // Default to 1 FPS if not specified
+            
+            if (fullImageSource.image_source_type === "static") {
+              // Static image sources need image_generator_uid
+              if (fullImageSource.image_generator_uid) {
+                wsUrl = `${wsBaseUrl}/image_source/${sourceId}/${fullImageSource.image_generator_uid}/${fps}/ws`;
+              } else {
+                wsUrl = `${wsBaseUrl}/image_source/${sourceId}/ws`;
+              }
+            } else if (fullImageSource.image_source_type === "dynamic") {
+              // Dynamic camera sources need camera_uid
+              if (fullImageSource.camera_uid) {
+                wsUrl = `${wsBaseUrl}/image_source/${sourceId}/${fullImageSource.camera_uid}/${fps}/ws`;
+              } else {
+                wsUrl = `${wsBaseUrl}/image_source/${sourceId}/ws`;
+              }
+            } else {
+              // Fallback to simple format
+              wsUrl = `${wsBaseUrl}/image_source/${sourceId}/ws`;
+            }
+            
+            feedLocation.value = wsUrl;
+            showCameraFeed.value = true;
+            
+            addToConsole(`Camera connected: ${fullImageSource.name || fullImageSource.uid} (${fullImageSource.image_source_type || 'unknown'} type)`);
+          } catch (error) {
+            logger.error('Failed to fetch full image source details', error);
+            // Fallback to simple WebSocket URL if fetching details fails
+            const wsBaseUrl = `ws://${window.location.hostname}:8000`;
+            const wsUrl = `${wsBaseUrl}/image_source/${sourceId}/ws`;
+            feedLocation.value = wsUrl;
+            showCameraFeed.value = true;
+            addToConsole(`Camera connected with fallback URL: ${sourceId}`);
+          }
+        } else {
+          // No camera selected or "No Camera" option selected
+          // Clear feed location first to trigger disconnection
+          feedLocation.value = '';
+          showCameraFeed.value = false;
+          
+          // Wait a moment for disconnection to process, then clear camera selection
+          setTimeout(() => {
+            selectedCamera.value = null;
+          }, 50);
+          
+          addToConsole("Camera disconnected");
+        }
+      } catch (error) {
+        logger.error('Failed to change camera source', error);
+        handleApiError(error, 'Failed to change camera source');
+        addToConsole(`Camera connection failed: ${error.message}`);
+      }
+    }
 
     // Connection handling methods
     async function handleConnect() {
@@ -630,6 +758,12 @@ export default {
       isLoading,
       isSequenceTabActive,
       
+      // Camera state
+      selectedCamera,
+      feedLocation,
+      showCameraFeed,
+      availableCameras,
+      
       // Computed from CNC store
       pos,
       mPos,
@@ -666,6 +800,7 @@ export default {
       onTerminalCommand,
       onTerminalCleared,
       onTabChanged,
+      onCameraSourceChanged,
     };
   }
 };
@@ -782,12 +917,83 @@ export default {
 
 .terminal-section {
   grid-column: 15/19; /* Extended from 15/18 to 15/19 for more width */
-  grid-row: 2/8;
+  grid-row: 2/5; /* Reduced from 2/8 to 2/5 to make room for camera section */
   color: white;
   background-color: #161616;
   border-radius: 8px;
   overflow: hidden;
   padding: 0.5rem;
+}
+
+.camera-section {
+  grid-column: 15/19; /* Same column as terminal section */
+  grid-row: 5/8; /* Below terminal section, from 5 to 8 */
+  color: white;
+  background-color: #161616;
+  border-radius: 8px;
+  overflow: hidden;
+  padding: 0.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.camera-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid #333;
+}
+
+.camera-header h3 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+  color: rgb(204, 161, 82);
+}
+
+.camera-dropdown {
+  background-color: rgb(41, 41, 41);
+  border: none;
+  color: white;
+  padding: 0.4rem 0.8rem;
+  border-radius: 4px;
+  font-family: "Droid Serif";
+  font-size: 0.9rem;
+  font-weight: 700;
+  min-width: 120px;
+}
+
+.camera-dropdown:focus {
+  outline: 2px solid rgb(204, 161, 82);
+  background-color: rgb(51, 51, 51);
+}
+
+.camera-dropdown option {
+  background-color: rgb(204, 161, 82);
+  color: rgb(0, 0, 0);
+}
+
+.camera-feed {
+  flex: 1;
+  display: flex;
+  background-color: #000;
+  border-radius: 4px;
+  overflow: hidden;
+  min-height: 200px; /* Ensure minimum height for canvas */
+  position: relative; /* For proper child positioning */
+}
+
+.camera-placeholder {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #000;
+  border-radius: 4px;
+  color: #666;
+  font-style: italic;
 }
 
 /* Responsive Design - Match original CNC.vue breakpoints */
@@ -804,7 +1010,12 @@ export default {
   
   .terminal-section {
     grid-column: 10/14;
-    grid-row: 2/11;
+    grid-row: 2/6; /* Adjusted to make room for camera */
+  }
+  
+  .camera-section {
+    grid-column: 10/14;
+    grid-row: 6/11; /* Below terminal section */
   }
 }
 
@@ -821,7 +1032,12 @@ export default {
   
   .terminal-section {
     grid-column: 1/10;
-    grid-row: 11/12;
+    grid-row: 11/13; /* Adjusted to make room for camera */
+  }
+  
+  .camera-section {
+    grid-column: 1/10;
+    grid-row: 13/15; /* Below terminal section on small screens */
   }
 }
 

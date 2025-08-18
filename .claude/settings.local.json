@@ -81,7 +81,8 @@
       "Bash(echo \"Found old pattern in $file\")",
       "Bash(echo:*)",
       "Bash(do echo \"Checking CSS in $file...\")",
-      "Bash(del check_notifications.py)"
+      "Bash(del check_notifications.py)",
+      "Bash(git checkout:*)"
     ],
     "deny": [],
     "defaultMode": "acceptEdits",

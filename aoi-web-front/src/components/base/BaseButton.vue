@@ -5,14 +5,14 @@
 </template>
 
 <script setup lang="ts">
-interface Props {
+export interface BaseButtonProps {
   mode?: 'flat' | 'outline' | string;
   width?: string;
   height?: string;
   fontSize?: string;
 }
 
-defineProps<Props>();
+defineProps<BaseButtonProps>();
 </script>
 
 <style scoped>

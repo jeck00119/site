@@ -47,19 +47,25 @@ export default {
         let webSocketInstance = null;
         
         function connectToCamera() {
+            logger.info('CameraScene: connectToCamera called', { feedLocation: props.feedLocation });
+            
             // Don't connect if no valid feed location
             if (!props.feedLocation) {
+                logger.warn('CameraScene: No feedLocation provided, skipping connection');
                 return;
             }
             
             // Disconnect existing connection if any
             if (webSocketInstance) {
+                logger.info('CameraScene: Disconnecting existing WebSocket connection');
                 webSocketInstance.disconnect();
                 webSocketInstance = null;
             }
             
             ws_uid = crypto.randomUUID();
             const wsUrl = props.feedLocation + `/${ws_uid}`;
+            
+            logger.info('CameraScene: Creating WebSocket connection', { wsUrl, ws_uid });
             
             // Create new WebSocket connection using the centralized composable
             webSocketInstance = useWebSocket(wsUrl, {
@@ -71,11 +77,19 @@ export default {
                 onError: onSocketError,
                 onClose: onSocketClose
             });
+            
+            logger.info('CameraScene: WebSocket instance created', { instanceExists: !!webSocketInstance });
         };
 
         function disconnectFromCamera() {
+            logger.info('CameraScene: disconnectFromCamera called', { 
+                hasWsUid: !!ws_uid, 
+                hasWebSocketInstance: !!webSocketInstance 
+            });
+            
             if(ws_uid){
                 try {
+                    logger.info('CameraScene: Closing image source socket', { ws_uid });
                     dispatchImageSources("imageSources/closeImageSourceSocket", {
                         uid: ws_uid
                     });
@@ -88,28 +102,40 @@ export default {
             
             // Use the centralized disconnect if websocket exists
             if (webSocketInstance) {
+                logger.info('CameraScene: Disconnecting WebSocket instance');
                 webSocketInstance.disconnect();
                 webSocketInstance = null;
             }
+            
+            logger.info('CameraScene: Camera disconnection completed');
         };
         
         // Reconnection is now handled by the useWebSocket composable
         
         function onSocketError(event) {
+            logger.error('CameraScene: WebSocket error', event);
             logger.webSocket('error', event);
             addError({ title: 'Camera Connection Error', message: 'Failed to connect to camera feed' });
         }
         
         function onSocketClose(event) {
+            logger.info('CameraScene: WebSocket closed', { code: event.code, reason: event.reason });
             logger.webSocket('close', { code: event.code, reason: event.reason });
         }
 
         function onSocketOpen() {
             try {
+                logger.info('CameraScene: WebSocket opened successfully');
                 logger.webSocket('open');
-                if (webSocketInstance && webSocketInstance.isConnected.value) {
-                    webSocketInstance.send('eses');
-                }
+                
+                // Small delay to ensure connection is fully established
+                setTimeout(() => {
+                    if (webSocketInstance && webSocketInstance.isConnected.value) {
+                        webSocketInstance.send('eses');
+                    } else {
+                        logger.warn('CameraScene: WebSocket instance not connected when trying to send initial message');
+                    }
+                }, 50);
             } catch (error) {
                 logger.error('Error sending initial message to camera websocket', error);
                 addError({ title: 'Camera Communication Error', message: error });
@@ -118,8 +144,10 @@ export default {
 
         function imageReceived(event) {
             try {
+                
                 // Validate event data
                 if (!event.data || event.data.size === 0) {
+                    logger.warn('CameraScene: No image data or empty data received');
                     return;
                 }
                 
@@ -292,12 +320,15 @@ export default {
 
         watch(feedLocation, (newValue) => {
             try {
+                logger.info('CameraScene feedLocation watcher triggered', { newValue, oldValue: feedLocation.value });
                 if(newValue) {
+                    logger.info('CameraScene: Connecting to camera with feedLocation:', newValue);
                     disconnectFromCamera();
                     setTimeout(() => {
                         connectToCamera();
                     }, 100);
                 } else {
+                    logger.info('CameraScene: Disconnecting from camera (no feedLocation)');
                     disconnectFromCamera();
                 }
             } catch (error) {
@@ -365,48 +396,76 @@ export default {
 
         watch(imageSource, (newValue) => {
             if(show.value && canvas.value && newValue) {
-                // Dispose previous background image to prevent memory leaks
-                if (canvas.value.backgroundImage) {
-                    try {
-                        canvas.value.backgroundImage.dispose();
-                    } catch (e) {
-                        // Image may already be disposed
-                    }
+                // Ensure canvas is fully initialized before rendering
+                if (!canvas.value.getElement()) {
+                    // Retry after a short delay
+                    setTimeout(() => {
+                        if (canvas.value && canvas.value.getElement()) {
+                            processImageForCanvas(newValue);
+                        }
+                    }, 100);
+                    return;
                 }
                 
-                // Fabric.js v6: Create FabricImage from HTML Image element with optimizations
-                const img = new Image();
-                img.onload = function() {
-                    if (canvas.value) {
-                        try {
-                            const fabricImg = new fabric.FabricImage(img, {
-                                // Performance optimizations for background image
-                                objectCaching: true,
-                                statefullCache: true,
-                                noScaleCache: false,
-                                evented: false
-                            });
-                            
-                            canvas.value.set({ backgroundImage: fabricImg });
-                            
-                            // Use throttled rendering for smooth performance
-                            throttledRender();
-                        } catch (err) {
-                            logger.error('Error creating Fabric image from camera feed', err);
-                            addErrorToStore(store, 'Canvas Rendering Error', err);
-                        }
-                    }
-                };
-                img.onerror = function(err) {
-                    logger.error('Error loading background image', err);
-                    addErrorToStore(store, 'Background Image Error', err);
-                };
+                // Check canvas dimensions
+                const canvasWidth = canvas.value.getWidth();
+                const canvasHeight = canvas.value.getHeight();
                 
-                // Set crossOrigin for better performance and caching
-                img.crossOrigin = 'anonymous';
-                img.src = newValue;
+                if (canvasWidth === 0 || canvasHeight === 0) {
+                    canvas.value.setWidth(600);
+                    canvas.value.setHeight(400);
+                }
+                
+                processImageForCanvas(newValue);
             }
         });
+        
+        function processImageForCanvas(imageUrl) {
+            
+            // Dispose previous background image to prevent memory leaks
+            if (canvas.value.backgroundImage) {
+                try {
+                    canvas.value.backgroundImage.dispose();
+                } catch (e) {
+                    // Image may already be disposed
+                }
+            }
+            
+            // Fabric.js v6: Create FabricImage from HTML Image element with optimizations
+            const img = new Image();
+            img.onload = function() {
+                if (canvas.value) {
+                    try {
+                        const fabricImg = new fabric.FabricImage(img, {
+                            // Performance optimizations for background image
+                            objectCaching: true,
+                            statefullCache: true,
+                            noScaleCache: false,
+                            evented: false
+                        });
+                        
+                        canvas.value.set({ backgroundImage: fabricImg });
+                        
+                        // Use throttled rendering for smooth performance
+                        throttledRender();
+                        
+                        // Force an immediate render for the first frame to ensure visibility
+                        canvas.value.requestRenderAll();
+                    } catch (err) {
+                        logger.error('Error creating Fabric image from camera feed', err);
+                        addErrorToStore(store, 'Canvas Rendering Error', err);
+                    }
+                }
+            };
+            img.onerror = function(err) {
+                logger.error('CameraScene: Error loading background image', err);
+                addErrorToStore(store, 'Background Image Error', err);
+            };
+            
+            // Set crossOrigin for better performance and caching
+            img.crossOrigin = 'anonymous';
+            img.src = imageUrl;
+        }
 
         function addStaticImage(url) {
             return new Promise((resolve, reject) => {
@@ -513,21 +572,34 @@ export default {
 
         onMounted(() => {
             logger.lifecycle('mounted', 'CameraScene component mounted');
+            logger.info('CameraScene: Component mounted with props', { 
+                feedLocation: props.feedLocation,
+                show: props.show,
+                cameraFeed: props.cameraFeed 
+            });
             initCanvas();
             
             // Start periodic image cache cleanup
             imageCleanupInterval = setInterval(cleanupImageCache, 30000); // Every 30 seconds
 
-            if (canvas.value) {
-                canvas.value.setHeight(canvasContainer.value.clientHeight);
-                canvas.value.setWidth(canvasContainer.value.clientWidth);
+            if (canvas.value && canvasContainer.value) {
+                const containerHeight = canvasContainer.value.clientHeight || 400;
+                const containerWidth = canvasContainer.value.clientWidth || 600;
+                canvas.value.setHeight(containerHeight);
+                canvas.value.setWidth(containerWidth);
             }
 
             const resizeObserver = new ResizeObserver(() => {
                 if(canvasContainer.value && canvas.value)
                 {
-                    canvas.value.setHeight(canvasContainer.value.clientHeight);
-                    canvas.value.setWidth(canvasContainer.value.clientWidth);
+                    const newHeight = canvasContainer.value.clientHeight || 400;
+                    const newWidth = canvasContainer.value.clientWidth || 600;
+                    canvas.value.setHeight(newHeight);
+                    canvas.value.setWidth(newWidth);
+                    // Re-render after resize
+                    if (canvas.value.backgroundImage) {
+                        canvas.value.requestRenderAll();
+                    }
                 }
             });
 
@@ -630,6 +702,14 @@ export default {
                 canvas.value.overlayImage = overlay.value;
                 throttledRender();
             }
+            
+            // Manually trigger connection if feedLocation is already set
+            if (props.feedLocation && props.cameraFeed) {
+                logger.info('CameraScene: feedLocation already set on mount, connecting...', { feedLocation: props.feedLocation });
+                setTimeout(() => {
+                    connectToCamera();
+                }, 100);
+            }
         });
 
         onBeforeUnmount(() => {
@@ -710,11 +790,19 @@ export default {
 <style scoped>
     #canvas-container {
         background-color: rgb(0, 0, 0);
-        /* background-color: red; */
+        width: 100%;
+        height: 100%;
+        min-height: 200px;
+        position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: center;
     }
 
     canvas {
-        width: 900px;
-        height: 755px;
+        width: 100% !important;
+        height: 100% !important;
+        object-fit: contain;
+        display: block;
     }
 </style>
