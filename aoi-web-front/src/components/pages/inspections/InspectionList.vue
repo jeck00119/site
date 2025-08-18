@@ -844,8 +844,9 @@ th {
     background-color: rgb(126, 99, 50);
 }
 
-.table-wrapper::-webkit-scrollbar {
-    display: none;
+/* Use modern scrollbar solution instead of hiding */
+.table-wrapper {
+    overflow-y: auto;
 }
 
 .table-actions {

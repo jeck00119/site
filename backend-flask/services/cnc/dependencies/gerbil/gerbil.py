@@ -103,7 +103,7 @@ class Gerbil:
             "99",
             "0",
         ]
-        self.poll_interval = 0.2
+        self.poll_interval = 0.1  # 100ms polling interval for consistency
         self.settings = {
             130: {"val": "1000", "cmt": "width"},
             131: {"val": "1000", "cmt": "height"}
@@ -537,7 +537,7 @@ class Gerbil:
             num_written = self._iface.write(line)
             # Add configurable delay to prevent buffer overflow and command fragmentation
             import time
-            time.sleep(0.05)  # 50ms delay between commands (consistent with Marlin)
+            time.sleep(0.1)  # 100ms delay between commands for maximum reliability
 
     def _onread(self):
         self.logger.debug(f"[GRBL THREAD] _onread thread started, _iface_read_do={self._iface_read_do}")

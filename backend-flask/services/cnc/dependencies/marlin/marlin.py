@@ -24,6 +24,25 @@ class MarlinBufferManager:
         marlin_instance._rx_buffer_backlog_line_number.clear()
         # Reset active command counter when clearing buffers
         marlin_instance._active_command_count = 0
+        # Reset flow control state
+        marlin_instance._pending_bytes = 0
+        marlin_instance._command_queue.clear()
+        # Clear error tracking to prevent stale state
+        if hasattr(marlin_instance, '_last_sync_fix_line'):
+            marlin_instance._last_sync_fix_line = None
+        if hasattr(marlin_instance, '_last_sync_fix_time'):
+            marlin_instance._last_sync_fix_time = None
+        if hasattr(marlin_instance, '_last_checksum_fix_line'):
+            marlin_instance._last_checksum_fix_line = None
+        if hasattr(marlin_instance, '_fixing_line_sync'):
+            marlin_instance._fixing_line_sync = False
+        if hasattr(marlin_instance, '_fixing_checksum_error'):
+            marlin_instance._fixing_checksum_error = False
+        # Clear circuit breaker counters
+        if hasattr(marlin_instance, '_sync_error_count'):
+            marlin_instance._sync_error_count.clear()
+        if hasattr(marlin_instance, '_sync_error_first_time'):
+            marlin_instance._sync_error_first_time.clear()
 
     @staticmethod  
     def reset_line_sync(marlin_instance, expected_line: int):
@@ -37,6 +56,19 @@ class MarlinBufferManager:
         # Stop any current streaming to prevent further line number conflicts
         marlin_instance._streaming_enabled = False
         marlin_instance._set_streaming_complete(True)
+    
+    @staticmethod
+    def reset_line_number_to_start(marlin_instance):
+        """Reset line number to 1 (used during boot/init)"""
+        marlin_instance._line_number = 1
+        marlin_instance._last_resend = None
+        marlin_instance._resend_count = 0
+    
+    @staticmethod
+    def reset_error_state_to_idle(marlin_instance):
+        """Reset Error state back to Idle when error is cleared"""
+        if marlin_instance.current_mode == "Error":
+            marlin_instance.current_mode = "Idle"
 
 
 class MarlinCommandVerifier:
@@ -49,28 +81,38 @@ class MarlinCommandVerifier:
             return False, ""
             
         # Extract the corrupted command
-        import re
         match = re.search(r'Unknown command: "([^"]+)"', line)
         if not match:
             return False, ""
             
         corrupted_cmd = match.group(1)
         
-        # Common corruption patterns
+        # Common corruption patterns - expanded based on new observations
         corruption_fixes = {
             'MM110': 'M110',
-            'MM114': 'M114', 
+            'MM114 R': 'M114 R',  # Fix for MM114 R corruption 
+            'M11M114 R': 'M114 R',  # Fix for M11M114 R corruption - preserve R parameter
+            '14 R': 'M114 R',     # Fix for M114 R prefix corruption (M1 dropped)
+            '4 R': 'M114 R',      # Fix for M114 R corruption (M11 dropped)
+            '114 R': 'M114 R',    # Fix for M114 R corruption (M dropped)
             'MM17': 'M17',
             'MM18': 'M18',
             'MM999': 'M999',
             'GG28': 'G28',
             'GG90': 'G90',
             'GG91': 'G91',
+            # New corruption patterns from logs  
+            'M11N21 G91': 'N21 G91',  # Fix specific line corruption from logs
+            'M11N9 G90': 'N9 G90',    # Fix new corruption pattern from latest logs
+            # General pattern fix for M11N prefix corruption
+            'M11N': 'N',
         }
         
         for corrupted, original in corruption_fixes.items():
             if corrupted in corrupted_cmd:
-                return True, corrupted_cmd.replace(corrupted, original)
+                fixed_cmd = corrupted_cmd.replace(corrupted, original)
+                # Logging will be handled by the caller
+                return True, fixed_cmd
                 
         return True, ""  # Detected corruption but couldn't fix
     
@@ -84,7 +126,10 @@ class MarlinCommandVerifier:
             return False
         
         # Only retry simple commands automatically
-        safe_retry_commands = ['M110', 'M114', 'M17', 'M18', 'M999']
+        safe_retry_commands = ['M110', 'M114 R', 'M17', 'M18', 'M999']
+        # Also allow retry of corrupted M114 R commands
+        if 'M114 R' in original_cmd:
+            return True
         return any(original_cmd.startswith(cmd) for cmd in safe_retry_commands)
 
 
@@ -93,17 +138,72 @@ class MarlinErrorHandler:
     
     @staticmethod
     def handle_line_number_error(marlin_instance, line: str, logger) -> bool:
-        """Handle line number mismatch errors. Returns True if handled."""
+        """Handle line number mismatch errors with circuit breaker pattern. Returns True if handled."""
         if "Line Number is not Last Line Number+1" not in line:
             return False
             
         # Extract the expected line number from error message  
-        import re
         match = re.search(r'Last Line: (\d+)', line)
         if match:
-            expected_line = int(match.group(1)) + 1
-            logger.warning(f"FORCE SYNC: Resetting line number from {marlin_instance._line_number} to {expected_line}")
-            MarlinBufferManager.reset_line_sync(marlin_instance, expected_line)
+            firmware_last_line = int(match.group(1))
+            expected_line = firmware_last_line + 1
+            
+            import time
+            current_time = time.time()
+            
+            # Initialize error tracking if not present
+            if not hasattr(marlin_instance, '_sync_error_count'):
+                marlin_instance._sync_error_count = {}
+            if not hasattr(marlin_instance, '_sync_error_first_time'):
+                marlin_instance._sync_error_first_time = {}
+            
+            # Track error count for this specific line
+            key = f"line_{firmware_last_line}"
+            if key not in marlin_instance._sync_error_count:
+                marlin_instance._sync_error_count[key] = 0
+                marlin_instance._sync_error_first_time[key] = current_time
+            
+            marlin_instance._sync_error_count[key] += 1
+            
+            # Circuit breaker: If we've seen this error too many times, stop trying
+            if marlin_instance._sync_error_count[key] > 5:
+                logger.error(f"CIRCUIT BREAKER: Too many sync errors for line {firmware_last_line} ({marlin_instance._sync_error_count[key]} attempts). Performing complete reset.")
+                # Reset line numbering completely and clear all buffers
+                marlin_instance._line_number = 1
+                MarlinBufferManager.clear_all_buffers(marlin_instance)
+                # Send M110 to reset firmware line numbering
+                marlin_instance._iface_write("M110 N0")
+                # Clear error tracking for fresh start
+                marlin_instance._sync_error_count.clear()
+                marlin_instance._sync_error_first_time.clear()
+                # Force return to Idle state after circuit breaker reset
+                marlin_instance.current_mode = "Idle"
+                marlin_instance._error = False
+                logger.info("Circuit breaker reset complete - returning to Idle state")
+                marlin_instance.callback("on_stateupdate", marlin_instance.current_mode, marlin_instance.current_position, marlin_instance.current_work_position)
+                return True
+            
+            # Time-based duplicate prevention (only for recent fixes)
+            if hasattr(marlin_instance, '_last_sync_fix_line') and hasattr(marlin_instance, '_last_sync_fix_time'):
+                if (marlin_instance._last_sync_fix_line == firmware_last_line and 
+                    current_time - marlin_instance._last_sync_fix_time < 1.0):  # 1-second cooldown
+                    logger.debug(f"Recently fixed sync for line {firmware_last_line}, ignoring duplicate")
+                    return True
+            
+            # Check if we're already fixing any sync error
+            if (not hasattr(marlin_instance, '_fixing_line_sync') or not marlin_instance._fixing_line_sync):
+                marlin_instance._fixing_line_sync = True
+                marlin_instance._last_sync_fix_line = firmware_last_line
+                marlin_instance._last_sync_fix_time = current_time
+                
+                logger.warning(f"LINE NUMBER ERROR: Firmware last line {firmware_last_line}, our line {marlin_instance._line_number}, syncing to {expected_line} (attempt {marlin_instance._sync_error_count[key]})")
+                MarlinBufferManager.reset_line_sync(marlin_instance, expected_line)
+                
+                # Brief pause to prevent rapid-fire errors
+                time.sleep(0.2)
+                marlin_instance._fixing_line_sync = False
+            else:
+                logger.debug("Already fixing sync error, ignoring line number error")
         return True
     
     @staticmethod
@@ -112,12 +212,28 @@ class MarlinErrorHandler:
         if "checksum mismatch" not in line:
             return False
             
-        import re
         match = re.search(r'Last Line: (\d+)', line)
         if match:
-            expected_line = int(match.group(1)) + 1
-            logger.warning(f"Checksum error - resetting line number from {marlin_instance._line_number} to {expected_line}")
-            MarlinBufferManager.reset_line_sync(marlin_instance, expected_line)
+            firmware_last_line = int(match.group(1))
+            expected_line = firmware_last_line + 1
+            
+            # Prevent multiple corrections for the same checksum error
+            if hasattr(marlin_instance, '_last_checksum_fix_line') and marlin_instance._last_checksum_fix_line == firmware_last_line:
+                logger.debug(f"Already fixed checksum for line {firmware_last_line}, ignoring duplicate")
+                return True
+            
+            # Check if we're already handling this error to prevent conflicts
+            if not hasattr(marlin_instance, '_fixing_checksum_error') or not marlin_instance._fixing_checksum_error:
+                marlin_instance._fixing_checksum_error = True
+                marlin_instance._last_checksum_fix_line = firmware_last_line
+                logger.warning(f"CHECKSUM ERROR: Firmware last line {firmware_last_line}, our line {marlin_instance._line_number}, syncing to {expected_line}")
+                MarlinBufferManager.reset_line_sync(marlin_instance, expected_line)
+                # Keep flag set briefly to prevent immediate duplicate processing
+                import time
+                time.sleep(0.1)
+                marlin_instance._fixing_checksum_error = False
+            else:
+                logger.debug("Already fixing checksum error, ignoring duplicate")
         return True
     
     @staticmethod
@@ -126,27 +242,33 @@ class MarlinErrorHandler:
         if not line.startswith("Resend:"):
             return False
             
-        import re
         match = re.search(r'Resend: (\d+)', line)
         if match:
             resend_line = int(match.group(1))
             
-            # Check for infinite resend loop
+            # Check for infinite resend loop - be more aggressive to prevent console spam
             if marlin_instance._last_resend == resend_line:
                 marlin_instance._resend_count += 1
-                if marlin_instance._resend_count > 5:
-                    logger.error(f"RESEND LOOP DETECTED: Ignoring repeated resend request for line {resend_line}")
-                    # Force a hard reset to break the loop
-                    marlin_instance._line_number = resend_line
+                if marlin_instance._resend_count > 3:  # Reduced from 5 to 3
+                    logger.warning(f"RESEND LOOP: Breaking loop for line {resend_line} after {marlin_instance._resend_count} attempts")
+                    # Force complete line number synchronization reset
+                    marlin_instance._line_number = resend_line + 1  # Start from next line
+                    MarlinBufferManager.clear_all_buffers(marlin_instance)
                     marlin_instance._resend_count = 0
                     marlin_instance._last_resend = None
-                    marlin_instance._streaming_enabled = False
+                    # Send M110 to reset line numbering on firmware side
+                    marlin_instance._iface_write(f"M110 N{resend_line}")
                     return True
             else:
                 marlin_instance._resend_count = 1
                 marlin_instance._last_resend = resend_line
             
-            logger.warning(f"RESEND: Syncing line number from {marlin_instance._line_number} to {resend_line} (attempt {marlin_instance._resend_count})")
+            # Check if line sync handler already fixed this
+            if hasattr(marlin_instance, '_fixing_line_sync') and marlin_instance._fixing_line_sync:
+                logger.debug(f"RESEND: Line sync already being handled, skipping resend for line {resend_line}")
+                return True
+                
+            logger.debug(f"RESEND: Syncing line number from {marlin_instance._line_number} to {resend_line} (attempt {marlin_instance._resend_count})")
             MarlinBufferManager.reset_line_sync(marlin_instance, resend_line)
         return True
 
@@ -171,9 +293,8 @@ class Marlin:
             "99",
             "0",
         ]
-        # Reduced polling interval for faster position updates during movement
-        # Was 0.2 (200ms), now 0.05 (50ms) for real-time tracking
-        self.poll_interval = 0.05
+        # Set polling interval to 200ms to prevent serial buffer overflow
+        self.poll_interval = 0.2  # 200ms polling for both idle and jog states to prevent corruption
         self.settings = {}
         self.settings_hash = {
             "G54": (0, 0, 0),
@@ -196,6 +317,7 @@ class Marlin:
         self.target = "firmware"
         self.connected = False
         self.initialized = False
+        self.connection_ready = False  # Track if connection is fully ready for commands
         self.preprocessor = GcodeMachine()
         self.preprocessor.callback = self._preprocessor_callback
         self.travel_dist_buffer = {}
@@ -206,7 +328,15 @@ class Marlin:
         self._last_mode = None
         self._last_position = (0, 0, 0)
         self._last_work_position = (0, 0, 0)
+        # Default buffer sizes - will be auto-detected based on board type
         self._rx_buffer_size = 128
+        self._serial_buffer_size = 64  # Default Arduino serial buffer size
+        self._tx_buffer_size = 32     # Marlin TX buffer size
+        self._pending_bytes = 0       # Track bytes pending in serial buffer
+        self._command_queue = []      # Queue commands when buffer is full
+        
+        # Auto-detect buffer sizes based on common BigTreeTech board signatures
+        self._auto_detect_buffer_sizes()
         self._rx_buffer_fill = []
         self._rx_buffer_backlog = []
         self._rx_buffer_backlog_line_number = []
@@ -230,7 +360,7 @@ class Marlin:
         self._line_number = 1  # Marlin line numbering starts at 1
         self._last_resend = None  # Track last resend request to prevent loops
         self._resend_count = 0    # Count consecutive resends
-        self._command_delay = 0.02  # 20ms delay between commands for responsive control
+        self._command_delay = 0.1  # 100ms delay between commands for maximum reliability
         self._active_command_count = 0  # Track active numbered commands
         self._poll_keep_alive = False
         self._iface_read_do = False
@@ -270,6 +400,18 @@ class Marlin:
         }
         atexit.register(self.disconnect)
 
+    def _auto_detect_buffer_sizes(self):
+        """Set optimized buffer sizes for STM32 boards"""
+        self._board_type = "STM32_Optimized"
+        
+        # Optimized settings for STM32 boards with adequate RAM
+        self._serial_buffer_size = 256   # STM32 USART buffer 
+        self._rx_buffer_size = 1024     # Marlin RX buffer (supports flow control)
+        self._tx_buffer_size = 64       # Marlin TX buffer
+        
+        self.logger.info(f"Using optimized buffer sizes: Serial={self._serial_buffer_size}, RX={self._rx_buffer_size}, TX={self._tx_buffer_size}")
+
+
     def setup_logging(self, handler=None):
         if handler:
             self._loghandler = handler
@@ -288,7 +430,7 @@ class Marlin:
             self.logger.debug("{}: Setting up interface on {}".format(self.name, self._ifacepath))
             self._iface = Interface("iface_" + self.name, self._ifacepath, baudrate)
             self._iface.start(self._queue)
-            print("{}: Setting up interface on {}".format(self.name, self._ifacepath))
+            self.logger.info("{}: Setting up interface on {}".format(self.name, self._ifacepath))
         else:
             self.logger.info(
                 "{}: Cannot start another interface. There is already an interface {}.".format(self.name, self._iface))
@@ -354,6 +496,7 @@ class Marlin:
         self.logger.info("{}: Disconnect completed.".format(self.name))
         self.connected = False
         self.initialized = False  # Reset initialization flag
+        self.connection_ready = False  # Reset ready flag
         self._iface = None
         self.callback("on_disconnected")
 
@@ -366,8 +509,10 @@ class Marlin:
 
     def abort(self):
         if not self.is_connected(): return
-        del self._rx_buffer_fill[:]
-        del self._rx_buffer_backlog[:]
+        # Use centralized buffer clearing but preserve only partial clearing for abort
+        # (abort doesn't need to clear _rx_buffer_backlog_line_number as it's job-specific)
+        self._rx_buffer_fill.clear()
+        self._rx_buffer_backlog.clear()
         self._streaming_enabled = False
         self._wait_empty_buffer = False
         self._streaming_src_end_reached = True
@@ -384,7 +529,22 @@ class Marlin:
         self._iface_write("~")
 
     def home(self):
+        if not self.is_ready_for_commands():
+            self.logger.warning("Cannot home - connection not ready. Waiting for initialization to complete...")
+            # Wait briefly and retry once
+            import time
+            time.sleep(1.0)
+            if not self.is_ready_for_commands():
+                self.logger.error("Connection not ready for homing command")
+                return
+                
         self.is_homing = True
+        # Immediately set state to Jog when homing starts (since we know movement will occur)
+        if self.current_mode != "Error":
+            old_mode = self.current_mode
+            self.current_mode = "Jog"
+            self.is_standstill = False
+            self.callback("on_stateupdate", self.current_mode, self.current_position, self.current_work_position)
         self._iface_write("G28")
 
     def poll_start(self):
@@ -430,6 +590,10 @@ class Marlin:
         self.logger.debug("{}: Incremental streaming set to {}".format(self.name, self._incremental_streaming))
 
     def send_immediately(self, line):
+        if not self.is_ready_for_commands():
+            self.logger.warning("Cannot send command - connection not ready: {}".format(line))
+            return
+            
         bytes_in_firmware_buffer = sum(self._rx_buffer_fill)
         if bytes_in_firmware_buffer > 0:
             self.logger.error(
@@ -489,9 +653,8 @@ class Marlin:
         self._set_job_finished(True)
         self._set_streaming_src_end_reached(True)
         self._error = False
-        # Reset state from Error back to Idle when error is cleared
-        if self.current_mode == "Error":
-            self.current_mode = "Idle"
+        # Use centralized error state reset
+        MarlinBufferManager.reset_error_state_to_idle(self)
         self._current_line = ""
         self._current_line_sent = True
         self.travel_dist_buffer = {}
@@ -514,6 +677,10 @@ class Marlin:
 
     def is_connected(self):
         return self.connected
+    
+    def is_ready_for_commands(self):
+        """Check if connection is ready to accept commands (avoids paused state)"""
+        return self.connected and self.initialized and self.connection_ready
 
     def _preprocessor_callback(self, event, *data):
         if event == "on_preprocessor_var_undefined":
@@ -560,7 +727,7 @@ class Marlin:
     def _set_next_line(self, send_comments=False):
         if self._current_line_nr < self.buffer_size:
             line = self.buffer[self._current_line_nr].strip()
-            print(f"[MARLIN DEBUG] Setting next line from buffer: '{line}'")
+            self.logger.debug(f"Setting next line from buffer: '{line}'")
             self.preprocessor.set_line(line)
             self.preprocessor.substitute_vars()
             self.preprocessor.parse_state()
@@ -570,7 +737,7 @@ class Marlin:
                 self._current_line = self.preprocessor.line + self.preprocessor.comment
             else:
                 self._current_line = self.preprocessor.line
-            print(f"[MARLIN DEBUG] After preprocessing: '{self._current_line}'")
+            self.logger.debug(f"After preprocessing: '{self._current_line}'")
             self._current_line_sent = False
             self._current_line_nr += 1
             self.preprocessor.done()
@@ -583,15 +750,13 @@ class Marlin:
         self._rx_buffer_fill.append(line_length)
         self._rx_buffer_backlog.append(self._current_line)
         self._rx_buffer_backlog_line_number.append(self._current_line_nr)
-        print(f"[MARLIN DEBUG] Sending buffer line: '{self._current_line}'")
+        self.logger.debug(f"Sending buffer line: '{self._current_line}'")
         self._iface_write(self._current_line)
         self._current_line_sent = True
         
-        # Only set to Jog mode for actual movement commands, not status queries
+        # Don't set state based on commands - use position-based detection instead
         if not self._is_status_command(self._current_line):
-            if self.current_mode != "Jog":
-                self.current_mode = "Jog"
-                self.callback("on_stateupdate", self.current_mode, self.current_position, self.current_work_position)
+            self.logger.warning(f"[HOMING-DEBUG] Sending movement command: '{self._current_line}', letting position detection handle state")
 
     def _rx_buf_can_receive_current_line(self):
         rx_free_bytes = self._rx_buffer_size - sum(self._rx_buffer_fill)
@@ -607,22 +772,67 @@ class Marlin:
             self._set_job_finished(True)
             self._set_streaming_complete(True)
 
+    def _can_send_command(self, command_length):
+        """Check if serial buffer can accept command using character counting protocol"""
+        available_space = self._serial_buffer_size - self._pending_bytes
+        required_space = command_length + 2  # +2 for \r\n
+        # Be conservative - keep 25% buffer space free for flow control
+        safety_margin = self._serial_buffer_size * 0.25
+        return available_space >= (required_space + safety_margin)
+    
+    def _send_with_flow_control(self, line):
+        """Send command only if buffer has space, otherwise queue it"""
+        command_length = len(line)
+        
+        if self._can_send_command(command_length):
+            # Buffer has space - send immediately
+            self._pending_bytes += command_length + 2
+            if self._iface:
+                self._iface.write(line)
+                # Only log non-polling commands to reduce spam
+                if not line.strip().startswith('M114'):
+                    self.logger.debug(f"Sending: {line.strip()}")
+            return True
+        else:
+            # Buffer full - queue command for later
+            self._command_queue.append(line)
+            self.logger.debug(f"Serial buffer full, queuing command: {line.strip()[:20]}...")
+            return False
+    
+    def _process_command_queue(self):
+        """Process queued commands when buffer space becomes available"""
+        while self._command_queue and self._can_send_command(len(self._command_queue[0])):
+            queued_command = self._command_queue.pop(0)
+            self._send_with_flow_control(queued_command)
+    
     def _iface_write(self, line):
         if self._iface:
             # Add line numbering and checksum for Marlin protocol
             formatted_line = self._format_line_with_checksum(line.strip())
-            # Only log non-polling commands to reduce spam
-            if not line.strip().startswith('M114'):
-                print(f"[MARLIN] Sending: {line.strip()}")
-            self._iface.write(formatted_line)
-            # Add configurable delay to prevent buffer overflow and command fragmentation
-            import time
-            time.sleep(self._command_delay)
+            
+            # M114 R is a real-time command - send immediately without flow control
+            if line.strip() == "M114 R":
+                self._iface.write(formatted_line)
+                # Minimal delay for real-time commands
+                import time
+                time.sleep(0.01)  # 10ms only for real-time commands
+            else:
+                # Use flow control for regular commands
+                success = self._send_with_flow_control(formatted_line)
+                
+                if success:
+                    # Add configurable delay to prevent buffer overflow and command fragmentation
+                    import time
+                    time.sleep(self._command_delay)
+            
+            # Try to process any queued commands
+            self._process_command_queue()
 
     def _format_line_with_checksum(self, line):
         """Format a line with Marlin line number and checksum"""
         # Skip line numbering for emergency/immediate commands and real-time polling
-        skip_numbering_commands = ['?', 'M112', '!', '~', '\x18', 'M999', 'M110', 'M114 R']
+        # M114 R is a real-time command and should NEVER have line numbers/checksums
+        skip_numbering_commands = ['?', 'M112', '!', '~', '\x18', 'M999', 'M110', 'M114 R', 'M114']
         
         if any(line.startswith(cmd) for cmd in skip_numbering_commands):
             return line + '\n'
@@ -653,9 +863,32 @@ class Marlin:
                 self.logger.debug(f"[MARLIN QUEUE] Processing line from queue: '{line}'")
                 if len(line) > 0:
                     if "echo:busy: processing" in line:
-                        self.current_mode = "Jog"
-                        self.callback("on_stateupdate", self.current_mode, self.current_position,
-                                      self.current_work_position)
+                        # Ignore busy messages - we use position-based state detection instead
+                        pass
+                    elif "echo:busy: paused for user" in line:
+                        # Handle paused state - need to handle firmware prompts properly
+                        self.logger.warning("CNC is paused for user confirmation - attempting to continue")
+                        if self.current_mode != "Error":
+                            # Try multiple resume approaches for different pause types
+                            self._iface_write("M108")  # Cancel heating/pause
+                            self._iface_write("M999")  # Reset from emergency stop
+                            # Send a simple command to trigger continuation
+                            import time
+                            time.sleep(0.1)
+                            self._iface_write("G4 P0")  # Dwell 0 seconds (no-op that might trigger continuation)
+                        self.callback("on_read", line)
+                    elif "//action:prompt" in line:
+                        # Handle firmware prompt actions
+                        if "//action:prompt_show" in line:
+                            self.logger.warning("Firmware prompt detected - sending continue response")
+                            # Send response to continue past the prompt - try different approaches
+                            # M876 S0 = Continue/Yes, M876 S1 = Cancel/No
+                            self._iface_write("M876 S0")  # Marlin prompt response: continue/yes
+                            # Also try a soft reset to clear any stuck state
+                            import time
+                            time.sleep(0.1)
+                            self._iface_write("M999")  # Soft reset to clear error state
+                        self.callback("on_read", line)
                     elif re.search(r'X:(-?[\d.]+) Y:(-?[\d.]+) Z:(-?[\d.]+)', line):
                         self._update_state_from_m114(line)
                     elif line.startswith("echo:"):
@@ -663,15 +896,22 @@ class Marlin:
                         self.callback("on_read", line)
                     elif line == "ok":
                         self._handle_ok()
+                        # Update flow control - command completed, free up buffer space
+                        if self._pending_bytes > 0:
+                            # Estimate freed space (conservative approach)
+                            self._pending_bytes = max(0, self._pending_bytes - 20)
+                        # Process any queued commands now that space is available
+                        self._process_command_queue()
                         self.callback("on_read", line)
                     elif line.startswith("Error:"):
                         self._error = True
                         self.current_mode = "Error"
                         
-                        # Use centralized error handlers
+                        # Use centralized error handlers only
                         handled = (
                             MarlinErrorHandler.handle_line_number_error(self, line, self.logger) or
-                            MarlinErrorHandler.handle_checksum_error(self, line, self.logger)
+                            MarlinErrorHandler.handle_checksum_error(self, line, self.logger) or
+                            MarlinErrorHandler.handle_resend_request(self, line, self.logger)
                         )
                         
                         self.callback("on_stateupdate", self.current_mode, self.current_position,
@@ -679,26 +919,46 @@ class Marlin:
                         self.callback("on_read", line)
                         self.callback("on_error", line, "", 0)
                     elif line.startswith("Resend:"):
-                        # Use centralized resend handler
-                        MarlinErrorHandler.handle_resend_request(self, line, self.logger)
+                        # Resend requests are already handled by the centralized error handler above
+                        # This ensures we don't double-process resend requests
                         self.callback("on_read", line)
                     elif "Unknown command:" in line:
-                        # Use centralized command verification
-                        is_corrupted, fixed_command = MarlinCommandVerifier.detect_command_corruption(line)
-                        if is_corrupted and fixed_command:
-                            self.logger.warning(f"COMMAND CORRUPTION DETECTED: {line}")
-                            self.logger.info(f"Attempting to fix: {fixed_command}")
+                        # Extract the unknown command from the error message
+                        match = re.search(r'Unknown command: "([^"]+)"', line)
+                        if match:
+                            unknown_cmd = match.group(1).strip()
                             
-                            # Retry if it's a safe command
-                            if MarlinCommandVerifier.should_retry_command(self, fixed_command):
-                                self.logger.info(f"Auto-retrying fixed command: {fixed_command}")
-                                self._iface_write(fixed_command)
+                            # Check if it's just a fragment (line numbers, checksums, etc.) - ignore these
+                            is_fragment = (
+                                len(unknown_cmd) <= 6 and unknown_cmd.isdigit() or  # Pure numbers like "42", "0000", "10000"
+                                unknown_cmd in ['R', 'N', ''] or  # Single characters or empty
+                                re.match(r'^\d*M114 R$', unknown_cmd) or  # Corrupted M114 R with number prefix
+                                'M114 R' in unknown_cmd or  # Any corruption containing M114 R (covers "M11M114 R")
+                                'F10000' in unknown_cmd or  # Feed rate fragments like "0 F10000"
+                                re.match(r'^\d+ F\d+$', unknown_cmd) or  # Pattern like "0 F10000"
+                                re.match(r'^\d+ R$', unknown_cmd)  # Pattern like "4 R", "114 R"
+                            )
+                            
+                            if is_fragment:
+                                # Just ignore fragments - they're corruption artifacts, don't spam console
+                                pass
                             else:
-                                self.logger.warning(f"Command corruption detected but not retrying: {fixed_command}")
-                        else:
-                            self.logger.warning(f"COMMAND CORRUPTION DETECTED but couldn't fix: {line}")
-                        
-                        self.callback("on_read", line)
+                                # Use centralized command verification for actual commands
+                                is_corrupted, fixed_command = MarlinCommandVerifier.detect_command_corruption(line)
+                                if is_corrupted and fixed_command:
+                                    self.logger.warning(f"COMMAND CORRUPTION DETECTED: {line}")
+                                    self.logger.info(f"Attempting to fix: {fixed_command}")
+                                    
+                                    # Retry if it's a safe command
+                                    if MarlinCommandVerifier.should_retry_command(self, fixed_command):
+                                        self.logger.info(f"Auto-retrying fixed command: {fixed_command}")
+                                        self._iface_write(fixed_command)
+                                    else:
+                                        self.logger.warning(f"Command corruption detected but not retrying: {fixed_command}")
+                                else:
+                                    self.logger.warning(f"COMMAND CORRUPTION DETECTED but couldn't fix: {line}")
+                                
+                                self.callback("on_read", line)
                     elif "Marlin" in line:
                         self.callback("on_read", line)
                         # Initialize Marlin protocol when we detect bootup
@@ -731,9 +991,23 @@ class Marlin:
         return any(line_upper.startswith(cmd) for cmd in status_commands)
 
     def _handle_ok(self):
+        # Handle OK responses for command completion
         # Decrement active command counter for numbered commands
         if self._active_command_count > 0:
             self._active_command_count -= 1
+        
+        # Clear error state on successful OK - this means communication is working again
+        if self.current_mode == "Error":
+            self.logger.info("Received OK after Error state - clearing error and resuming normal operation")
+            self.current_mode = "Idle"
+            self._error = False
+            # Clear any error tracking state
+            if hasattr(self, '_fixing_line_sync'):
+                self._fixing_line_sync = False
+            if hasattr(self, '_fixing_checksum_error'):
+                self._fixing_checksum_error = False
+            # Notify frontend of recovery
+            self.callback("on_stateupdate", self.current_mode, self.current_position, self.current_work_position)
             
         if not self.streaming_complete:
             self._rx_buffer_fill_pop()
@@ -745,11 +1019,9 @@ class Marlin:
             if self._active_command_count == 0 and len(self._rx_buffer_fill) == 0:
                 self._streaming_enabled = False  # Enable polling when idle
 
-        if self.is_homing:
-            self.is_homing = False
-            if self.current_mode != "Error":
-                self.current_mode = "Idle"
-                self.callback("on_idle", "idle")
+        # Don't reset homing flag just because we got an "ok" - wait for position-based detection
+        # The position-based state detection will handle the final transition to Idle
+        pass
 
     def _on_bootup(self):
         self._onboot_init()
@@ -759,7 +1031,20 @@ class Marlin:
         
         # Send M110 to reset line numbering to ensure sync
         self._iface_write("M110 N0")
-        self._line_number = 1
+        MarlinBufferManager.reset_line_number_to_start(self)
+        
+        # Mark connection as ready after a brief delay to allow firmware to fully initialize
+        import threading
+        def mark_ready():
+            import time
+            time.sleep(1.5)  # Wait 1.5 seconds for firmware to fully initialize (some firmware needs more time)
+            self.connection_ready = True
+            self.logger.info("Marlin connection is now ready for commands")
+            self.callback("on_connection_ready")  # Notify that commands can now be sent safely
+        
+        ready_thread = threading.Thread(target=mark_ready)
+        ready_thread.daemon = True
+        ready_thread.start()
         
         self.callback("on_boot")
         self.poll_start()
@@ -778,7 +1063,7 @@ class Marlin:
                 self.current_work_position = (w_pos_x, w_pos_y, w_pos_z)
                 self.current_position = self.current_work_position
 
-                # Handle position change detection
+                # Position-based state detection - this is the ONLY way we determine Idle vs Jog
                 if self._last_position is None:
                     # First position report after connection - assume standstill
                     self.is_standstill = True
@@ -786,18 +1071,35 @@ class Marlin:
                     # Position changed - we're moving
                     if self.is_standstill:
                         self.is_standstill = False
-                        # Set state to Jog when movement is detected (unless in Error state)
-                        if self.current_mode == "Idle":
+                        # Always set state to Jog when movement is detected (unless in Error state)
+                        if self.current_mode != "Error":
+                            old_mode = self.current_mode
                             self.current_mode = "Jog"
+                            # Ensure state update is sent immediately when transitioning to Jog
+                            self.callback("on_stateupdate", self.current_mode, self.current_position, self.current_work_position)
                         self.callback("on_movement")
                 else:
                     # Position unchanged - we've stopped
                     if not self.is_standstill:
                         self.is_standstill = True
-                        # Set state back to Idle when movement stops (unless in Error state)
-                        if self.current_mode == "Jog":
-                            self.current_mode = "Idle"
-                            self.callback("on_idle", "idle")
+                        # During homing, detect when homing is actually complete
+                        if self.is_homing:
+                            # Check if we're at home position (0,0,z) - indicates homing finished
+                            if self.current_position[0] == 0.0 and self.current_position[1] == 0.0:
+                                self.logger.info(f"Homing completed successfully at position {self.current_position}")
+                                self.is_homing = False
+                                # Set state to Idle when homing truly finishes
+                                if self.current_mode != "Error":
+                                    old_mode = self.current_mode
+                                    self.current_mode = "Idle"
+                                    self.callback("on_idle", "idle")
+                                    self.callback("on_stateupdate", self.current_mode, self.current_position, self.current_work_position)
+                        else:
+                            # Normal operation - set state back to Idle when movement stops (unless in Error state)
+                            if self.current_mode != "Error":
+                                old_mode = self.current_mode
+                                self.current_mode = "Idle"
+                                self.callback("on_idle", "idle")
                         self.callback("on_standstill")
 
                 if (self.current_mode != self._last_mode or
@@ -847,16 +1149,14 @@ class Marlin:
             self.logger.error(f"Error parsing settings: {e}")
 
     def _onboot_init(self):
-        del self._rx_buffer_fill[:]
-        del self._rx_buffer_backlog[:]
-        del self._rx_buffer_backlog_line_number[:]
+        # Use centralized buffer clearing for consistency
+        MarlinBufferManager.clear_all_buffers(self)
         self._set_streaming_complete(True)
         self._set_job_finished(True)
         self._set_streaming_src_end_reached(True)
         self._error = False
-        # Reset state from Error back to Idle when error is cleared during boot
-        if self.current_mode == "Error":
-            self.current_mode = "Idle"
+        # Use centralized error state reset
+        MarlinBufferManager.reset_error_state_to_idle(self)
         self._current_line = ""
         self._current_line_sent = True
         self._clear_queue()
@@ -864,9 +1164,8 @@ class Marlin:
         # Reset position tracking to avoid false movement detection on first position report
         self._last_position = None
         self._last_work_position = None
-        self._line_number = 1  # Reset line numbering on boot
-        self._last_resend = None  # Clear any resend tracking
-        self._resend_count = 0    # Reset resend counter
+        # Use centralized line number reset
+        MarlinBufferManager.reset_line_number_to_start(self)
         # Enable polling for idle machine - no job running
         self._streaming_enabled = False  # Allow position polling when idle
         self._active_command_count = 0   # Reset command count
@@ -894,11 +1193,22 @@ class Marlin:
 
     def _should_poll_position(self):
         """Determine if it's safe to send M114 R polling commands"""
-        # Allow polling during movement for real-time position updates
-        # Only check that we're not overflowing the buffer
-        # M114 R is a realtime command that doesn't interfere with movement
-        buffer_has_space = sum(self._rx_buffer_fill) < (self._rx_buffer_size - 20)
-        return buffer_has_space
+        # M114 R is now a real-time command that bypasses flow control
+        # Only check basic conditions to prevent overwhelming the firmware
+        
+        buffer_has_space = sum(self._rx_buffer_fill) < (self._rx_buffer_size - 20)  # Less restrictive
+        low_command_count = self._active_command_count <= 3  # Allow more commands since M114 R is real-time
+        
+        can_poll = buffer_has_space and low_command_count
+        
+        # For debugging: log why we're not polling (but don't spam)
+        if not can_poll:
+            current_reason = f"RxBuf:{sum(self._rx_buffer_fill)}/{self._rx_buffer_size}, SerialBuf:{self._pending_bytes}/{self._serial_buffer_size}, Active:{self._active_command_count}, Queued:{len(self._command_queue)}"
+            if not hasattr(self, '_last_poll_skip_reason') or self._last_poll_skip_reason != current_reason:
+                self.logger.debug(f"Skipping M114 R poll: {current_reason}")
+                self._last_poll_skip_reason = current_reason
+        
+        return can_poll
     
     def _get_state(self):
         self._iface_write("?")
@@ -914,11 +1224,11 @@ class Marlin:
             self.callback("on_job_completed")
 
     def _load_line_into_buffer(self, line):
-        print(f"[MARLIN DEBUG] Processing line: '{line}'")
+        self.logger.debug(f"Processing line: '{line}'")
         self.preprocessor.set_line(line)
         split_lines = self.preprocessor.split_lines()
         for l1 in split_lines:
-            print(f"[MARLIN DEBUG] Split line: '{l1}'")
+            self.logger.debug(f"Split line: '{l1}'")
             self.preprocessor.set_line(l1)
             self.preprocessor.strip()
             self.preprocessor.tidy()
@@ -926,13 +1236,13 @@ class Marlin:
             self.preprocessor.find_vars()
             fractionized_lines = self.preprocessor.fractionize()
             for l2 in fractionized_lines:
-                print(f"[MARLIN DEBUG] Final processed line: '{l2}'")
+                self.logger.debug(f"Final processed line: '{l2}'")
                 self.buffer.append(l2)
                 self.buffer_size += 1
             self.preprocessor.done()
 
     def _load_lines_into_buffer(self, string):
-        print(f"[MARLIN DEBUG] Loading into buffer: '{string}'")
+        self.logger.debug(f"Loading into buffer: '{string}'")
         lines = string.split("\n")
         for line in lines:
             self._load_line_into_buffer(line)

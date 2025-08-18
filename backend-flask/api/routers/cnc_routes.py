@@ -457,7 +457,7 @@ async def ws_cnc(
                 await websocket.send_json(msg)
                 msg = cnc_service.read_callback_buffer(cnc_uid)
 
-            # Use centralized sleep with cancellation handling - reduced to match batching interval
+            # Reduced to 20ms for faster sequence state updates
             if not await manager.safe_sleep_with_cancellation(0.02):
                 break  # Cancelled, exit loop
         await manager.disconnect(cnc_uid)

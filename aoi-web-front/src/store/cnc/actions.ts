@@ -196,6 +196,54 @@ export default {
         }
     },
 
+    async patchLocationWithCoordinates(context, payload){
+        let patchedLocation = null
+        for(const location of context.state.locations){
+            if (location.uid == payload.locationUid){
+                patchedLocation = location;
+                break;
+            }
+        }
+        if (!patchedLocation) {
+            throw new Error('Location not found');
+        }
+        
+        // Store old values for rollback
+        const oldValues = {
+            name: patchedLocation.name,
+            x: patchedLocation.x,
+            y: patchedLocation.y,
+            z: patchedLocation.z,
+            feedrate: patchedLocation.feedrate
+        };
+        
+        // Update location with new values
+        patchedLocation.name = payload.name;
+        patchedLocation.x = payload.x;
+        patchedLocation.y = payload.y;
+        patchedLocation.z = payload.z;
+        patchedLocation.feedrate = payload.feedrate;
+        
+        try{
+            const token = context.rootGetters["auth/getToken"] || sessionStorage.getItem('auth-token');
+            const { response, responseData } = await api.put('/location', patchedLocation, {
+                "content-type": "application/json",
+                "Authorization": token
+            });
+            if (!response.ok) {
+                throw new Error(responseData.detail || 'Failed to update location');
+            }
+        } catch (error) {
+            // Rollback changes on error
+            patchedLocation.name = oldValues.name;
+            patchedLocation.x = oldValues.x;
+            patchedLocation.y = oldValues.y;
+            patchedLocation.z = oldValues.z;
+            patchedLocation.feedrate = oldValues.feedrate;
+            throw error;
+        }
+    },
+
     async deleteLocation(context, payload){
         const token = context.rootGetters["auth/getToken"] || sessionStorage.getItem('auth-token');
         const { response, responseData } = await api.delete(`/location/${payload}`, {
@@ -226,6 +274,12 @@ export default {
                 logger.error('CNC Command Error', error);
                 throw error;
             }
+            
+            // Log important commands for monitoring
+            if (payload.command === 'home' || payload.command.includes('G28')) {
+                logger.info(`Homing command executed on CNC ${payload.cncUid}`);
+            }
+            
         } catch (error) {
             logger.error('CNC Command Exception', error);
             throw error;
@@ -348,5 +402,6 @@ export default {
 
     setCNCState(context, payload) {
         context.commit('setCNCState', payload);
-    }
+    },
+
 }

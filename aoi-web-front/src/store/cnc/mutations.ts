@@ -70,6 +70,30 @@ export default {
     },
 
     setCNCState(state, payload){
+        // Validate UID exists
+        if (!payload.uid) {
+            console.warn('setCNCState: Missing CNC UID');
+            return;
+        }
+        
+        // Normalize state to proper case and validate
+        const normalizedState = payload.state.charAt(0).toUpperCase() + payload.state.slice(1).toLowerCase();
+        const validStates = ['Idle', 'Run', 'Hold', 'Jog', 'Alarm', 'Door', 'Check', 'Home', 'Sleep', 'Error'];
+        
+        if (!validStates.includes(normalizedState)) {
+            console.warn(`setCNCState: Invalid state '${payload.state}' (normalized: '${normalizedState}') for CNC ${payload.uid}`);
+            return;
+        }
+        
+        // Use normalized state
+        payload.state = normalizedState;
+        
+        // Log state changes for debugging
+        const previousState = state.cncStates[payload.uid];
+        if (previousState && previousState !== payload.state) {
+            console.debug(`CNC ${payload.uid} state change: ${previousState} → ${payload.state}`);
+        }
+        
         state.cncStates[payload.uid] = payload.state;
     },
 

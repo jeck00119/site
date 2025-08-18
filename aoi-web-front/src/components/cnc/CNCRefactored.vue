@@ -15,6 +15,7 @@
           :axis-uid="axisUid"
           :current-position="pos"
           :selected-feedrate="selectedFeedrate"
+          :selected-steps="selectedSteps"
           @location-saved="onLocationSaved"
           @location-deleted="onLocationDeleted"
         />
@@ -177,6 +178,7 @@ export default {
     const terminalMessages = ref([]);
     const ugsTerminalHistory = computed(() => terminalMessages.value.join('\n'));
     const webSocketState = ref("Disconnected");
+    const connectionReady = ref(false);  // Track if CNC is ready for commands
     
     // Cross-platform port error dialog state
     const showPortErrorDialog = ref(false);
@@ -193,6 +195,7 @@ export default {
     
     // Computed property for connection state
     const isConnected = computed(() => webSocketState.value === "Connected");
+    const isReadyForCommands = computed(() => isConnected.value && connectionReady.value);
 
     // Lifecycle hooks
     onMounted(() => {
@@ -250,7 +253,7 @@ export default {
       }
     }
 
-    function reconnectToWs() {
+    async function reconnectToWs() {
       disconnectFromWs();
       setTimeout(async () => {
         await connectToWs();
@@ -285,10 +288,12 @@ export default {
 
     function onCncSocketClose() {
       webSocketState.value = "Disconnected";
+      connectionReady.value = false;  // Reset ready state on disconnect
     }
 
     function onCncSocketError() {
       webSocketState.value = "Error";
+      connectionReady.value = false;  // Reset ready state on error
     }
 
     function onCncSocketMsgRecv(event) {
@@ -315,11 +320,9 @@ export default {
           break;
 
         case "batch":
-          // Handle batched messages
+          // Handle batched messages atomically
           if (msg.messages && Array.isArray(msg.messages)) {
-            msg.messages.forEach(batchedMsg => {
-              handleSingleMessage(batchedMsg);
-            });
+            handleBatchedMessages(msg.messages);
           }
           break;
 
@@ -340,6 +343,35 @@ export default {
           webSocketState.value = "Connected";
           break;
 
+        case "on_job_completed":
+          addToConsole("Job completed");
+          break;
+
+        case "on_feed_change":
+          if (msg.feed_rate) {
+            addToConsole(`Feed rate changed: ${msg.feed_rate}`);
+          }
+          break;
+
+        case "on_boot":
+          addToConsole("CNC controller booted");
+          break;
+
+        case "on_connection_ready":
+          addToConsole("CNC initialization completed - ready for commands");
+          connectionReady.value = true;
+          break;
+
+        case "on_movement":
+          // Movement in progress - no console spam, just debug log
+          logger.debug("CNC movement in progress", { uid: props.axisUid });
+          break;
+
+        case "on_standstill":
+          // Movement stopped - no console spam, just debug log
+          logger.debug("CNC movement stopped", { uid: props.axisUid });
+          break;
+
         default:
           logger.debug("Unhandled WebSocket message:", msg);
       }
@@ -352,6 +384,81 @@ export default {
         wPos: msg.wPos,
         state: msg.state
       });
+    }
+
+    function handleBatchedMessages(messages) {
+      // Process batched messages atomically with error recovery
+      const stateUpdates = [];
+      const consoleMessages = [];
+      let hasError = false;
+      
+      try {
+        // First pass: collect all updates without applying them
+        for (const batchedMsg of messages) {
+          switch (batchedMsg.event) {
+            case "on_stateupdate":
+              stateUpdates.push(batchedMsg);
+              break;
+            case "on_read":
+              consoleMessages.push(batchedMsg.message);
+              break;
+            case "on_idle":
+              stateUpdates.push({ event: "set_state", state: batchedMsg.message });
+              break;
+            case "on_error":
+              consoleMessages.push(`Error: ${batchedMsg.message}`);
+              break;
+            case "on_job_completed":
+              consoleMessages.push("Job completed");
+              break;
+            case "on_feed_change":
+              if (batchedMsg.feed_rate) {
+                consoleMessages.push(`Feed rate changed: ${batchedMsg.feed_rate}`);
+              }
+              break;
+            case "on_boot":
+              consoleMessages.push("CNC controller booted");
+              break;
+            case "on_connection_ready":
+              consoleMessages.push("CNC initialization completed - ready for commands");
+              connectionReady.value = true;
+              break;
+            case "on_movement":
+            case "on_standstill":
+              // Skip movement events in batches to reduce noise
+              break;
+            default:
+              // Handle other messages individually
+              handleSingleMessage(batchedMsg);
+              break;
+          }
+        }
+        
+        // Second pass: apply all updates atomically
+        if (stateUpdates.length > 0) {
+          // Apply the most recent state update only
+          const latestUpdate = stateUpdates[stateUpdates.length - 1];
+          if (latestUpdate.event === "on_stateupdate") {
+            handleStateUpdate(latestUpdate);
+          } else if (latestUpdate.event === "set_state") {
+            cncStore.setCncState(props.axisUid, latestUpdate.state);
+          }
+        }
+        
+        // Add console messages in order
+        consoleMessages.forEach(message => addToConsole(message));
+        
+      } catch (error) {
+        logger.error("Failed to process batched messages atomically:", error);
+        // Fallback to individual processing on error
+        messages.forEach(msg => {
+          try {
+            handleSingleMessage(msg);
+          } catch (msgError) {
+            logger.error("Failed to process individual message in batch:", msgError);
+          }
+        });
+      }
     }
 
     function handleSettingsDownloaded(msg) {
@@ -376,6 +483,7 @@ export default {
       
       // Set state to disconnected when hardware connection fails
       webSocketState.value = "Disconnected";
+      connectionReady.value = false;  // Reset ready state
       
       // Show cross-platform port error dialog if applicable
       if (msg.is_cross_platform_issue) {
@@ -488,6 +596,7 @@ export default {
         addToConsole(`Connection failed: ${error.message}`);
         // Set state to disconnected on error
         webSocketState.value = "Disconnected";
+        connectionReady.value = false;  // Reset ready state
       }
     }
 
@@ -530,6 +639,8 @@ export default {
       
       // Connection state
       isConnected,
+      isReadyForCommands,
+      connectionReady,
       
       // Methods
       connectToWs,
@@ -562,17 +673,19 @@ export default {
 
 <style scoped>
 .cnc-container {
-  margin: 1rem 1rem;
-  width: 100%;
-  border-radius: 12px;
+  margin: 1rem 0.5rem; /* Balanced margins to prevent border cutoff */
+  width: 100%; /* Full container width without overflow */
+  max-width: 100%;
+  border-radius: 6px; /* Reduced from 12px to 6px - less rounded corners */
   box-shadow: 0 2px 8px black;
-  padding: 0.5rem;
+  padding: 0.7rem; /* Increased padding for more internal space */
   text-align: center;
   background-color: #515151;
   font-family: "Droid Serif";
   font-size: 1rem;
   font-weight: 700;
   display: flex;
+  box-sizing: border-box;
 }
 
 .wrapper {
@@ -595,7 +708,7 @@ export default {
 }
 
 .save-section {
-  grid-column: 1;
+  grid-column: 1/3; /* Made wider by spanning 2 columns instead of 1 */
   grid-row: 5/8;
   color: white;
   background-color: #161616;
@@ -605,7 +718,7 @@ export default {
 }
 
 .movement-section {
-  grid-column: 2/5;
+  grid-column: 3/5; /* Adjusted to start from column 3 to make room for wider save-section */
   grid-row: 5/8;
   display: flex;
   gap: 5px;
@@ -638,7 +751,7 @@ export default {
 .tabs-inner-container {
   width: 100%;
   height: 100%;
-  max-width: 380px;  /* Increased from 320px to make tabs wider */
+  max-width: 320px;  /* Align with LocationTabs container width */
   max-height: 360px;  /* Increased from 280px to accommodate taller section */
   display: flex;
   align-items: center;
@@ -668,7 +781,7 @@ export default {
 }
 
 .terminal-section {
-  grid-column: 15/18;
+  grid-column: 15/19; /* Extended from 15/18 to 15/19 for more width */
   grid-row: 2/8;
   color: white;
   background-color: #161616;

@@ -43,6 +43,26 @@ body {
   background-color: rgb(53, 53, 53);
   overflow-y: auto;
   overflow-x: hidden;
+  /* Ensure content doesn't extend under scrollbar */
+  box-sizing: border-box;
+}
+
+/* Make main scrollbar thinner */
+body::-webkit-scrollbar {
+  width: 8px;
+}
+
+body::-webkit-scrollbar-track {
+  background: var(--color-bg-secondary);
+}
+
+body::-webkit-scrollbar-thumb {
+  background: var(--color-text-muted);
+  border-radius: var(--border-radius-base);
+}
+
+body::-webkit-scrollbar-thumb:hover {
+  background: var(--color-primary);
 }
 
 h1 {

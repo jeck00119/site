@@ -268,7 +268,7 @@ export default {
   height: 100%;
   width: 100%;
   min-height: 237px;
-  min-width: 380px;  /* Increased from 320px for wider display */
+  min-width: 320px;  /* Match LocationTabs container width */
   border-radius: 8px;
   padding: 0.5rem;
   overflow: hidden;

@@ -306,8 +306,9 @@ th {
     height: 3.5vh;
 }
 
-.table-wrapper::-webkit-scrollbar {
-    display: none;
+/* Use modern scrollbar solution instead of hiding */
+.table-wrapper {
+    overflow-y: auto;
 }
 
 .cell {

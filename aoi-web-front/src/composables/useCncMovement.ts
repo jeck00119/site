@@ -65,8 +65,8 @@ export function useCncMovement(axisUid: string) {
           return;
         }
 
-        // Check again in 50ms for faster response
-        setTimeout(checkIdle, 50);
+        // Check again in 5ms for ultra-fast sequence response  
+        setTimeout(checkIdle, 5);
       };
 
       // Initial check
@@ -187,12 +187,16 @@ export function useCncMovement(axisUid: string) {
         const position = positions[i];
         logger.info(`[CNC-MOVEMENT] Executing sequence step ${i + 1}/${positions.length}`, { position: position.name });
         
-        await executeMovementToPosition(position, options);
+        // Use more aggressive options for sequences
+        const sequenceOptions = {
+          ...options,
+          timeout: 10000,  // Reduced timeout for sequences
+          waitForIdle: true
+        };
         
-        // Quick pause between positions to allow for state updates
-        if (i < positions.length - 1) {
-          await new Promise(resolve => setTimeout(resolve, 200));
-        }
+        await executeMovementToPosition(position, sequenceOptions);
+        
+        // No artificial delay - rely on immediate state detection
       }
       
       logger.info('[CNC-MOVEMENT] Sequence completed successfully');

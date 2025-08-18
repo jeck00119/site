@@ -273,9 +273,28 @@
 
 /* ===== UTILITY CLASSES ===== */
 
-/* Scrollbar utilities */
+/* ===== SCROLLBAR UTILITIES ===== */
+/* 
+ * Modern scrollbar solution that prevents layout shifts and overlap
+ * 
+ * Usage:
+ * - .custom-scrollbar: For scrollable containers with visible custom scrollbars
+ * - .scrollbar-hidden: For scrollable containers with hidden scrollbars but reserved space
+ * - .scrollbar-stable: For containers that need stable scrollbar space
+ * - .content-width-minus-scrollbar: Prevents content from extending under scrollbar
+ * - .prevent-scrollbar-overlap: Adds padding to prevent scrollbar overlap
+ * 
+ * The --scrollbar-width CSS variable is automatically calculated by JavaScript
+ * and provides the actual scrollbar width for the current system.
+ */
+
+.custom-scrollbar {
+  /* Modern scrollbar solution with layout shift prevention */
+  overflow-y: auto;
+}
+
 .custom-scrollbar::-webkit-scrollbar { 
-  width: 10px; 
+  width: 6px; 
 }
 .custom-scrollbar::-webkit-scrollbar-track { 
   background: var(--color-bg-secondary); 
@@ -288,9 +307,69 @@
   background: var(--color-primary); 
 }
 
+/* For cases where scrollbar needs to be hidden but space reserved */
+.scrollbar-hidden {
+  overflow-y: auto;
+}
 .scrollbar-hidden::-webkit-scrollbar {
   display: none;
 }
+
+/* Utility for containers that should always have scrollbar space */
+.scrollbar-stable {
+  overflow-y: auto;
+}
+
+/* CSS Custom Property for scrollbar width - set by JavaScript */
+:root {
+  --scrollbar-width: 17px; /* Default fallback */
+}
+
+/* Modern container-based scrollbar width calculation */
+@supports (container-type: inline-size) {
+  @property --scrollbar-width-calculated {
+    syntax: "<length>";
+    inherits: true;
+    initial-value: 0px;
+  }
+  
+  html {
+    container-type: inline-size;
+  }
+  
+  :root {
+    --scrollbar-width-calculated: calc(100vw - 100cqw);
+    --scrollbar-width: var(--scrollbar-width-calculated);
+  }
+}
+
+/* Improved scrollbar space reservation utilities */
+.scrollbar-space-reserved {
+  /* Reserve space for scrollbar to prevent layout shifts */
+  margin-right: var(--scrollbar-width);
+  box-sizing: border-box;
+}
+
+.viewport-width-minus-scrollbar {
+  /* Full viewport width minus scrollbar */
+  width: calc(100vw - var(--scrollbar-width));
+  max-width: calc(100vw - var(--scrollbar-width));
+}
+
+.content-width-minus-scrollbar {
+  /* Full content width minus scrollbar for containers */
+  width: calc(100% - var(--scrollbar-width));
+  max-width: calc(100% - var(--scrollbar-width));
+  box-sizing: border-box;
+}
+
+.prevent-scrollbar-overlap {
+  /* Prevent content from overlapping with scrollbar */
+  padding-right: var(--scrollbar-width);
+  box-sizing: border-box;
+}
+
+/* No special scrollbar handling needed */
 
 /* Flexbox utilities */
 .flex-center { 

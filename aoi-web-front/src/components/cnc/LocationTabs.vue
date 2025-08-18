@@ -169,7 +169,7 @@ export default {
   height: 100%;
   width: 100%;
   min-height: 280px;
-  min-width: 380px;  /* Increased from 320px to match container */
+  min-width: 320px;  /* Reduced width to make tab smaller */
   color: white;
   overflow: hidden;
   box-sizing: border-box;
@@ -189,9 +189,9 @@ export default {
   align-items: center;
   justify-content: space-between;
   background-color: rgb(41, 41, 41);
-  border-radius: 15px;
-  padding: 0.3rem;
-  gap: 0.3rem;
+  border-radius: 12px; /* Reduced from 15px */
+  padding: 0.2rem; /* Reduced from 0.3rem */
+  gap: 0.2rem; /* Reduced from 0.3rem */
 }
 
 .nav-arrow {

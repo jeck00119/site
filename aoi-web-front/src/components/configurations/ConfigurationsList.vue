@@ -476,13 +476,15 @@ export default{
     display: flex;
     flex-direction: row;
     flex-wrap: wrap;
-    justify-content: space-between;
-    margin: 1%;
+    justify-content: flex-start;
+    gap: 2%;
+    margin: 2% 0 0 0;
 }
 
 .card-wrapper {
-    margin: 2%;
+    margin: 0 0 2% 0;
     width: 45vw;
+    flex: 0 0 45vw;
 }
 
 
@@ -546,5 +548,11 @@ input {
 
 .error-leave-active {
     transition: all 0.3s ease-in;
+}
+
+.add-button {
+    margin-top: 3%;
+    margin-bottom: 5%; /* Reduced space to avoid footer overlap */
+    text-align: center;
 }
 </style>

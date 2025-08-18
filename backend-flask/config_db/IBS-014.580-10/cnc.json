@@ -47,40 +47,84 @@
                     "cncUid": "8a84a38d-1587-4705-b6f5-801abafa330d",
                     "items": [
                         {
-                            "feedrate": 1500,
-                            "locationUid": "b4f05ce7-b2be-46da-b041-9e74c6e9eb8a",
-                            "name": "pos1",
+                            "feedrate": 15000,
+                            "locationUid": "51d2a262-0a87-463a-91d6-3692d5c0d3b1",
+                            "name": "Pos1",
                             "x": 100,
                             "y": 100,
                             "z": 5
                         },
                         {
-                            "feedrate": 1500,
-                            "locationUid": "82003131-843d-42a5-a4c0-5c0529a75869",
-                            "name": "pos3",
+                            "feedrate": 20000,
+                            "locationUid": "0fd74088-0ec0-469e-98db-0e59930e4cfb",
+                            "name": "Pos2",
+                            "x": 200,
+                            "y": 200,
+                            "z": 5
+                        },
+                        {
+                            "feedrate": 20000,
+                            "locationUid": "95e51a78-0d22-40a4-a0a1-bb7c85c040b1",
+                            "name": "Pos3",
+                            "x": 200,
+                            "y": 100,
+                            "z": 5
+                        },
+                        {
+                            "feedrate": 5000,
+                            "locationUid": "c4c92924-c652-48ea-99a0-24f4b4f0de54",
+                            "name": "Pos4",
                             "x": 0,
-                            "y": 0,
-                            "z": 0
+                            "y": 100,
+                            "z": 5
                         },
                         {
                             "feedrate": 1500,
-                            "locationUid": "cae08b94-e07d-4eef-b7dc-a009498a9e97",
-                            "name": "Home_Zero",
+                            "locationUid": "d16566e9-e324-47d3-8b8d-1a51404c67a1",
+                            "name": "Home_Pos",
                             "x": 0,
                             "y": 0,
-                            "z": 0
-                        },
-                        {
-                            "feedrate": 1500,
-                            "locationUid": "4264366a-6ecb-4b45-a5ee-6faaa1dd4359",
-                            "name": "test1",
-                            "x": 0,
-                            "y": 0,
-                            "z": 0
+                            "z": 5
                         }
                     ],
                     "name": "Default Sequences",
                     "uid": "sequences-8a84a38d-1587-4705-b6f5-801abafa330d-default"
+                }
+            ],
+            "shortcuts": [
+                {
+                    "cncUid": "8a84a38d-1587-4705-b6f5-801abafa330d",
+                    "items": [
+                        {
+                            "locationUid": "d16566e9-e324-47d3-8b8d-1a51404c67a1",
+                            "name": "Home_Pos"
+                        },
+                        {
+                            "locationUid": "51d2a262-0a87-463a-91d6-3692d5c0d3b1",
+                            "name": "Pos1"
+                        },
+                        {
+                            "locationUid": "0fd74088-0ec0-469e-98db-0e59930e4cfb",
+                            "name": "Pos2"
+                        },
+                        {
+                            "locationUid": "95e51a78-0d22-40a4-a0a1-bb7c85c040b1",
+                            "name": "Pos3"
+                        },
+                        {
+                            "locationUid": "c4c92924-c652-48ea-99a0-24f4b4f0de54",
+                            "name": "Pos4"
+                        },
+                        {
+                            "locationUid": "c1de0ea9-16de-462b-8480-5e6f9503ed9a",
+                            "name": "Pos5"
+                        },
+                        null,
+                        null,
+                        null
+                    ],
+                    "name": "Default Shortcuts",
+                    "uid": "shortcuts-8a84a38d-1587-4705-b6f5-801abafa330d-default"
                 }
             ],
             "type": "Marlin",

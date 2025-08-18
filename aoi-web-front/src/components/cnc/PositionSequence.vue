@@ -44,38 +44,48 @@
         }"
       >
         <div class="item-content">
-          <div class="item-name">{{ item.name }}</div>
+          <div class="item-header">
+            <div class="item-name">{{ item.name }}</div>
+            <div class="item-actions">
+              <button 
+                class="action-button move-up"
+                @click="moveItemUp(index)"
+                :disabled="index === 0 || isExecuting"
+                title="Move Up"
+              >
+                <font-awesome-icon icon="chevron-up" />
+              </button>
+              <button 
+                class="action-button move-down"
+                @click="moveItemDown(index)"
+                :disabled="index === sequenceList.length - 1 || isExecuting"
+                title="Move Down"
+              >
+                <font-awesome-icon icon="chevron-down" />
+              </button>
+              <button 
+                class="action-button edit-item"
+                @click="editSequenceItem(index)"
+                :disabled="isExecuting"
+                title="Edit Position"
+              >
+                <font-awesome-icon icon="pencil-alt" />
+              </button>
+              <button 
+                class="action-button remove-item"
+                @click="removeFromSequence(index)"
+                :disabled="isExecuting"
+                title="Remove"
+              >
+                <font-awesome-icon icon="trash" />
+              </button>
+            </div>
+          </div>
           <div class="item-coords">
             <span>X: {{ item.x?.toFixed(3) || '---' }}</span>
             <span>Y: {{ item.y?.toFixed(3) || '---' }}</span>
             <span>Z: {{ item.z?.toFixed(3) || '---' }}</span>
           </div>
-        </div>
-        <div class="item-actions">
-          <button 
-            class="action-button move-up"
-            @click="moveItemUp(index)"
-            :disabled="index === 0 || isExecuting"
-            title="Move Up"
-          >
-            <font-awesome-icon icon="chevron-up" />
-          </button>
-          <button 
-            class="action-button move-down"
-            @click="moveItemDown(index)"
-            :disabled="index === sequenceList.length - 1 || isExecuting"
-            title="Move Down"
-          >
-            <font-awesome-icon icon="chevron-down" />
-          </button>
-          <button 
-            class="action-button remove-item"
-            @click="removeFromSequence(index)"
-            :disabled="isExecuting"
-            title="Remove"
-          >
-            <font-awesome-icon icon="trash" />
-          </button>
         </div>
       </div>
       
@@ -116,6 +126,62 @@
         </button>
       </div>
     </div>
+
+    <!-- Edit Position Dialog -->
+    <base-dialog
+      title="Edit Position"
+      :show="showEditDialog"
+      @close="closeEditDialog"
+    >
+      <template #default>
+        <div class="dialog-content" v-if="editingItem">
+          <div class="input-group">
+            <label>Name:</label>
+            <input 
+              type="text" 
+              v-model.trim="editingItem.name"
+              placeholder="Enter position name"
+              maxlength="50"
+            />
+          </div>
+          
+          <div class="coordinates-section">
+            <h4>Coordinates</h4>
+            <div class="coord-inputs">
+              <div class="coord-group">
+                <label>X:</label>
+                <input type="number" v-model.number="editingItem.x" step="0.001" />
+              </div>
+              <div class="coord-group">
+                <label>Y:</label>
+                <input type="number" v-model.number="editingItem.y" step="0.001" />
+              </div>
+              <div class="coord-group">
+                <label>Z:</label>
+                <input type="number" v-model.number="editingItem.z" step="0.001" />
+              </div>
+            </div>
+          </div>
+          
+          <div class="settings-section">
+            <h4>Movement Settings</h4>
+            <div class="setting-inputs">
+              <div class="setting-group">
+                <label>Feedrate:</label>
+                <input type="number" v-model.number="editingItem.feedrate" min="1" max="10000" />
+              </div>
+            </div>
+          </div>
+        </div>
+      </template>
+      
+      <template #actions>
+        <base-button @click="saveEditedPosition" :disabled="!isValidEditData">
+          Save Changes
+        </base-button>
+        <base-button @click="closeEditDialog">Cancel</base-button>
+      </template>
+    </base-dialog>
   </div>
 </template>
 
@@ -154,6 +220,11 @@ export default {
     const isPaused = ref(false);
     const isExecuting = ref(false);
     const currentStepIndex = ref(0);
+    
+    // Edit dialog state
+    const showEditDialog = ref(false);
+    const editingItem = ref(null);
+    const editingIndex = ref(-1);
     
     // Get locations from the store
     const { locations } = cncStore;
@@ -288,6 +359,71 @@ export default {
       }
     });
     
+    // Edit functions
+    function editSequenceItem(index) {
+      editingIndex.value = index;
+      // Deep copy the item to avoid direct mutation
+      editingItem.value = {
+        ...sequenceList.value[index]
+      };
+      showEditDialog.value = true;
+    }
+    
+    function closeEditDialog() {
+      showEditDialog.value = false;
+      editingItem.value = null;
+      editingIndex.value = -1;
+    }
+    
+    async function saveEditedPosition() {
+      if (!editingItem.value || editingIndex.value === -1) return;
+      
+      try {
+        // Update the sequence item
+        sequenceList.value[editingIndex.value] = {
+          ...editingItem.value,
+          name: editingItem.value.name.trim()
+        };
+        
+        // Save sequence to persistence
+        await saveSequence();
+        
+        // If this position exists in saved locations, update it there too
+        const locationToUpdate = locations.value.find(loc => 
+          loc.uid === editingItem.value.locationUid
+        );
+        
+        if (locationToUpdate) {
+          try {
+            // Update the location in the database with new coordinates and settings
+            await cncStore.patchLocationWithCoordinates({
+              locationUid: editingItem.value.locationUid,
+              name: editingItem.value.name.trim(),
+              x: editingItem.value.x,
+              y: editingItem.value.y,
+              z: editingItem.value.z,
+              feedrate: editingItem.value.feedrate
+            });
+            
+            // Refresh locations
+            setTimeout(() => {
+              cncStore.fetchLocations(props.axisUid);
+            }, 200);
+            
+          } catch (error) {
+            logger.warn('[SEQUENCE] Failed to update location in database:', error);
+            // Continue anyway - sequence is still updated locally
+          }
+        }
+        
+        closeEditDialog();
+        
+      } catch (error) {
+        logger.error('[SEQUENCE] Failed to save edited position:', error);
+        handleApiError(error, 'Failed to save edited position');
+      }
+    }
+    
     // Lifecycle
     onMounted(async () => {
       await loadSequence();
@@ -314,7 +450,20 @@ export default {
       moveItemDown,
       playSequence,
       pauseSequence,
-      stopSequence
+      stopSequence,
+      editSequenceItem,
+      showEditDialog,
+      editingItem,
+      closeEditDialog,
+      saveEditedPosition,
+      isValidEditData: computed(() => {
+        return editingItem.value && 
+               editingItem.value.name?.trim() && 
+               typeof editingItem.value.x === 'number' && 
+               typeof editingItem.value.y === 'number' && 
+               typeof editingItem.value.z === 'number' && 
+               editingItem.value.feedrate > 0;
+      })
     };
   }
 };
@@ -328,10 +477,10 @@ export default {
   height: 100%;
   width: 100%;
   min-height: 237px;
-  min-width: 380px;  /* Increased from 320px for wider display */
+  min-width: 320px;  /* Match LocationTabs container width */
   border-radius: 8px;
   padding: 0.5rem;
-  overflow: visible; /* Changed from hidden to visible to prevent cutting off content */
+  overflow: hidden; /* Prevent overflow to stay within container bounds */
   box-sizing: border-box;
 }
 
@@ -391,19 +540,18 @@ export default {
 /* Sequence List */
 .sequence-list {
   flex: 1;
-  overflow-y: auto; /* Re-enabled scrolling */
+  overflow-y: auto; /* Vertical scrolling only */
+  overflow-x: hidden; /* Prevent horizontal scrollbar */
   margin-bottom: 0.5rem;
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 8px;
   min-height: 100px;
-  max-height: 300px; /* Reasonable max height for scrolling */
+  max-height: 200px; /* Increased height for better visibility */
 }
 
 
 .sequence-item {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
   padding: 0.5rem;
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
   background-color: rgba(255, 255, 255, 0.02);
@@ -441,6 +589,14 @@ export default {
   display: flex;
   flex-direction: column;
   gap: 0.2rem;
+  min-width: 0; /* Allow text to wrap/truncate if needed */
+}
+
+.item-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.2rem;
 }
 
 .item-name {
@@ -454,7 +610,7 @@ export default {
   color: rgba(255, 255, 255, 0.7);
   font-family: monospace;
   display: flex;
-  gap: 1rem;
+  gap: 0.5rem; /* Gap between coordinates */
 }
 
 .item-coords span {
@@ -484,6 +640,10 @@ export default {
 .action-button:hover:not(:disabled) {
   background: rgba(255, 255, 255, 0.2);
   transform: scale(1.1);
+}
+
+.action-button.edit-item:hover:not(:disabled) {
+  background: rgba(33, 150, 243, 0.8);
 }
 
 .action-button.remove-item:hover:not(:disabled) {
@@ -595,5 +755,92 @@ export default {
 
 .sequence-list::-webkit-scrollbar-thumb:hover {
   background: rgba(204, 161, 82, 0.8);
+}
+
+/* Edit Dialog Styles */
+.dialog-content {
+  color: white;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+.input-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.input-group label {
+  font-weight: bold;
+  color: rgb(204, 161, 82);
+}
+
+.input-group input {
+  background-color: rgb(41, 41, 41);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: white;
+  padding: 0.5rem;
+  border-radius: 4px;
+  font-size: 0.9rem;
+}
+
+.input-group input:focus {
+  outline: 2px solid rgb(204, 161, 82);
+  border-color: rgb(204, 161, 82);
+  background-color: rgb(51, 51, 51);
+}
+
+.coordinates-section h4,
+.settings-section h4 {
+  margin: 0 0 0.5rem 0;
+  color: rgb(204, 161, 82);
+  border-bottom: 1px solid rgba(204, 161, 82, 0.3);
+  padding-bottom: 0.3rem;
+}
+
+.coord-inputs,
+.setting-inputs {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.5rem;
+}
+
+.setting-inputs {
+  grid-template-columns: 1fr; /* Single column since only feedrate now */
+}
+
+.coord-group,
+.setting-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.coord-group label,
+.setting-group label {
+  font-size: 0.8rem;
+  font-weight: bold;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.coord-group input,
+.setting-group input {
+  background-color: rgb(41, 41, 41);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: white;
+  padding: 0.4rem;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  font-family: monospace;
+}
+
+.coord-group input:focus,
+.setting-group input:focus {
+  outline: 2px solid rgb(204, 161, 82);
+  border-color: rgb(204, 161, 82);
+  background-color: rgb(51, 51, 51);
 }
 </style>

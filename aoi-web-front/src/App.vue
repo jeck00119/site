@@ -223,14 +223,13 @@ export default {
         if (contentHeight <= viewportHeight - footerHeight) {
           // Short content - only need minimal clearance
           bottomPadding = Math.max(20, footerHeight * 0.3); // 20px minimum or 30% of footer
-          // Hide scrollbar when all content is visible
-          document.body.style.overflowY = 'hidden';
         } else {
           // Long content - need enough space to scroll past footer
           bottomPadding = footerHeight + 20; // Footer height + 20px buffer
-          // Show scrollbar when content overflows
-          document.body.style.overflowY = 'auto';
         }
+        
+        // Modern scrollbar solution: let scrollbar-gutter handle space reservation
+        // No need to dynamically hide/show scrollbars - prevents layout shifts
         
         // Apply the calculated padding
         routeWrapper.style.paddingBottom = `${bottomPadding}px`;
@@ -315,9 +314,10 @@ export default {
 
 .route-wrapper {
   width: 95%;
-  margin: 0 0 0 5%; /* Push content to the right to avoid burger menu while maintaining full width */
+  margin: 0 0 0 4%; /* Adjusted to 4% - middle ground between 3% and 5% */
   padding: 0; /* JavaScript will set bottom padding dynamically */
   overflow: visible;
+  box-sizing: border-box;
 }
 
 .error-list-wrapper {

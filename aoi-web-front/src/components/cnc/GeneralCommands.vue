@@ -272,10 +272,10 @@ export default {
         emit('command-executed', { command, success: false, error });
         
       } finally {
-        // Add a small delay to prevent rapid clicking
+        // Reduced delay for faster user interaction
         setTimeout(() => {
           isExecuting.value = false;
-        }, 500);
+        }, 100);
       }
     }
 
@@ -527,7 +527,7 @@ export default {
   position: fixed;
   top: 0;
   left: 0;
-  width: 100vw;
+  width: 100%; /* Use container width instead of viewport */
   height: 100vh;
   background-color: rgba(0, 0, 0, 0.7);
   display: flex;
@@ -540,7 +540,7 @@ export default {
   background-color: rgb(41, 41, 41);
   border-radius: 12px;
   width: 500px;
-  max-width: 90vw;
+  max-width: 90%; /* Use container width instead of viewport */
   max-height: 80vh;
   overflow-y: auto;
   color: white;

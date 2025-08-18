@@ -348,8 +348,8 @@ export default {
 }
 
 .small-button {
-  width: 40px;
-  height: 40px;
+  width: 32px; /* Reduced from 40px */
+  height: 36px; /* Increased height for better proportion */
   display: flex;
   align-items: center;
   justify-content: center;

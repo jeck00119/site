@@ -1158,8 +1158,9 @@ table {
     margin-top: 1vh;
 }
 
-.table-wrapper::-webkit-scrollbar {
-    display: none;
+/* Use modern scrollbar solution instead of hiding */
+.table-wrapper {
+    overflow-y: auto;
 }
 
 .table-wrapper thead th {

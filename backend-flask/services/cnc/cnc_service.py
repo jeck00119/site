@@ -26,12 +26,12 @@ class CncService(metaclass=Singleton):
         self._error_handler = CncErrorHandler()
         self.logger = logging.getLogger(__name__)
         
-        # Message batching configuration
+        # Message batching configuration - optimized for sequence responsiveness
         self._batch_buffers: dict[str, list] = {}
         self._last_batch_time: dict[str, float] = {}
-        # Reduced batching interval for real-time position updates
-        self._batch_interval = 0.02  # 20ms batching interval (was 50ms)
-        self._max_batch_size = 10    # Maximum messages per batch
+        # Reduced batching for faster sequence state updates
+        self._batch_interval = 0.02  # 20ms batching interval for faster sequence detection
+        self._max_batch_size = 5     # Smaller batches for quicker processing
 
     @staticmethod
     def get_available_types():
@@ -268,7 +268,7 @@ class CncService(metaclass=Singleton):
                 'cnc_uid': cnc_uid
             }
 
-        elif event in ["on_job_completed", "on_movement", "on_standstill", "on_boot", "on_write", "on_feed_change"]:
+        elif event in ["on_job_completed", "on_movement", "on_standstill", "on_boot", "on_write", "on_feed_change", "on_connection_ready"]:
             return {'event': event}
 
         else:
@@ -277,7 +277,7 @@ class CncService(metaclass=Singleton):
     
     def _has_priority_message(self, messages):
         """Check if batch contains priority messages that should be sent immediately"""
-        priority_events = ["on_error", "on_alarm", "on_job_completed", "on_boot", "connection_error"]
+        priority_events = ["on_error", "on_alarm", "on_job_completed", "on_boot", "on_connection_ready", "connection_error"]
         return any(msg.get('event') in priority_events for msg in messages)
 
     def _get_cnc_type(self, uid):
@@ -366,8 +366,12 @@ class CncService(metaclass=Singleton):
                 try:
                     loop = asyncio.new_event_loop()
                     asyncio.set_event_loop(loop)
-                    validation_result = loop.run_until_complete(port_manager.validate_port_for_device_type(cnc_model.port, 'cncs'))
-                    loop.close()
+                    try:
+                        validation_result = loop.run_until_complete(port_manager.validate_port_for_device_type(cnc_model.port, 'cncs'))
+                    finally:
+                        # Properly close the loop to prevent warnings
+                        loop.close()
+                        asyncio.set_event_loop(None)
                 except Exception as async_error:
                     self.logger.warning(f"CNC {cnc_model.uid}: Async validation failed ({async_error}), using sync validation")
                     # Fall back to synchronous validation

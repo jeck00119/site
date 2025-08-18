@@ -89,6 +89,7 @@ export default {
   width: 100%;
   min-height: 100%;
   overflow-y: auto;
+  /* Standard overflow behavior */
 }
 
 .page-container::-webkit-scrollbar {
@@ -117,7 +118,7 @@ export default {
   flex-grow: 1;
   overflow: visible;
   margin: 0;
-  margin-left: -1rem;
+  margin-left: 0; /* Removed negative margin to prevent left border cutoff */
 }
 
 .cnc {

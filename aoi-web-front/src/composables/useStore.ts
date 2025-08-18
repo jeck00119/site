@@ -70,6 +70,7 @@ export function useCncStore(axisUid = null) {
   const loadLocations = () => dispatch('cnc/loadLocations', {});
   const moveToLocation = (payload: any) => dispatch('cnc/api_moveToLocation', payload);
   const patchLocation = (payload: any) => dispatch('cnc/patchLocation', payload);
+  const patchLocationWithCoordinates = (payload: any) => dispatch('cnc/patchLocationWithCoordinates', payload);
   const fetchLocations = (axisUid: any) => dispatch('cnc/fetchLocations', axisUid);
   const abort = (payload: any) => dispatch('cnc/api_jogCancel', payload);
   
@@ -152,6 +153,7 @@ export function useCncStore(axisUid = null) {
     loadLocations,
     moveToLocation,
     patchLocation,
+    patchLocationWithCoordinates,
     fetchLocations,
     abort,
     updateCncData,

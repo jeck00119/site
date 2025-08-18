@@ -191,6 +191,10 @@ export default {
     selectedFeedrate: {
       type: [String, Number],
       required: true
+    },
+    selectedSteps: {
+      type: [String, Number],
+      required: true
     }
   },
   emits: ['location-saved', 'location-deleted'],
