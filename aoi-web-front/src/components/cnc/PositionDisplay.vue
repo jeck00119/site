@@ -34,8 +34,11 @@
       v-if="show3DViewer"
       :cnc-config="cncConfig"
       :axis-uid="axisUid"
-      :current-pos="pos"
+      :current-pos="simulatedPos"
+      :is-cnc-connected="isCncConnected"
       @close="show3DViewer = false"
+      @moveTo="handleMoveTo"
+      @simulateMoveTo="handleSimulateMoveTo"
     />
 
     <!-- CNC Setup Modal -->
@@ -215,8 +218,9 @@
 </template>
 
 <script>
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import { useCncStore } from '@/composables/useStore';
+import { useCncMovement } from '@/composables/useCncMovement';
 import { logger } from '@/utils/logger';
 import CncViewer3D from './CncViewer3D.vue';
 
@@ -238,13 +242,19 @@ export default {
   setup(props) {
     
     // Use centralized CNC store composable
-    const { pos } = useCncStore(props.axisUid);
+    const { pos, cncState } = useCncStore(props.axisUid);
+    
+    // Use CNC movement composable for click-to-move functionality
+    const { executeMovementToPosition, isMoving } = useCncMovement(props.axisUid);
     
     // CNC Setup Modal state
     const showCncSetup = ref(false);
     
     // 3D Viewer state
     const show3DViewer = ref(false);
+    
+    // Simulated position for testing (starts with real position)
+    const simulatedPos = ref({ ...pos.value });
     
     // Default CNC configuration
     const defaultCncConfig = {
@@ -405,6 +415,63 @@ export default {
       return selectedAxes.value.x && selectedAxes.value.y && selectedAxes.value.z && !hasSelectedRotaryAxes.value;
     });
     
+    // Check if CNC is connected and ready for movement
+    const isCncConnected = computed(() => {
+      const state = cncState?.value;
+      // CNC is considered connected if it has a valid state (not null/undefined/'UNKNOWN')
+      return state && state.toUpperCase() !== 'UNKNOWN' && state.toUpperCase() !== 'ALARM';
+    });
+    
+    // Handle click-to-move from 3D viewer
+    const handleMoveTo = async (targetPosition) => {
+      try {
+        logger.info('3D Viewer click-to-move request:', targetPosition);
+        
+        // Check if CNC is connected first
+        if (!isCncConnected.value) {
+          logger.warn('CNC not connected, ignoring click-to-move request');
+          logger.info('Current CNC state:', cncState?.value);
+          return;
+        }
+        
+        if (isMoving.value) {
+          logger.warn('CNC is already moving, ignoring click-to-move request');
+          return;
+        }
+        
+        // Execute movement using the composable
+        await executeMovementToPosition({
+          x: targetPosition.x,
+          y: targetPosition.y,
+          z: targetPosition.z,
+          name: '3D Click Target',
+          feedrate: 1500 // Default feedrate for click-to-move
+        });
+        
+        logger.info('Click-to-move completed successfully');
+      } catch (error) {
+        logger.error('Click-to-move failed:', error);
+        // Could add a notification here for user feedback
+      }
+    };
+    
+    // Handle simulation click-to-move (updates local position without real CNC command)
+    const handleSimulateMoveTo = (targetPosition) => {
+      logger.info('Simulation: Moving to position', targetPosition);
+      simulatedPos.value = {
+        x: targetPosition.x,
+        y: targetPosition.y,
+        z: targetPosition.z
+      };
+    };
+    
+    // Watch for real position changes to update simulated position
+    watch(pos, (newPos) => {
+      if (newPos) {
+        simulatedPos.value = { ...newPos };
+      }
+    }, { deep: true });
+    
     onMounted(() => {
       logger.lifecycle('mounted', 'PositionDisplay component mounted', { axisUid: props.axisUid });
       loadCncConfig();
@@ -417,6 +484,11 @@ export default {
       cncConfig,
       closeCncSetupModal,
       saveCncConfigAndOpen3D,
+      handleMoveTo,
+      handleSimulateMoveTo,
+      isMoving,
+      isCncConnected,
+      simulatedPos,
       // Manual axis selection
       selectedAxes,
       selectedAxesCount,
@@ -449,7 +521,16 @@ export default {
   flex-direction: column;
   width: 95%;
   margin: 0 auto;
-  gap: var(--space-1);
+  gap: var(--space-3);
+}
+
+.position-section h4 {
+  margin: 0 0 var(--space-2) 0;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-bold);
+  text-align: center;
+  text-transform: uppercase;
 }
 
 .data-row {
@@ -490,6 +571,12 @@ export default {
 .boxed:hover {
   border-color: var(--color-primary);
   box-shadow: var(--shadow-base);
+}
+
+.boxed.target {
+  background-color: var(--color-warning-light);
+  color: var(--color-warning-dark);
+  border-color: var(--color-warning);
 }
 
 .axis-info {

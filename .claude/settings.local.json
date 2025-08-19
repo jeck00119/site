@@ -95,13 +95,16 @@
       "mcp__playwright__browser_close",
       "mcp__playwright__browser_snapshot",
       "mcp__playwright__browser_evaluate",
-      "Bash(git log:*)"
+      "Bash(git log:*)",
+      "Bash(npm run lint:*)",
+      "Bash(npm run:*)"
     ],
     "deny": [],
     "defaultMode": "acceptEdits",
     "additionalDirectories": [
       "E:\\e",
-      "C:\\c\\Users\\andre\\Desktop"
+      "C:\\c\\Users\\andre\\Desktop",
+      "E:\\e\\site"
     ]
   }
 }

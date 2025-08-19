@@ -20,7 +20,7 @@ import { faHouse, faMagnifyingGlassChart, faScrewdriverWrench, faGear, faGears, 
     faExpand, faCrop, faSignature, faFlagCheckered, faNetworkWired, faPlayCircle, faImage,
     faSdCard, faArrowsRotate, faArrowRotateLeft, faArrowRotateRight, faLockOpen, faCubesStacked,
     faChevronLeft, faChevronRight, faChevronUp, faChevronDown, faList, faPause, faSpinner,
-    faCheckCircle, faTimesCircle, faExclamationTriangle, faInfoCircle, faPencilAlt } from '@fortawesome/free-solid-svg-icons';
+    faCheckCircle, faTimesCircle, faExclamationTriangle, faInfoCircle, faPencilAlt, faEye } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome';
 
 import { OhVueIcon, addIcons } from 'oh-vue-icons';
@@ -152,6 +152,7 @@ library.add(faTimesCircle);
 library.add(faExclamationTriangle);
 library.add(faInfoCircle);
 library.add(faPencilAlt);
+library.add(faEye);
 
 
 
