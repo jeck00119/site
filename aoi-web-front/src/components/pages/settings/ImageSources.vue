@@ -293,9 +293,16 @@ export default{
             logger.debug('ImageSources - component mounted, loading image sources');
             try {
                 await imageSourcesStore.loadImageSources();
-                logger.debug('ImageSources - image sources loaded');
+                logger.debug('ImageSources - image sources loaded successfully');
             } catch (error) {
                 logger.error('ImageSources - error loading image sources:', error);
+                // Set a user-friendly notification instead of failing silently
+                setTypedNotification(
+                    GeneralMessages.SERVER_CONNECTION_ERROR,
+                    'Failed to load image sources. Please check if the backend server is running and try refreshing the page.',
+                    NotificationType.ERROR,
+                    7000 // Show error for 7 seconds
+                );
             }
         });
 
@@ -359,6 +366,9 @@ export default{
 .list-wrapper {
     margin: 1%;
     height: 9%;
+    position: relative;
+    z-index: 1000;
+    overflow: visible;
 }
 
 h1{

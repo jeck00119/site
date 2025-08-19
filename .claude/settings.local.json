@@ -82,12 +82,26 @@
       "Bash(echo:*)",
       "Bash(do echo \"Checking CSS in $file...\")",
       "Bash(del check_notifications.py)",
-      "Bash(git checkout:*)"
+      "Bash(git checkout:*)",
+      "Bash(E:sitevenvScriptspython -c \"import sys; sys.path.append(''E:/site/backend-flask''); from services.camera.camera_service import CameraService; cs = CameraService(); print(''Initialized cameras:'', list(cs.cameras.keys()))\")",
+      "Bash(\"E:\\site\\venv\\Scripts\\python.exe\" -c \"import sys; sys.path.append(''E:/site/backend-flask''); from services.camera.camera_service import CameraService; cs = CameraService(); print(''Initialized cameras:'', list(cs.cameras.keys()))\")",
+      "Bash(./venv/Scripts/python.exe --version)",
+      "Bash(./venv/Scripts/python.exe -c \"import sys; sys.path.append(''./backend-flask''); from services.camera.camera_service import CameraService; cs = CameraService(); print(''Initialized cameras:'', list(cs.cameras.keys())); print(''Camera repository has:'', len(cs.camera_repository.read_all()), ''camera configs'')\")",
+      "Bash(./venv/Scripts/python.exe -c \"\nimport sys\nsys.path.append(''./backend-flask'')\nfrom services.configurations.configurations_service import ConfigurationsService\nfrom services.configurations.configuration_cache import ConfigurationCache\n\nconfig_service = ConfigurationsService()\ncache = ConfigurationCache()\ncurrent_config = cache.get_cached_config()\n\nif current_config:\n    print(''Current config UID:'', current_config)\n    print(''Config cache directory:'', config_service.get_config_directory(current_config))\nelse:\n    print(''No configuration loaded'')\n    print(''Available configs:'', config_service.get_available_configurations())\n\")",
+      "mcp__playwright__browser_navigate",
+      "mcp__playwright__browser_click",
+      "mcp__playwright__browser_type",
+      "mcp__playwright__browser_take_screenshot",
+      "mcp__playwright__browser_close",
+      "mcp__playwright__browser_snapshot",
+      "mcp__playwright__browser_evaluate",
+      "Bash(git log:*)"
     ],
     "deny": [],
     "defaultMode": "acceptEdits",
     "additionalDirectories": [
-      "E:\\e"
+      "E:\\e",
+      "C:\\c\\Users\\andre\\Desktop"
     ]
   }
 }

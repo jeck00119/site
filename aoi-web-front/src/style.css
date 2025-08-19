@@ -27,15 +27,6 @@ a:hover {
   color: #535bf2;
 }
 
-a {
-  font-weight: 500;
-  color: #646cff;
-  text-decoration: inherit;
-}
-a:hover {
-  color: #535bf2;
-}
-
 body {
   margin: 0;
   min-width: 320px;
@@ -110,15 +101,56 @@ button:focus-visible {
   min-height: 100vh;
 }
 
-@media (prefers-color-scheme: light) {
-  :root {
-    color: #213547;
-    background-color: #ffffff;
-  }
-  a:hover {
-    color: #747bff;
-  }
-  button {
-    background-color: #f9f9f9;
-  }
+/* Global vue-multiselect dark theme overrides */
+.multiselect {
+  color: white;
+}
+
+.multiselect__tags {
+  background: #252424 !important;
+  background-color: #252424 !important;
+  border: 1px solid #40444e !important;
+  color: white !important;
+}
+
+.multiselect__single,
+.multiselect__placeholder {
+  color: white !important;
+  background: transparent !important;
+}
+
+.multiselect__input {
+  color: white !important;
+  background: transparent !important;
+}
+
+.multiselect__content-wrapper {
+  background: #252424 !important;
+  background-color: #252424 !important;
+  border: 1px solid #40444e !important;
+  border-radius: 4px !important;
+}
+
+.multiselect__option {
+  color: white !important;
+  background: transparent !important;
+}
+
+.multiselect__option:hover,
+.multiselect__option--highlight {
+  background: #3d3d3e !important;
+  background-color: #3d3d3e !important;
+  color: white !important;
+}
+
+.multiselect__option--selected {
+  background: rgba(204, 161, 82, 1) !important;
+  background-color: rgba(204, 161, 82, 1) !important;
+  color: white !important;
+}
+
+.multiselect__option--selected:hover {
+  background: rgba(204, 161, 82, 0.8) !important;
+  background-color: rgba(204, 161, 82, 0.8) !important;
+  color: white !important;
 }

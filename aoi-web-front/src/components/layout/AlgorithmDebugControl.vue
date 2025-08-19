@@ -34,7 +34,7 @@
                                     </base-button-rectangle>
                                 </div>
                             </div>
-                            <div class="algorithm-list">
+                            <div class="algorithm-list ">
                                 <vue-multiselect
                                     v-model="currentReferenceName"
                                     :options="referenceAlgorithms"
@@ -124,7 +124,7 @@
                                     </base-button-rectangle>
                                 </div>
                             </div>
-                            <div class="algorithm-list">
+                            <div class="algorithm-list ">
                                 <vue-multiselect
                                     v-model="currentAlgorithmName"
                                     :options="Array.isArray(algorithms) ? algorithms.map(alg => alg && alg.type ? alg.type : (alg && alg.name ? alg.name : 'Unknown Algorithm')).filter(Boolean) : []"

@@ -243,12 +243,38 @@ export default {
     width: 100%;
     height: 100%;
     margin: 0;
+    overflow: visible !important; /* Allow dropdown to overflow */
 }
 
 .select-container {
     width: 90%;
     height: 100%;
+    position: relative;
+    z-index: 1001;
 }
+
+/* Ensure vue-multiselect dropdown is visible */
+.select-container .multiselect {
+    position: relative;
+    z-index: 1001;
+}
+
+.select-container .multiselect--active .multiselect__content-wrapper {
+    display: block !important;
+}
+
+.select-container .multiselect__content-wrapper {
+    position: fixed !important;
+    z-index: 9999 !important;
+    max-height: 300px !important;
+    overflow-y: auto !important;
+    background: #252424 !important;
+    border: 1px solid #40444e !important;
+    border-radius: 4px !important;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3) !important;
+    min-width: 200px !important;
+}
+
 
 .action-wrapper {
     margin-bottom: 1vh;

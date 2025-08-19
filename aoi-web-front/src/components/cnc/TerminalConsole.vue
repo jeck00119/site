@@ -1,7 +1,5 @@
 <template>
   <div class="terminal-grid">
-    <label class="terminal-label">UGS Terminal</label>
-    
     <div class="terminal-output-container">
       <textarea 
         ref="terminalOutput"
@@ -233,16 +231,6 @@ export default {
   display: flex;
   flex-direction: column;
   height: 100%;
-}
-
-.terminal-label {
-  font-size: 1.2rem;
-  font-weight: bold;
-  margin-bottom: 0.5rem;
-  text-align: center;
-  background-color: rgb(41, 41, 41);
-  padding: 0.5rem;
-  border-radius: 8px;
 }
 
 .terminal-output-container {

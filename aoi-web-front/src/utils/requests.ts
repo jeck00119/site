@@ -83,13 +83,13 @@ async function handleResponse<T>(response: Response, url: string): Promise<Reque
     };
 }
 
-async function get<T = any>(url: string, headers?: Headers): Promise<RequestResponse<T>> {
+async function get<T = any>(url: string, headers?: Headers, timeout?: number): Promise<RequestResponse<T>> {
     const mergedHeaders = mergeWithAuthHeaders(headers);
 
     const response = await fetch(url, {
         method: 'GET',
         headers: mergedHeaders,
-        signal: AbortSignal.timeout(10000) // 10 second timeout
+        signal: AbortSignal.timeout(timeout || 10000) // Custom timeout or default 10 seconds
     });
 
     return handleResponse<T>(response, url);

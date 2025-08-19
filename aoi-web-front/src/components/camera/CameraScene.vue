@@ -4,6 +4,36 @@
     </div>
 </template>
 
+<style scoped>
+#canvas-container {
+    position: relative;
+    overflow: hidden;
+    box-sizing: border-box;
+}
+
+#canvas-container canvas {
+    display: block;
+    max-width: 100%;
+    max-height: 100%;
+    box-sizing: border-box;
+}
+
+/* Ensure Fabric.js canvas layers stay constrained to container size */
+#canvas-container .upper-canvas,
+#canvas-container .lower-canvas {
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    max-width: 100% !important;
+    max-height: 100% !important;
+    min-width: 100% !important;
+    min-height: 100% !important;
+    box-sizing: border-box !important;
+}
+</style>
+
 <script>
 import * as fabric from 'fabric';
 import { ref, watch, onMounted, toRef, onUnmounted, onBeforeUnmount, nextTick } from 'vue';
@@ -318,24 +348,30 @@ export default {
             }
         });
 
-        watch(feedLocation, (newValue) => {
+        watch(feedLocation, (newValue, oldValue) => {
             try {
-                logger.info('CameraScene feedLocation watcher triggered', { newValue, oldValue: feedLocation.value });
-                if(newValue) {
-                    logger.info('CameraScene: Connecting to camera with feedLocation:', newValue);
-                    disconnectFromCamera();
-                    setTimeout(() => {
-                        connectToCamera();
-                    }, 100);
+                logger.info('CameraScene feedLocation watcher triggered', { newValue, oldValue });
+                
+                // Only process if the value actually changed (handle undefined oldValue on mount)
+                if (newValue !== oldValue && !(oldValue === undefined && newValue === '')) {
+                    if(newValue) {
+                        logger.info('CameraScene: Connecting to camera with feedLocation:', newValue);
+                        disconnectFromCamera();
+                        setTimeout(() => {
+                            connectToCamera();
+                        }, 150); // Increased delay to prevent race conditions
+                    } else {
+                        logger.info('CameraScene: Disconnecting from camera (no feedLocation)');
+                        disconnectFromCamera();
+                    }
                 } else {
-                    logger.info('CameraScene: Disconnecting from camera (no feedLocation)');
-                    disconnectFromCamera();
+                    logger.debug('CameraScene: feedLocation unchanged, skipping reconnection');
                 }
             } catch (error) {
                 logger.error('Error handling feed location change', error);
                 addErrorToStore(store, 'Camera Feed Change Error', error);
             }
-        });
+        }, { flush: 'post', immediate: true }); // Execute after DOM updates, and immediately on mount
 
         watch(show, (newValue) => {
             if(!newValue)
@@ -344,10 +380,11 @@ export default {
                 removeImages();
             }
 
+            // Don't manually call connectToCamera() - let feedLocation watcher handle it
             if(newValue && props.cameraFeed)
             {
                 removeImages();
-                connectToCamera();
+                // Connection will be handled by feedLocation watcher
             }
         });
 
@@ -407,15 +444,6 @@ export default {
                     return;
                 }
                 
-                // Check canvas dimensions
-                const canvasWidth = canvas.value.getWidth();
-                const canvasHeight = canvas.value.getHeight();
-                
-                if (canvasWidth === 0 || canvasHeight === 0) {
-                    canvas.value.setWidth(600);
-                    canvas.value.setHeight(400);
-                }
-                
                 processImageForCanvas(newValue);
             }
         });
@@ -436,12 +464,37 @@ export default {
             img.onload = function() {
                 if (canvas.value) {
                     try {
+                        // Get current canvas dimensions
+                        const canvasWidth = canvas.value.getWidth();
+                        const canvasHeight = canvas.value.getHeight();
+                        
+                        // Calculate scaling to fit the image within the canvas while maintaining aspect ratio
+                        const imageAspectRatio = img.width / img.height;
+                        const canvasAspectRatio = canvasWidth / canvasHeight;
+                        
+                        let scaleX, scaleY;
+                        if (imageAspectRatio > canvasAspectRatio) {
+                            // Image is wider than canvas - fit to width
+                            scaleX = scaleY = canvasWidth / img.width;
+                        } else {
+                            // Image is taller than canvas - fit to height
+                            scaleX = scaleY = canvasHeight / img.height;
+                        }
+                        
                         const fabricImg = new fabric.FabricImage(img, {
                             // Performance optimizations for background image
                             objectCaching: true,
                             statefullCache: true,
                             noScaleCache: false,
-                            evented: false
+                            evented: false,
+                            // Scale the image to fit the canvas
+                            scaleX: scaleX,
+                            scaleY: scaleY,
+                            // Center the image in the canvas
+                            originX: 'center',
+                            originY: 'center',
+                            left: canvasWidth / 2,
+                            top: canvasHeight / 2
                         });
                         
                         canvas.value.set({ backgroundImage: fabricImg });
@@ -596,8 +649,13 @@ export default {
                     const newWidth = canvasContainer.value.clientWidth || 600;
                     canvas.value.setHeight(newHeight);
                     canvas.value.setWidth(newWidth);
-                    // Re-render after resize
-                    if (canvas.value.backgroundImage) {
+                    
+                    // Re-scale background image if it exists
+                    if (canvas.value.backgroundImage && imageSource.value) {
+                        // Reprocess the current image with new canvas dimensions
+                        processImageForCanvas(imageSource.value);
+                    } else if (canvas.value.backgroundImage) {
+                        // Just re-render if no image source available
                         canvas.value.requestRenderAll();
                     }
                 }
@@ -703,12 +761,10 @@ export default {
                 throttledRender();
             }
             
-            // Manually trigger connection if feedLocation is already set
+            // Don't manually trigger connection - let feedLocation watcher handle it
             if (props.feedLocation && props.cameraFeed) {
-                logger.info('CameraScene: feedLocation already set on mount, connecting...', { feedLocation: props.feedLocation });
-                setTimeout(() => {
-                    connectToCamera();
-                }, 100);
+                logger.info('CameraScene: feedLocation already set on mount, will be handled by watcher...', { feedLocation: props.feedLocation });
+                // Connection will be handled by feedLocation watcher
             }
         });
 

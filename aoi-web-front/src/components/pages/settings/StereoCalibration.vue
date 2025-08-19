@@ -1,7 +1,7 @@
 <template>
     <div class="flex-container">
         <div class="calibration-settings-panel">
-            <div class="image-source-selector">
+            <div class="image-source-selector ">
                 <label id="image-source-label" for="image-source">First Image Source</label>
                 <vue-multiselect
                     v-model="firstImageSource"
@@ -10,7 +10,7 @@
                     :searchable="true"
                 ></vue-multiselect>
             </div>
-            <div class="image-source-selector">
+            <div class="image-source-selector ">
                 <label id="image-source-label" for="image-source">Second Image Source</label>
                 <vue-multiselect
                     v-model="secondImageSource"

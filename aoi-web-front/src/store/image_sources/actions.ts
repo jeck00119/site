@@ -7,13 +7,14 @@ import { logger } from "../../utils/logger";
 export default {
     async loadImageSources(context) {
         const token = context.rootGetters["auth/getToken"] || sessionStorage.getItem('auth-token');
+        // Use longer timeout for image sources loading to prevent timeout errors
         const { response, responseData } = await get(`http://${ipAddress}:${port}/image_source`, {
             'content-type': 'application/json',
             'Authorization': token,
             'Cache-Control': 'no-cache, no-store, must-revalidate',
             'Pragma': 'no-cache',
             'Expires': '0'
-        }); 
+        }, 15000); // 15 second timeout instead of default 10 seconds 
 
         if(!response.ok)
         {

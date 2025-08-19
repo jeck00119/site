@@ -2,7 +2,7 @@
   <div class="cnc-container">
     <div class="wrapper">
       <!-- Position Display -->
-      <div class="positions-section">
+      <div class="positions-section cnc-section">
         <PositionDisplay 
           :axis-name="axisName" 
           :axis-uid="axisUid" 
@@ -10,7 +10,7 @@
       </div>
 
       <!-- Location Management -->
-      <div class="save-section">
+      <div class="save-section cnc-section">
         <LocationManagement
           :axis-uid="axisUid"
           :current-position="pos"
@@ -33,7 +33,7 @@
       </div>
 
       <!-- General Commands -->
-      <div class="commands-section">
+      <div class="commands-section cnc-section">
         <GeneralCommands
           :axis-uid="axisUid"
           :is-connected="isConnected"
@@ -42,7 +42,7 @@
       </div>
 
       <!-- Location Tabs (Shortcuts & Sequence) -->
-      <div class="location-tabs-section">
+      <div class="location-tabs-section cnc-section">
         <div class="tabs-inner-container">
           <LocationTabs
             :axis-uid="axisUid"
@@ -58,7 +58,7 @@
       </div>
 
       <!-- Feedrate and State -->
-      <div class="feedrate-section">
+      <div class="feedrate-section cnc-section">
         <FeedrateState
           :axis-uid="axisUid"
           :connection-status="webSocketState"
@@ -68,7 +68,7 @@
       </div>
 
       <!-- Steps Control -->
-      <div class="steps-section">
+      <div class="steps-section cnc-section">
         <StepsControl
           :selected-steps="selectedSteps"
           :feedrate="selectedFeedrate"
@@ -80,7 +80,7 @@
       </div>
 
       <!-- Terminal Console -->
-      <div class="terminal-section">
+      <div class="terminal-section cnc-section">
         <TerminalConsole
           :axis-uid="axisUid"
           :terminal-history="ugsTerminalHistory"
@@ -91,7 +91,7 @@
       </div>
 
       <!-- Camera Feed Section -->
-      <div class="camera-section">
+      <div class="camera-section cnc-section">
         <div class="camera-header">
           <h3>Camera Feed</h3>
           <select 
@@ -110,16 +110,17 @@
           </select>
         </div>
         <div class="camera-feed">
-          <CameraScene
-            width="100%"
-            height="100%"
-            :show="showCameraFeed"
-            :camera-feed="true"
-            :feed-location="feedLocation"
-            :canvas-id="`cnc-camera-${axisUid}`"
-            :graphics="[]"
-            v-if="selectedCamera && selectedCamera !== 'none'"
-          />
+          <div class="camera-scene-container" v-if="selectedCamera && selectedCamera !== 'none'">
+            <CameraScene
+              width="100%"
+              height="100%"
+              :show="showCameraFeed"
+              :camera-feed="true"
+              :feed-location="feedLocation"
+              :canvas-id="`cnc-camera-${axisUid}`"
+              :graphics="[]"
+            />
+          </div>
           <div class="camera-placeholder" v-else>
             <p>No camera selected</p>
           </div>
@@ -163,7 +164,7 @@
 </template>
 
 <script>
-import { ref, onMounted, onUnmounted, computed } from "vue";
+import { ref, onMounted, onUnmounted, computed, watch } from "vue";
 import { useRouter } from "vue-router";
 import api from "../../utils/api.js";
 import { useCncStore, useWebSocket, useLoadingState, useImageSourcesStore } from '@/composables/useStore';
@@ -230,6 +231,7 @@ export default {
     const selectedCamera = ref(null);
     const feedLocation = ref('');
     const showCameraFeed = ref(false);
+    
 
     // WebSocket connection
     let socketInstance = null;
@@ -244,7 +246,19 @@ export default {
     // Available camera sources (show both dynamic and static sources)
     const availableCameras = computed(() => {
       const sources = imageSourcesStore.imageSources.value || [];
-      return sources; // Show all sources, not just dynamic
+      
+      // Filter out misconfigured image sources to prevent spam
+      return sources.filter(source => {
+        if (source.image_source_type === 'dynamic') {
+          // Dynamic sources need a valid camera_uid
+          return source.camera_uid && source.camera_uid.trim() !== '';
+        } else if (source.image_source_type === 'static') {
+          // Static sources need a valid image_generator_uid
+          return source.image_generator_uid && source.image_generator_uid.trim() !== '';
+        }
+        // Include other types by default
+        return true;
+      });
     });
 
     // Lifecycle hooks
@@ -634,72 +648,101 @@ export default {
       isSequenceTabActive.value = tabIndex === 1; // 1 is the sequence tab
     }
     
+
     // Camera handling methods
-    async function onCameraSourceChanged(sourceId) {
-      try {
-        if (sourceId && sourceId !== 'none') {
-          selectedCamera.value = sourceId;
-          
-          // Fetch the full image source details from the backend
-          try {
-            const response = await api.get(`/image_source/${sourceId}`);
-            const fullImageSource = response.data;
-            
-            // Construct WebSocket URL based on image source type (like AlgorithmDebug does)
-            const wsBaseUrl = `ws://${window.location.hostname}:8000`;
-            let wsUrl;
-            const fps = fullImageSource.fps || 1; // Default to 1 FPS if not specified
-            
-            if (fullImageSource.image_source_type === "static") {
-              // Static image sources need image_generator_uid
-              if (fullImageSource.image_generator_uid) {
-                wsUrl = `${wsBaseUrl}/image_source/${sourceId}/${fullImageSource.image_generator_uid}/${fps}/ws`;
-              } else {
-                wsUrl = `${wsBaseUrl}/image_source/${sourceId}/ws`;
-              }
-            } else if (fullImageSource.image_source_type === "dynamic") {
-              // Dynamic camera sources need camera_uid
-              if (fullImageSource.camera_uid) {
-                wsUrl = `${wsBaseUrl}/image_source/${sourceId}/${fullImageSource.camera_uid}/${fps}/ws`;
-              } else {
-                wsUrl = `${wsBaseUrl}/image_source/${sourceId}/ws`;
-              }
-            } else {
-              // Fallback to simple format
-              wsUrl = `${wsBaseUrl}/image_source/${sourceId}/ws`;
-            }
-            
-            feedLocation.value = wsUrl;
-            showCameraFeed.value = true;
-            
-            addToConsole(`Camera connected: ${fullImageSource.name || fullImageSource.uid} (${fullImageSource.image_source_type || 'unknown'} type)`);
-          } catch (error) {
-            logger.error('Failed to fetch full image source details', error);
-            // Fallback to simple WebSocket URL if fetching details fails
-            const wsBaseUrl = `ws://${window.location.hostname}:8000`;
-            const wsUrl = `${wsBaseUrl}/image_source/${sourceId}/ws`;
-            feedLocation.value = wsUrl;
-            showCameraFeed.value = true;
-            addToConsole(`Camera connected with fallback URL: ${sourceId}`);
-          }
-        } else {
-          // No camera selected or "No Camera" option selected
-          // Clear feed location first to trigger disconnection
-          feedLocation.value = '';
-          showCameraFeed.value = false;
-          
-          // Wait a moment for disconnection to process, then clear camera selection
-          setTimeout(() => {
-            selectedCamera.value = null;
-          }, 50);
-          
-          addToConsole("Camera disconnected");
-        }
-      } catch (error) {
-        logger.error('Failed to change camera source', error);
-        handleApiError(error, 'Failed to change camera source');
-        addToConsole(`Camera connection failed: ${error.message}`);
+    let cameraChangeTimeout = null;
+    
+    // Helper function to validate image source configuration
+    function validateImageSource(imageSource) {
+      if (imageSource.image_source_type === 'dynamic' && (!imageSource.camera_uid || imageSource.camera_uid.trim() === '')) {
+        addToConsole(`Camera error: Image source "${imageSource.name}" has no camera configured`);
+        logger.error('Dynamic image source missing camera_uid', { sourceId: imageSource.uid, imageSource });
+        return false;
       }
+      
+      if (imageSource.image_source_type === 'static' && (!imageSource.image_generator_uid || imageSource.image_generator_uid.trim() === '')) {
+        addToConsole(`Camera error: Image source "${imageSource.name}" has no image generator configured`);
+        logger.error('Static image source missing image_generator_uid', { sourceId: imageSource.uid, imageSource });
+        return false;
+      }
+      
+      return true;
+    }
+    
+    // Helper function to build WebSocket URL for image source
+    function buildImageSourceWebSocketUrl(imageSource) {
+      const wsBaseUrl = `ws://${window.location.hostname}:8000`;
+      const sourceId = imageSource.uid;
+      const fps = imageSource.fps || 1;
+      
+      if (imageSource.image_source_type === "static") {
+        if (imageSource.image_generator_uid) {
+          return `${wsBaseUrl}/image_source/${sourceId}/${imageSource.image_generator_uid}/${fps}/ws`;
+        } else {
+          return `${wsBaseUrl}/image_source/${sourceId}/ws`;
+        }
+      } else if (imageSource.image_source_type === "dynamic") {
+        if (imageSource.camera_uid) {
+          return `${wsBaseUrl}/image_source/${sourceId}/${imageSource.camera_uid}/${fps}/ws`;
+        } else {
+          return `${wsBaseUrl}/image_source/${sourceId}/ws`;
+        }
+      } else {
+        return `${wsBaseUrl}/image_source/${sourceId}/ws`;
+      }
+    }
+    
+    // Helper function to connect to camera
+    async function connectToCamera(sourceId) {
+      try {
+        const response = await api.get(`/image_source/${sourceId}`);
+        const imageSource = response.data;
+        
+        if (!validateImageSource(imageSource)) {
+          return false;
+        }
+        
+        const wsUrl = buildImageSourceWebSocketUrl(imageSource);
+        feedLocation.value = wsUrl;
+        showCameraFeed.value = true;
+        addToConsole(`Camera connected: ${imageSource.name || imageSource.uid} (${imageSource.image_source_type || 'unknown'} type)`);
+        return true;
+      } catch (error) {
+        logger.error('Failed to fetch image source details', error);
+        addToConsole(`Camera error: Failed to get configuration for image source ${sourceId}`);
+        return false;
+      }
+    }
+    
+    // Helper function to disconnect camera
+    function disconnectCamera() {
+      feedLocation.value = '';
+      showCameraFeed.value = false;
+      selectedCamera.value = null;
+      addToConsole("Camera disconnected - all connections closed");
+    }
+    
+    async function onCameraSourceChanged(sourceId) {
+      // Clear any existing timeout to debounce rapid selections
+      if (cameraChangeTimeout) {
+        clearTimeout(cameraChangeTimeout);
+      }
+      
+      // Debounce camera changes by 100ms
+      cameraChangeTimeout = setTimeout(async () => {
+        try {
+          if (sourceId && sourceId !== 'none') {
+            selectedCamera.value = sourceId;
+            await connectToCamera(sourceId);
+          } else {
+            disconnectCamera();
+          }
+        } catch (error) {
+          logger.error('Failed to change camera source', error);
+          handleApiError(error, 'Failed to change camera source');
+          addToConsole(`Camera connection failed: ${error.message}`);
+        }
+      }, 100); // End of setTimeout debounce
     }
 
     // Connection handling methods
@@ -831,10 +874,8 @@ export default {
   overflow: hidden;
 }
 
-/* Grid Layout - Match original CNC.vue positioning */
-.positions-section {
-  grid-column: 1/5;
-  grid-row: 2/5;
+/* Common section styling */
+.cnc-section {
   color: white;
   background-color: #161616;
   border-radius: 8px;
@@ -842,14 +883,15 @@ export default {
   padding: 0.5rem;
 }
 
+/* Grid Layout - Match original CNC.vue positioning */
+.positions-section {
+  grid-column: 1/5;
+  grid-row: 2/5;
+}
+
 .save-section {
   grid-column: 1/3; /* Made wider by spanning 2 columns instead of 1 */
   grid-row: 5/8;
-  color: white;
-  background-color: #161616;
-  border-radius: 8px;
-  overflow: hidden;
-  padding: 0.5rem;
 }
 
 .movement-section {
@@ -862,21 +904,11 @@ export default {
 .commands-section {
   grid-column: 5/10;
   grid-row: 2/5;
-  color: white;
-  background-color: #161616;
-  border-radius: 8px;
-  overflow: hidden;
-  padding: 0.5rem;
 }
 
 .location-tabs-section {
   grid-column: 10/15;
   grid-row: 4/8;  /* Changed from 5/8 to 4/8 - takes more vertical space */
-  color: white;
-  background-color: #161616;
-  border-radius: 8px;
-  overflow: hidden;
-  padding: 0.5rem;
   position: relative;
   display: flex;
   align-items: center;
@@ -898,41 +930,21 @@ export default {
 .feedrate-section {
   grid-column: 10/15;
   grid-row: 2/4;  /* Changed from 2/5 to 2/4 - takes less vertical space */
-  color: white;
-  background-color: #161616;
-  border-radius: 8px;
-  overflow: hidden;
-  padding: 0.5rem;
 }
 
 .steps-section {
   grid-column: 5/10;
   grid-row: 5/8;
-  color: white;
-  background-color: #161616;
-  border-radius: 8px;
-  overflow: hidden;
-  padding: 0.5rem;
 }
 
 .terminal-section {
   grid-column: 15/19; /* Extended from 15/18 to 15/19 for more width */
-  grid-row: 2/5; /* Reduced from 2/8 to 2/5 to make room for camera section */
-  color: white;
-  background-color: #161616;
-  border-radius: 8px;
-  overflow: hidden;
-  padding: 0.5rem;
+  grid-row: 2/4; /* Further reduced from 2/5 to 2/4 to make terminal smaller */
 }
 
 .camera-section {
   grid-column: 15/19; /* Same column as terminal section */
-  grid-row: 5/8; /* Below terminal section, from 5 to 8 */
-  color: white;
-  background-color: #161616;
-  border-radius: 8px;
-  overflow: hidden;
-  padding: 0.5rem;
+  grid-row: 4/8; /* Expanded from 5/8 to 4/8 to make camera bigger */
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
@@ -981,8 +993,21 @@ export default {
   background-color: #000;
   border-radius: 4px;
   overflow: hidden;
-  min-height: 200px; /* Ensure minimum height for canvas */
-  position: relative; /* For proper child positioning */
+  height: 312px !important;
+  max-height: 312px !important;
+  max-width: 100%;
+  position: relative;
+}
+
+.camera-scene-container {
+  width: 100% !important;
+  height: 312px !important;
+  max-width: 100% !important;
+  max-height: 312px !important;
+  overflow: hidden;
+  display: flex;
+  flex: 1;
+  position: relative;
 }
 
 .camera-placeholder {
@@ -1010,12 +1035,12 @@ export default {
   
   .terminal-section {
     grid-column: 10/14;
-    grid-row: 2/6; /* Adjusted to make room for camera */
+    grid-row: 2/4; /* Smaller terminal for larger screens */
   }
   
   .camera-section {
     grid-column: 10/14;
-    grid-row: 6/11; /* Below terminal section */
+    grid-row: 4/11; /* Bigger camera section */
   }
 }
 
@@ -1032,12 +1057,12 @@ export default {
   
   .terminal-section {
     grid-column: 1/10;
-    grid-row: 11/13; /* Adjusted to make room for camera */
+    grid-row: 11/12; /* Smaller terminal on small screens */
   }
   
   .camera-section {
     grid-column: 1/10;
-    grid-row: 13/15; /* Below terminal section on small screens */
+    grid-row: 12/16; /* Bigger camera section on small screens */
   }
 }
 

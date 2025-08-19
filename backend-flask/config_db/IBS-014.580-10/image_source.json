@@ -12,32 +12,6 @@
             "name": "WebCamera",
             "settle_time": 0,
             "uid": "cb4c65e6-f831-4b8c-be0a-bfd259b2c2de"
-        },
-        "2": {
-            "activate_location": false,
-            "camera_calibration_uid": null,
-            "camera_settings_uid": "",
-            "camera_uid": "",
-            "fps": 30,
-            "image_generator_uid": "",
-            "image_source_type": "dynamic",
-            "location_name": "",
-            "name": "test",
-            "settle_time": 0,
-            "uid": "498fc9ea-8bbd-4c3c-b3ef-2e47ba8808e2"
-        },
-        "3": {
-            "activate_location": false,
-            "camera_calibration_uid": null,
-            "camera_settings_uid": "",
-            "camera_uid": "",
-            "fps": 30,
-            "image_generator_uid": "",
-            "image_source_type": "dynamic",
-            "location_name": "",
-            "name": "dfdf",
-            "settle_time": 0,
-            "uid": "5a7977cd-ca14-4079-9c9b-77fc2dccdcfb"
         }
     }
 }
