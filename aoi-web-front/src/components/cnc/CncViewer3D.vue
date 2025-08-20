@@ -1,7 +1,7 @@
 <template>
   <div class="viewer-container">
     <div class="viewer-header">
-      <h2>CNC Digital Twin - {{ cncConfig.cncType.toUpperCase() }}</h2>
+      <h2>CNC Digital Twin</h2>
       <div class="viewer-controls">
         <button @click="resetCamera" class="control-button">
           <font-awesome-icon icon="home" />
@@ -119,15 +119,15 @@
       <div class="info-panel">
         <div class="position-info">
           <h4>Current Position</h4>
-          <div class="position-row">
+          <div v-if="cncConfig.selectedAxes?.x !== false" class="position-row">
             <span class="axis">X:</span>
             <span class="value">{{ displayPosition.x.toFixed(3) }}mm</span>
           </div>
-          <div class="position-row">
+          <div v-if="cncConfig.selectedAxes?.y !== false" class="position-row">
             <span class="axis">Y:</span>
             <span class="value">{{ displayPosition.y.toFixed(3) }}mm</span>
           </div>
-          <div class="position-row">
+          <div v-if="cncConfig.selectedAxes?.z !== false" class="position-row">
             <span class="axis">Z:</span>
             <span class="value">{{ displayPosition.z.toFixed(3) }}mm</span>
           </div>
@@ -136,29 +136,29 @@
         <div class="target-info" v-if="targetPosition || (targetArrived && lastTargetPosition)">
           <h4>Target Position</h4>
           <div v-if="targetArrived && lastTargetPosition">
-            <div class="position-row">
+            <div v-if="cncConfig.selectedAxes?.x !== false" class="position-row">
               <span class="axis">X:</span>
               <span class="value target arrived">{{ lastTargetPosition.x?.toFixed(3) || '0.000' }}mm</span>
             </div>
-            <div class="position-row">
+            <div v-if="cncConfig.selectedAxes?.y !== false" class="position-row">
               <span class="axis">Y:</span>
               <span class="value target arrived">{{ lastTargetPosition.y?.toFixed(3) || '0.000' }}mm</span>
             </div>
-            <div class="position-row">
+            <div v-if="cncConfig.selectedAxes?.z !== false" class="position-row">
               <span class="axis">Z:</span>
               <span class="value target arrived">{{ lastTargetPosition.z?.toFixed(3) || '0.000' }}mm</span>
             </div>
           </div>
           <div v-else-if="targetPosition">
-            <div class="position-row">
+            <div v-if="cncConfig.selectedAxes?.x !== false" class="position-row">
               <span class="axis">X:</span>
               <span class="value target">{{ targetPosition.x?.toFixed(3) || '0.000' }}mm</span>
             </div>
-            <div class="position-row">
+            <div v-if="cncConfig.selectedAxes?.y !== false" class="position-row">
               <span class="axis">Y:</span>
               <span class="value target">{{ targetPosition.y?.toFixed(3) || '0.000' }}mm</span>
             </div>
-            <div class="position-row">
+            <div v-if="cncConfig.selectedAxes?.z !== false" class="position-row">
               <span class="axis">Z:</span>
               <span class="value target">{{ targetPosition.z?.toFixed(3) || '0.000' }}mm</span>
             </div>
@@ -168,16 +168,16 @@
         <div class="config-info">
           <h4>Configuration</h4>
           <div class="config-row">
-            <span class="label">Type:</span>
-            <span class="value">{{ cncConfig.cncType }}</span>
+            <span class="label">Selected Axes:</span>
+            <span class="value">{{ selectedAxesDisplay }}</span>
           </div>
-          <div class="config-row">
-            <span class="label">Axes:</span>
-            <span class="value">{{ cncConfig.xAxisLength }}×{{ cncConfig.yAxisLength }}×{{ cncConfig.zAxisLength }}mm</span>
+          <div v-if="selectedLinearAxes.length > 0" class="config-row">
+            <span class="label">Axis Lengths:</span>
+            <span class="value">{{ axisLengthsDisplay }}</span>
           </div>
-          <div class="config-row">
+          <div v-if="selectedLinearAxes.length > 0" class="config-row">
             <span class="label">Work Zone:</span>
-            <span class="value">{{ cncConfig.workingZoneX }}×{{ cncConfig.workingZoneY }}×{{ cncConfig.workingZoneZ }}mm</span>
+            <span class="value">{{ workZoneDisplay }}</span>
           </div>
         </div>
       </div>
@@ -236,6 +236,9 @@ export default {
     let zAxisMesh = null;
     let gridHelper = null;
     let fineGridHelper = null;
+    let xAxisLabel = null;
+    let yAxisLabel = null;
+    let zAxisLabel = null;
     
     // State
     const isAnimating = ref(true);
@@ -297,7 +300,7 @@ export default {
     const isExecutingSimulation = ref(false);
     
     // Camera views
-    const cameraViews = ['Top', 'Side'];
+    const cameraViews = ['3D', 'Top', 'Side'];
     const currentCameraIndex = ref(0);
     const currentCameraView = computed(() => cameraViews[currentCameraIndex.value]);
     
@@ -312,6 +315,9 @@ export default {
     });
     
     const clickStatusText = computed(() => {
+      if (currentCameraView.value === '3D') {
+        return 'Presentation View';
+      }
       if (isSimulationMode.value) {
         if (currentCameraView.value === 'Top' || currentCameraView.value === 'Side') {
           return targetPosition.value ? 'Click Play to Execute' : 'Click to Set Target';
@@ -330,6 +336,48 @@ export default {
     // Play button state
     const canExecuteSimulation = computed(() => {
       return isSimulationMode.value && targetPosition.value && !isExecutingSimulation.value;
+    });
+
+    // Computed properties for display strings based on selected axes
+    const selectedLinearAxes = computed(() => {
+      const axes = [];
+      if (props.cncConfig.selectedAxes?.x !== false) axes.push('X');
+      if (props.cncConfig.selectedAxes?.y !== false) axes.push('Y');  
+      if (props.cncConfig.selectedAxes?.z !== false) axes.push('Z');
+      return axes;
+    });
+
+    const selectedAxesDisplay = computed(() => {
+      return selectedLinearAxes.value.length > 0 ? selectedLinearAxes.value.join(', ') : 'None';
+    });
+
+    const axisLengthsDisplay = computed(() => {
+      const lengths = [];
+      if (props.cncConfig.selectedAxes?.x !== false && props.cncConfig.xAxisLength) {
+        lengths.push(`X:${props.cncConfig.xAxisLength}mm`);
+      }
+      if (props.cncConfig.selectedAxes?.y !== false && props.cncConfig.yAxisLength) {
+        lengths.push(`Y:${props.cncConfig.yAxisLength}mm`);
+      }
+      if (props.cncConfig.selectedAxes?.z !== false && props.cncConfig.zAxisLength) {
+        lengths.push(`Z:${props.cncConfig.zAxisLength}mm`);
+      }
+      return lengths.join(' × ');
+    });
+
+
+    const workZoneDisplay = computed(() => {
+      const zones = [];
+      if (props.cncConfig.selectedAxes?.x !== false && props.cncConfig.workingZoneX) {
+        zones.push(`X:${props.cncConfig.workingZoneX}mm`);
+      }
+      if (props.cncConfig.selectedAxes?.y !== false && props.cncConfig.workingZoneY) {
+        zones.push(`Y:${props.cncConfig.workingZoneY}mm`);
+      }
+      if (props.cncConfig.selectedAxes?.z !== false && props.cncConfig.workingZoneZ) {
+        zones.push(`Z:${props.cncConfig.workingZoneZ}mm`);
+      }
+      return zones.join(' × ');
     });
     
     // Click-to-move state
@@ -700,6 +748,9 @@ export default {
       zAxisMesh = null;
       gridHelper = null;
       fineGridHelper = null;
+      xAxisLabel = null;
+      yAxisLabel = null;
+      zAxisLabel = null;
       raycaster = null;
       clickTarget = null;
       mouse = null;
@@ -889,6 +940,25 @@ export default {
         createCNCRig();
         setupControls();
         
+        // Apply initial 3D rotation since default view is 3D
+        if (currentCameraView.value === '3D' && cncGroup) {
+          const centerX = props.cncConfig.xAxisLength / 2;
+          const centerY = props.cncConfig.yAxisLength / 2;
+          const centerZ = props.cncConfig.zAxisLength / 2;
+          
+          const rotationMatrix = new THREE.Matrix4();
+          const translationToOrigin = new THREE.Matrix4().makeTranslation(-centerX, -centerY, -centerZ);
+          const translationBack = new THREE.Matrix4().makeTranslation(centerX, centerY, centerZ);
+          const rotationZ = new THREE.Matrix4().makeRotationZ(Math.PI); // +180 degrees
+          
+          rotationMatrix.multiplyMatrices(translationBack, rotationZ);
+          rotationMatrix.multiply(translationToOrigin);
+          cncGroup.applyMatrix4(rotationMatrix);
+        }
+        
+        // Set camera position after rotation is applied
+        setCameraPosition(currentCameraView.value);
+        
         // Start animation loop
         animate();
         
@@ -1045,6 +1115,53 @@ export default {
       originSphere.position.set(0, 0, 0);
       cncGroup.add(originSphere);
     };
+
+    const createTextSprite = (text, color = '#ffffff') => {
+      const canvas = document.createElement('canvas');
+      const context = canvas.getContext('2d');
+      canvas.width = 160;
+      canvas.height = 160;
+      
+      // Clear background
+      context.clearRect(0, 0, canvas.width, canvas.height);
+      
+      // Create symmetric rounded rectangle dark background
+      const padding = 20;
+      const radius = 15;
+      const bgX = padding;
+      const bgY = padding;
+      const bgWidth = canvas.width - padding * 2;
+      const bgHeight = canvas.height - padding * 2;
+      
+      // Draw rounded rectangle background
+      context.beginPath();
+      context.roundRect(bgX, bgY, bgWidth, bgHeight, radius);
+      context.fillStyle = 'rgba(0, 0, 0, 0.85)';
+      context.fill();
+      context.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+      context.lineWidth = 2;
+      context.stroke();
+      
+      // Add bold text
+      context.font = 'bold 80px Arial';
+      context.textAlign = 'center';
+      context.textBaseline = 'middle';
+      
+      // Main text with intense color - centered in square canvas
+      context.fillStyle = color;
+      context.fillText(text, 80, 80);
+      
+      const texture = trackResource(new THREE.CanvasTexture(canvas), 'textures');
+      const spriteMaterial = createTrackedMaterial(THREE.SpriteMaterial, { 
+        map: texture,
+        transparent: true,
+        opacity: 1.0
+      });
+      const sprite = trackResource(new THREE.Sprite(spriteMaterial), 'meshes');
+      sprite.scale.set(25, 25, 1);
+      
+      return sprite;
+    };
     
     const createXAxis = (materials) => {
       if (props.cncConfig.xAxisLength <= 0) return;
@@ -1061,6 +1178,11 @@ export default {
       xArrow.position.set(props.cncConfig.xAxisLength, 0, 0);
       xArrow.rotation.z = -Math.PI / 2;
       cncGroup.add(xArrow);
+
+      // X-Axis label - initial position (will be updated by updateLabelPositions)
+      xAxisLabel = createTextSprite('X', '#ff1744');
+      xAxisLabel.position.set(props.cncConfig.xAxisLength, -50, 40);
+      cncGroup.add(xAxisLabel);
     };
     
     const createYAxis = (materials) => {
@@ -1076,6 +1198,11 @@ export default {
       const yArrow = createTrackedMesh(yArrowGeometry, materials.yAxis);
       yArrow.position.set(0, props.cncConfig.yAxisLength, 0);
       cncGroup.add(yArrow);
+
+      // Y-Axis label - initial position (will be updated by updateLabelPositions)
+      yAxisLabel = createTextSprite('Y', '#00e676');
+      yAxisLabel.position.set(-50, props.cncConfig.yAxisLength, 40);
+      cncGroup.add(yAxisLabel);
     };
     
     const createZAxis = (materials) => {
@@ -1093,6 +1220,11 @@ export default {
       zArrow.position.set(0, 0, props.cncConfig.zAxisLength);
       zArrow.rotation.x = Math.PI / 2;
       cncGroup.add(zArrow);
+
+      // Z-Axis label - initial position (will be updated by updateLabelPositions)
+      zAxisLabel = createTextSprite('Z', '#2196f3');
+      zAxisLabel.position.set(-50, 40, props.cncConfig.zAxisLength);
+      cncGroup.add(zAxisLabel);
     };
     
     const initializeToolPosition = () => {
@@ -1132,7 +1264,7 @@ export default {
     };
     
     const createToolHead = (materials) => {
-      const toolGeometry = createTrackedGeometry(THREE.SphereGeometry, 8);
+      const toolGeometry = createTrackedGeometry(THREE.SphereGeometry, 12);
       toolHead = createTrackedMesh(toolGeometry, materials.tool);
       toolHead.position.set(props.currentPos.x, props.currentPos.y, props.currentPos.z);
       
@@ -1212,6 +1344,47 @@ export default {
       fineGridHelper.visible = showGrid && currentCameraView.value === 'Side';
       cncGroup.add(fineGridHelper);
     };
+
+    
+    // Debug rotation axes - separate from cncGroup so they don't rotate
+    let debugAxesGroup = null;
+    let debugVerticalAxis = null;
+    let debugHorizontalAxis = null;
+    
+    const createDebugRotationAxes = () => {
+      // Create a separate group for debug axes that won't rotate with the CNC
+      debugAxesGroup = new THREE.Group();
+      scene.add(debugAxesGroup);
+      
+      // Get the center of the working zone box
+      const centerX = props.cncConfig.xAxisLength / 2;
+      const centerY = props.cncConfig.yAxisLength / 2;
+      const centerZ = props.cncConfig.zAxisLength / 2;
+      
+      // Create vertical axis (Z-axis through center) - always stays vertical
+      const verticalGeometry = createTrackedGeometry(THREE.CylinderGeometry, 1, 1, props.cncConfig.zAxisLength * 2);
+      const verticalMaterial = createTrackedMaterial(THREE.MeshBasicMaterial, {
+        color: 0xff00ff,  // Magenta for visibility
+        opacity: 0.5,
+        transparent: true
+      });
+      debugVerticalAxis = createTrackedMesh(verticalGeometry, verticalMaterial);
+      debugVerticalAxis.position.set(centerX, centerY, centerZ);
+      debugVerticalAxis.rotation.x = Math.PI / 2;  // Rotate to align with Z-axis
+      debugAxesGroup.add(debugVerticalAxis);  // Add to separate group, not cncGroup
+      
+      // Create horizontal axis (X-axis through center for initial view) - always stays horizontal
+      const horizontalGeometry = createTrackedGeometry(THREE.CylinderGeometry, 1, 1, Math.max(props.cncConfig.xAxisLength, props.cncConfig.yAxisLength) * 2);
+      const horizontalMaterial = createTrackedMaterial(THREE.MeshBasicMaterial, {
+        color: 0x00ffff,  // Cyan for visibility
+        opacity: 0.5,
+        transparent: true
+      });
+      debugHorizontalAxis = createTrackedMesh(horizontalGeometry, horizontalMaterial);
+      debugHorizontalAxis.position.set(centerX, centerY, centerZ);
+      debugHorizontalAxis.rotation.z = Math.PI / 2;
+      debugAxesGroup.add(debugHorizontalAxis);  // Add to separate group, not cncGroup
+    };
     
     const createSimpleAxisVisualization = () => {
       const materials = createAxisMaterials();
@@ -1224,6 +1397,7 @@ export default {
       createXYGrid();
       createXZGrid();
       createClickTarget();
+      createDebugRotationAxes(); // Add debug axes
     };
     
     const createWorkingZone = () => {
@@ -1253,7 +1427,7 @@ export default {
     
     const createClickTarget = () => {
       // Create a ghost tool head identical to the original but transparent
-      const ghostGeometry = createTrackedGeometry(THREE.SphereGeometry, 8); // Same size as actual tool
+      const ghostGeometry = createTrackedGeometry(THREE.SphereGeometry, 12); // Same size as actual tool
       const ghostMaterial = createTrackedMaterial(THREE.MeshBasicMaterial, { 
         color: 0xffff00, // Same yellow color as original
         transparent: true,
@@ -1306,13 +1480,12 @@ export default {
     const createMouseState = () => {
       return {
         isLeftMouseDown: false,
-        isMiddleMouseDown: false,
         mouseX: 0,
         mouseY: 0,
         isDragging: false,
         lastDeltaX: 0,
-        lastDeltaY: 0,
-        deltaHistory: []
+        lastDeltaY: 0
+        // Right mouse state and deltaHistory removed - rotation disabled
       };
     };
     
@@ -1324,9 +1497,8 @@ export default {
       
       if (event.button === 0) {
         mouseState.isLeftMouseDown = true;
-      } else if (event.button === 1) {
-        mouseState.isMiddleMouseDown = true;
       }
+      // Right mouse rotation removed
     };
     
     const handleMouseUp = (mouseState) => (event) => {
@@ -1337,9 +1509,8 @@ export default {
         if (!mouseState.isDragging && (currentCameraView.value === 'Top' || currentCameraView.value === 'Side')) {
           handleClickToMove(event);
         }
-      } else if (event.button === 1) {
-        mouseState.isMiddleMouseDown = false;
       }
+      // Right mouse tracking removed
     };
     
     // Cache frequently used vectors to reduce garbage collection
@@ -1400,21 +1571,19 @@ export default {
     };
 
     const applyPanningLimits = (newPosition) => {
-      const { panLimit, center } = getCachedPanningParams();
-      
-      // Reuse vector cache for offset calculation
-      vectorCache.tempVector.copy(newPosition).sub(center);
-      const offsetLength = vectorCache.tempVector.length();
-      
-      if (offsetLength > panLimit) {
-        vectorCache.tempVector.normalize().multiplyScalar(panLimit);
-        newPosition.copy(center).add(vectorCache.tempVector);
-      }
-      
+      // No panning limits - allow free movement
       return newPosition;
     };
     
     const handleCameraPanning = (deltaX, deltaY) => {
+      // Cancel any active camera transition that might interfere with panning
+      if (activeTransitionId) {
+        cancelAnimationFrame(activeTransitionId);
+        activeTransitionId = null;
+      }
+      
+      // Labels no longer hidden during panning since rotation is disabled
+      
       const { panX, panY } = calculatePanning(deltaX, deltaY);
       const newPosition = camera.position.clone().add(panX).add(panY);
       const constrainedPosition = applyPanningLimits(newPosition);
@@ -1423,12 +1592,7 @@ export default {
       markDirty('rendering');
     };
     
-    // Cache rotation calculations
-    const rotationCache = {
-      spherical: new THREE.Spherical(),
-      targetPosition: new THREE.Vector3(),
-      positionDiff: new THREE.Vector3()
-    };
+    // Rotation cache removed - no longer needed since mouse rotation is disabled
 
     let cachedRotationLimits = null;
     let lastRotationConfigHash = null;
@@ -1453,57 +1617,21 @@ export default {
     };
 
     const handleCameraRotation = (deltaX, deltaY) => {
-      // Hide grid when rotating for clearer view
-      showGrid = false;
-      if (gridHelper) gridHelper.visible = false;
-      if (fineGridHelper) fineGridHelper.visible = false;
-      
-      const center = getCameraCenter().vector;
-      
-      // Reuse cached spherical coordinate object
-      rotationCache.positionDiff.copy(camera.position).sub(center);
-      rotationCache.spherical.setFromVector3(rotationCache.positionDiff);
-      
-      // Apply rotation with sensitivity control
-      const rotationSpeed = 0.008;
-      rotationCache.spherical.theta -= deltaX * rotationSpeed;
-      rotationCache.spherical.phi += deltaY * rotationSpeed;
-      
-      // Enhanced rotation limits to prevent camera flipping
-      rotationCache.spherical.phi = Math.max(0.1, Math.min(Math.PI - 0.1, rotationCache.spherical.phi));
-      
-      // Apply cached radius limits
-      const { minRadius, maxRadius } = getCachedRotationLimits();
-      rotationCache.spherical.radius = Math.min(maxRadius, Math.max(minRadius, rotationCache.spherical.radius));
-      
-      // Apply smooth rotation transition using cached target position
-      rotationCache.targetPosition.setFromSpherical(rotationCache.spherical).add(center);
-      camera.position.lerp(rotationCache.targetPosition, 0.8);
-      camera.lookAt(center);
-      markDirty('rendering');
+      // Mouse rotation disabled - only use view switching buttons
+      return;
     };
     
     // Throttled mouse update processing
     const processMouseUpdate = (mouseState, deltaX, deltaY) => {
-      // Add delta smoothing
-      mouseState.deltaHistory.push({ deltaX, deltaY });
-      if (mouseState.deltaHistory.length > 3) {
-        mouseState.deltaHistory.shift();
-      }
-      
-      // Calculate smoothed deltas
-      const smoothedDeltaX = mouseState.deltaHistory.reduce((sum, d) => sum + d.deltaX, 0) / mouseState.deltaHistory.length;
-      const smoothedDeltaY = mouseState.deltaHistory.reduce((sum, d) => sum + d.deltaY, 0) / mouseState.deltaHistory.length;
-      
+      // Only handle panning now - rotation is disabled
       if (mouseState.isLeftMouseDown) {
-        handleCameraPanning(smoothedDeltaX, smoothedDeltaY);
-      } else if (mouseState.isMiddleMouseDown) {
-        handleCameraRotation(smoothedDeltaX, smoothedDeltaY);
+        handleCameraPanning(deltaX, deltaY);
       }
+      // Right mouse rotation removed
     };
 
     const handleMouseMove = (mouseState) => (event) => {
-      if (!mouseState.isLeftMouseDown && !mouseState.isMiddleMouseDown) return;
+      if (!mouseState.isLeftMouseDown) return;  // Only handle left mouse for panning
       
       const deltaX = event.clientX - mouseState.mouseX;
       const deltaY = event.clientY - mouseState.mouseY;
@@ -1560,7 +1688,7 @@ export default {
         );
         cachedZoomLimits = {
           minDistance: maxDimension * 0.5,
-          maxDistance: maxDimension * 5
+          maxDistance: maxDimension * 1.5
         };
         lastZoomConfigHash = configHash;
       }
@@ -1581,9 +1709,9 @@ export default {
       const currentDistance = camera.position.distanceTo(center);
       const newDistance = Math.min(maxDistance, Math.max(minDistance, currentDistance * scale));
       
-      // Apply smooth zoom with easing using cached target position
+      // Apply direct zoom without smooth lerp to avoid interfering with panning
       zoomCache.targetPosition.copy(center).add(zoomCache.direction.multiplyScalar(newDistance));
-      camera.position.lerp(zoomCache.targetPosition, 0.5);
+      camera.position.copy(zoomCache.targetPosition);
       markDirty('rendering');
     };
     
@@ -1791,9 +1919,14 @@ export default {
       if (toolHead && targetPosition) {
         const currentPos = toolHead.position;
         
-        // Create line geometry with current and target positions
+        // Create line geometry showing simultaneous multi-axis movement
+        // Direct straight line path from current to target position
         const points = [];
+        
+        // Start position
         points.push(new THREE.Vector3(currentPos.x, currentPos.y, currentPos.z));
+        
+        // Direct to target position (simultaneous movement)
         points.push(new THREE.Vector3(targetPosition.x, targetPosition.y, targetPosition.z));
         
         // Use tracked resources for trajectory line (temporary objects)
@@ -2152,14 +2285,22 @@ export default {
       const maxX = props.cncConfig.xAxisLength;
       const maxY = props.cncConfig.yAxisLength;
       const maxZ = props.cncConfig.zAxisLength;
-      return Math.max(maxX, maxY, maxZ) * 1.5;
+      return Math.max(maxX, maxY, maxZ) * 0.7;
     };
     
     const easeInOutCubic = (t) => {
       return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
     };
     
+    let activeTransitionId = null;
+
     const smoothCameraTransition = (targetPosition, targetLookAt, duration = 500) => {
+      // Cancel any existing transition
+      if (activeTransitionId) {
+        cancelAnimationFrame(activeTransitionId);
+        activeTransitionId = null;
+      }
+      
       const startPosition = camera.position.clone();
       const startQuaternion = camera.quaternion.clone();
       
@@ -2182,20 +2323,70 @@ export default {
         markDirty('rendering');
         
         if (progress < 1) {
-          requestAnimationFrame(transitionAnimate);
+          activeTransitionId = requestAnimationFrame(transitionAnimate);
         } else {
           camera.lookAt(targetLookAt);
           markDirty('rendering');
+          activeTransitionId = null;
         }
       };
       
-      transitionAnimate();
+      activeTransitionId = requestAnimationFrame(transitionAnimate);
     };
     
+    const updateLabelPositions = (viewType) => {
+      switch (viewType) {
+        case '3D':
+          // In 3D view, show all three axis labels
+          if (xAxisLabel) {
+            xAxisLabel.position.set(props.cncConfig.xAxisLength, -50, 40);
+            xAxisLabel.visible = true;
+          }
+          if (yAxisLabel) {
+            yAxisLabel.position.set(-50, props.cncConfig.yAxisLength, 40);
+            yAxisLabel.visible = true;
+          }
+          if (zAxisLabel) {
+            zAxisLabel.position.set(-50, 40, props.cncConfig.zAxisLength);
+            zAxisLabel.visible = true;
+          }
+          break;
+        case 'Top':
+          // In top view, show only X and Y labels (front axes), hide Z label (behind)
+          if (xAxisLabel) {
+            xAxisLabel.position.set(props.cncConfig.xAxisLength, -50, 40);
+            xAxisLabel.visible = true;
+          }
+          if (yAxisLabel) {
+            yAxisLabel.position.set(-50, props.cncConfig.yAxisLength, 40);
+            yAxisLabel.visible = true;
+          }
+          if (zAxisLabel) zAxisLabel.visible = false; // Hide Z label (behind in top view)
+          break;
+        case 'Side':
+          // In side view, show only X and Z labels (front axes), hide Y label (behind)
+          if (xAxisLabel) {
+            xAxisLabel.position.set(props.cncConfig.xAxisLength, 50, -50);
+            xAxisLabel.visible = true;
+          }
+          if (yAxisLabel) yAxisLabel.visible = false; // Hide Y label (behind in side view)
+          if (zAxisLabel) {
+            zAxisLabel.position.set(-50, 50, props.cncConfig.zAxisLength);
+            zAxisLabel.visible = true;
+          }
+          break;
+      }
+    };
+
     const setGridVisibility = (viewType) => {
       showGrid = true;
       
       switch (viewType) {
+        case '3D':
+          // In 3D view, no grids - presentation only
+          if (gridHelper) gridHelper.visible = false;  // No XY grid
+          if (fineGridHelper) fineGridHelper.visible = false; // No XZ grid
+          break;
         case 'Top':
           if (gridHelper) gridHelper.visible = true;  // XY grid
           if (fineGridHelper) fineGridHelper.visible = false; // XZ grid
@@ -2207,7 +2398,14 @@ export default {
         default:
           if (gridHelper) gridHelper.visible = true;  // XY grid
           if (fineGridHelper) fineGridHelper.visible = false; // XZ grid
+          // Hide all axis labels when rotating/free camera
+          if (xAxisLabel) xAxisLabel.visible = false;
+          if (yAxisLabel) yAxisLabel.visible = false;
+          if (zAxisLabel) zAxisLabel.visible = false;
       }
+      
+      // Update label positions and visibility based on view
+      updateLabelPositions(viewType);
     };
     
     const setCameraPosition = (viewType) => {
@@ -2219,12 +2417,52 @@ export default {
       let targetPosition;
       
       switch (viewType) {
+        case '3D':
+          // Isometric 3D view - camera positioned so Z-axis appears perfectly vertical on screen
+          const isoDistance = Math.max(props.cncConfig.xAxisLength, props.cncConfig.yAxisLength, props.cncConfig.zAxisLength) * 1.45;
+          const boxCenterX = props.cncConfig.xAxisLength * 0.5;
+          const boxCenterY = props.cncConfig.yAxisLength * 0.5;
+          const boxCenterZ = props.cncConfig.zAxisLength * 0.5;
+          
+          // Position camera diagonally but ensure Z-axis appears vertical
+          targetPosition = new THREE.Vector3(
+            boxCenterX - isoDistance * 0.7,  // Diagonal position
+            boxCenterY - isoDistance * 0.7,  // Diagonal position
+            boxCenterZ                        // Same Z height as center (horizontal view)
+          );
+          // Look at the center of the working zone
+          const lookAtPoint = new THREE.Vector3(
+            boxCenterX,
+            boxCenterY,
+            boxCenterZ
+          );
+          
+          // Use custom transition that sets the camera up vector to ensure Z appears vertical
+          const startPosition = camera.position.clone();
+          const startQuaternion = camera.quaternion.clone();
+          
+          // Set camera up vector to align with world Z-axis
+          camera.up.set(0, 0, 1);
+          camera.position.copy(targetPosition);
+          camera.lookAt(lookAtPoint);
+          
+          const targetQuaternion = camera.quaternion.clone();
+          camera.position.copy(startPosition);
+          camera.quaternion.copy(startQuaternion);
+          
+          
+          smoothCameraTransition(targetPosition, lookAtPoint, 600);
+          break;
         case 'Top':
-          targetPosition = new THREE.Vector3(center.x, center.y, distance);
+          // Adjust zoom for Top view to show labels better
+          const topDistance = Math.max(props.cncConfig.xAxisLength, props.cncConfig.yAxisLength, props.cncConfig.zAxisLength) * 0.75;
+          targetPosition = new THREE.Vector3(center.x, center.y, -topDistance);
           smoothCameraTransition(targetPosition, new THREE.Vector3(center.x, center.y, 0), 600);
           break;
         case 'Side':
-          targetPosition = new THREE.Vector3(center.x, -distance, center.z);
+          // Adjust distance for Side view - slightly zoomed out
+          const sideDistance = Math.max(props.cncConfig.xAxisLength, props.cncConfig.zAxisLength) * 1.1;
+          targetPosition = new THREE.Vector3(center.x, -sideDistance, center.z);
           smoothCameraTransition(targetPosition, center.vector, 600);
           break;
         default:
@@ -2240,8 +2478,44 @@ export default {
     };
     
     const switchCameraView = () => {
+      const previousView = currentCameraView.value;
       currentCameraIndex.value = (currentCameraIndex.value + 1) % cameraViews.length;
-      setCameraPosition(currentCameraView.value);
+      const newView = currentCameraView.value;
+      
+      // Handle 3D view rotation transitions
+      if (cncGroup) {
+        if (previousView === '3D' && newView !== '3D') {
+          // Leaving 3D view: Apply -180° to undo the rotation
+          const centerX = props.cncConfig.xAxisLength / 2;
+          const centerY = props.cncConfig.yAxisLength / 2;
+          const centerZ = props.cncConfig.zAxisLength / 2;
+          
+          const rotationMatrix = new THREE.Matrix4();
+          const translationToOrigin = new THREE.Matrix4().makeTranslation(-centerX, -centerY, -centerZ);
+          const translationBack = new THREE.Matrix4().makeTranslation(centerX, centerY, centerZ);
+          const rotationZ = new THREE.Matrix4().makeRotationZ(-Math.PI); // -180 degrees
+          
+          rotationMatrix.multiplyMatrices(translationBack, rotationZ);
+          rotationMatrix.multiply(translationToOrigin);
+          cncGroup.applyMatrix4(rotationMatrix);
+        } else if (previousView !== '3D' && newView === '3D') {
+          // Entering 3D view: Apply +180° rotation
+          const centerX = props.cncConfig.xAxisLength / 2;
+          const centerY = props.cncConfig.yAxisLength / 2;
+          const centerZ = props.cncConfig.zAxisLength / 2;
+          
+          const rotationMatrix = new THREE.Matrix4();
+          const translationToOrigin = new THREE.Matrix4().makeTranslation(-centerX, -centerY, -centerZ);
+          const translationBack = new THREE.Matrix4().makeTranslation(centerX, centerY, centerZ);
+          const rotationZ = new THREE.Matrix4().makeRotationZ(Math.PI); // +180 degrees
+          
+          rotationMatrix.multiplyMatrices(translationBack, rotationZ);
+          rotationMatrix.multiply(translationToOrigin);
+          cncGroup.applyMatrix4(rotationMatrix);
+        }
+      }
+      
+      setCameraPosition(newView);
     };
     
     // UI Interaction Functions
@@ -2447,6 +2721,7 @@ export default {
     
     // Watch for position changes
     watch(() => props.currentPos, handlePositionWatch, { deep: true });
+
     
     return {
       threeContainer,
@@ -2473,7 +2748,12 @@ export default {
       errorMessage,
       hasWebglSupport,
       isInitialized,
-      retryInitialization
+      retryInitialization,
+      // Axis display computed properties
+      selectedLinearAxes,
+      selectedAxesDisplay,
+      axisLengthsDisplay,
+      workZoneDisplay
     };
   }
 };
@@ -2558,10 +2838,10 @@ export default {
 }
 
 .info-panel {
-  width: 340px !important;
+  width: 380px !important;
   background-color: var(--color-bg-secondary);
   border-left: var(--border-width-1) solid var(--color-border-secondary);
-  padding: var(--space-4);
+  padding: var(--space-5);
   padding-right: var(--space-6); /* Extra space from scrollbar */
   overflow-y: auto;
 }
@@ -2569,8 +2849,8 @@ export default {
 .position-info,
 .target-info,
 .config-info {
-  margin-bottom: var(--space-4);
-  max-width: 280px; /* Limit width of content */
+  margin-bottom: var(--space-6);
+  max-width: 320px; /* More width for content */
   margin-left: auto;
   margin-right: auto; /* Center the content blocks */
 }
@@ -2593,22 +2873,26 @@ export default {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: var(--space-2);
-  padding: var(--space-1);
+  margin-bottom: var(--space-3);
+  padding: var(--space-3);
   background-color: var(--color-bg-tertiary);
   border-radius: var(--border-radius-base);
+  min-height: 36px;
 }
 
 .axis,
 .label {
   font-weight: var(--font-weight-medium);
   color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
 }
 
 .value {
   font-family: var(--font-family-mono);
   font-weight: var(--font-weight-bold);
   color: var(--color-text-primary);
+  font-size: var(--font-size-sm);
+  white-space: nowrap;
 }
 
 .value.target {

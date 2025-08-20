@@ -313,6 +313,33 @@ export default {
             throw error;
         }
     },
+    
+    async api_moveRelative(context, payload){
+        try {
+            // Build query parameters for simultaneous movement
+            const params = new URLSearchParams();
+            params.append('feed_rate', payload.feedrate);
+            if (payload.x !== undefined && payload.x !== 0) {
+                params.append('x', payload.x);
+            }
+            if (payload.y !== undefined && payload.y !== 0) {
+                params.append('y', payload.y);
+            }
+            if (payload.z !== undefined && payload.z !== 0) {
+                params.append('z', payload.z);
+            }
+            
+            const { response, responseData } = await api.get(`/cnc/${payload.cncUid}/__API__/move_relative?${params.toString()}`);
+            if (!response.ok) {
+                const error = new Error(responseData.detail || `Failed to execute simultaneous relative movement on CNC ${payload.cncUid}`);
+                logger.error('CNC Simultaneous Movement Error', error);
+                throw error;
+            }
+        } catch (error) {
+            logger.error('CNC Simultaneous Movement Exception', error);
+            throw error;
+        }
+    },
 
     async api_terminal(context, payload){
         try {

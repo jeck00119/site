@@ -66,6 +66,7 @@ export function useCncStore(axisUid = null) {
   const apiCommand = (payload: any) => dispatch('cnc/api_command', payload);
   const increaseAxis = (payload: any) => dispatch('cnc/api_increaseAxis', payload);
   const decreaseAxis = (payload: any) => dispatch('cnc/api_decreaseAxis', payload);
+  const moveRelative = (payload: any) => dispatch('cnc/api_moveRelative', payload);
   const terminalCommand = (payload: any) => dispatch('cnc/api_terminal', payload);
   const loadLocations = () => dispatch('cnc/loadLocations', {});
   const moveToLocation = (payload: any) => dispatch('cnc/api_moveToLocation', payload);
@@ -149,6 +150,7 @@ export function useCncStore(axisUid = null) {
     apiCommand,
     increaseAxis,
     decreaseAxis,
+    moveRelative,
     terminalCommand,
     loadLocations,
     moveToLocation,

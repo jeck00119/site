@@ -47,7 +47,7 @@
                     "cncUid": "8a84a38d-1587-4705-b6f5-801abafa330d",
                     "items": [
                         {
-                            "feedrate": 15000,
+                            "feedrate": 10000,
                             "locationUid": "51d2a262-0a87-463a-91d6-3692d5c0d3b1",
                             "name": "Pos1",
                             "x": 100,
@@ -55,7 +55,7 @@
                             "z": 5
                         },
                         {
-                            "feedrate": 20000,
+                            "feedrate": 10000,
                             "locationUid": "0fd74088-0ec0-469e-98db-0e59930e4cfb",
                             "name": "Pos2",
                             "x": 200,
@@ -63,7 +63,7 @@
                             "z": 5
                         },
                         {
-                            "feedrate": 20000,
+                            "feedrate": 10000,
                             "locationUid": "95e51a78-0d22-40a4-a0a1-bb7c85c040b1",
                             "name": "Pos3",
                             "x": 200,
@@ -71,7 +71,7 @@
                             "z": 5
                         },
                         {
-                            "feedrate": 5000,
+                            "feedrate": 10000,
                             "locationUid": "c4c92924-c652-48ea-99a0-24f4b4f0de54",
                             "name": "Pos4",
                             "x": 0,
@@ -79,7 +79,7 @@
                             "z": 5
                         },
                         {
-                            "feedrate": 1500,
+                            "feedrate": 10000,
                             "locationUid": "d16566e9-e324-47d3-8b8d-1a51404c67a1",
                             "name": "Home_Pos",
                             "x": 0,

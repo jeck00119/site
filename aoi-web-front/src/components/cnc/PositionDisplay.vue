@@ -69,18 +69,6 @@
                   <input type="checkbox" id="enable-z" v-model="selectedAxes.z" />
                   <label for="enable-z">Z-Axis (Linear)</label>
                 </div>
-                <div class="axis-checkbox">
-                  <input type="checkbox" id="enable-a" v-model="selectedAxes.a" />
-                  <label for="enable-a">A-Axis (Rotary)</label>
-                </div>
-                <div class="axis-checkbox">
-                  <input type="checkbox" id="enable-b" v-model="selectedAxes.b" />
-                  <label for="enable-b">B-Axis (Rotary)</label>
-                </div>
-                <div class="axis-checkbox">
-                  <input type="checkbox" id="enable-c" v-model="selectedAxes.c" />
-                  <label for="enable-c">C-Axis (Rotary)</label>
-                </div>
               </div>
               <p class="axis-summary">{{ selectedAxesCount }} axes selected: {{ selectedAxesList }}</p>
             </div>
@@ -119,39 +107,6 @@
                   min="1" 
                   max="1000"
                   placeholder="e.g. 100"
-                />
-              </div>
-              
-              <div v-if="selectedAxes.a" class="form-group">
-                <label>A-Axis Range (degrees):</label>
-                <input 
-                  type="number" 
-                  v-model.number="cncConfig.aAxisRange" 
-                  min="0" 
-                  max="360"
-                  placeholder="e.g. 360"
-                />
-              </div>
-              
-              <div v-if="selectedAxes.b" class="form-group">
-                <label>B-Axis Range (degrees):</label>
-                <input 
-                  type="number" 
-                  v-model.number="cncConfig.bAxisRange" 
-                  min="0" 
-                  max="360"
-                  placeholder="e.g. 180"
-                />
-              </div>
-              
-              <div v-if="selectedAxes.c" class="form-group">
-                <label>C-Axis Range (degrees):</label>
-                <input 
-                  type="number" 
-                  v-model.number="cncConfig.cAxisRange" 
-                  min="0" 
-                  max="360"
-                  placeholder="e.g. 360"
                 />
               </div>
             </div>
@@ -194,15 +149,6 @@
               </div>
             </div>
             
-            <!-- Machine Type (simplified to 3 main types) -->
-            <div class="form-group">
-              <label>CNC Type:</label>
-              <select v-model="cncConfig.cncType">
-                <option v-if="selectedAxes.x && selectedAxes.y" value="cartesian">Cartesian</option>
-                <option v-if="selectedAxes.x && selectedAxes.y" value="corexy">CoreXY</option>
-                <option v-if="selectedAxes.x && selectedAxes.y" value="delta">Delta</option>
-              </select>
-            </div>
           </div>
         </div>
         
@@ -261,13 +207,9 @@ export default {
       xAxisLength: 300,
       yAxisLength: 300,
       zAxisLength: 100,
-      aAxisRange: 360,
-      bAxisRange: 180,
-      cAxisRange: 360,
       workingZoneX: 250,
       workingZoneY: 250,
-      workingZoneZ: 80,
-      cncType: 'cartesian'
+      workingZoneZ: 80
     };
     
     const cncConfig = ref({ ...defaultCncConfig });
@@ -331,16 +273,6 @@ export default {
         errors.push('Z-axis length is required and must be greater than 0');
       }
       
-      // Validate rotary axes ranges
-      if (selectedAxes.value.a && (!cncConfig.value.aAxisRange || cncConfig.value.aAxisRange <= 0 || cncConfig.value.aAxisRange > 360)) {
-        errors.push('A-axis range must be between 1 and 360 degrees');
-      }
-      if (selectedAxes.value.b && (!cncConfig.value.bAxisRange || cncConfig.value.bAxisRange <= 0 || cncConfig.value.bAxisRange > 360)) {
-        errors.push('B-axis range must be between 1 and 360 degrees');
-      }
-      if (selectedAxes.value.c && (!cncConfig.value.cAxisRange || cncConfig.value.cAxisRange <= 0 || cncConfig.value.cAxisRange > 360)) {
-        errors.push('C-axis range must be between 1 and 360 degrees');
-      }
       
       // Validate working zones don't exceed axis lengths
       if (selectedAxes.value.x && cncConfig.value.workingZoneX > cncConfig.value.xAxisLength) {
@@ -385,10 +317,7 @@ export default {
     const selectedAxes = ref({
       x: true,  // Default to XYZ for common 3-axis machines
       y: true,
-      z: true,
-      a: false,
-      b: false,
-      c: false
+      z: true
     });
     
     // Computed properties for manual selection
@@ -407,13 +336,10 @@ export default {
       return selectedAxes.value.x || selectedAxes.value.y || selectedAxes.value.z;
     });
     
-    const hasSelectedRotaryAxes = computed(() => {
-      return selectedAxes.value.a || selectedAxes.value.b || selectedAxes.value.c;
-    });
-    
     const isSelectedCartesian = computed(() => {
-      return selectedAxes.value.x && selectedAxes.value.y && selectedAxes.value.z && !hasSelectedRotaryAxes.value;
+      return selectedAxes.value.x && selectedAxes.value.y && selectedAxes.value.z;
     });
+
     
     // Check if CNC is connected and ready for movement
     const isCncConnected = computed(() => {
@@ -471,7 +397,7 @@ export default {
         simulatedPos.value = { ...newPos };
       }
     }, { deep: true });
-    
+
     onMounted(() => {
       logger.lifecycle('mounted', 'PositionDisplay component mounted', { axisUid: props.axisUid });
       loadCncConfig();
@@ -494,7 +420,6 @@ export default {
       selectedAxesCount,
       selectedAxesList,
       hasSelectedLinearAxes,
-      hasSelectedRotaryAxes,
       isSelectedCartesian
     };
   }

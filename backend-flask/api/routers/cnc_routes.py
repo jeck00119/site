@@ -497,6 +497,38 @@ async def axis_plus(
         )
 
 
+@router.get("/{cnc_uid}/__API__/move_relative")
+async def move_relative(
+        cnc_uid: str,
+        feed_rate: int,
+        x: float = None,
+        y: float = None,
+        z: float = None,
+        cnc_service: CncService = Depends(get_service_by_type(CncService)),
+):
+    """Move CNC by relative amounts on multiple axes simultaneously"""
+    try:
+        handle_cnc_operation_errors("relative movement", cnc_service, cnc_uid)
+        cnc_service.move_relative(uid=cnc_uid, x=x, y=y, z=z, feed_rate=feed_rate)
+        axes_moved = []
+        if x is not None:
+            axes_moved.append(f"X:{x}")
+        if y is not None:
+            axes_moved.append(f"Y:{y}")
+        if z is not None:
+            axes_moved.append(f"Z:{z}")
+        return RouteHelper.create_success_response(f"Simultaneous relative movement executed on CNC {cnc_uid}: {', '.join(axes_moved)}")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise create_error_response(
+            operation=f"simultaneous relative movement X:{x} Y:{y} Z:{z} at feed rate {feed_rate}",
+            entity_type="CNC",
+            entity_id=cnc_uid,
+            exception=e
+        )
+
+
 @router.get("/{cnc_uid}/__API__/{location_uid}/move_to_location")
 async def move_to_location(
         cnc_uid: str,

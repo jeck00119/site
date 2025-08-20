@@ -604,6 +604,22 @@ class CncService(metaclass=Singleton):
         elif axis in ['z', 'Z']:
             kwargs['z'] = int(step)
         self._execute_cnc_command(uid, 'move_by', **kwargs)
+    
+    def move_relative(self, uid, x=None, y=None, z=None, feed_rate=None):
+        """Move CNC by relative amounts on multiple axes simultaneously"""
+        kwargs = {}
+        if feed_rate is not None:
+            kwargs['feed_rate'] = int(feed_rate)
+        if x is not None and x != 0:
+            kwargs['x'] = round(float(x), 3)
+        if y is not None and y != 0:
+            kwargs['y'] = round(float(y), 3)
+        if z is not None and z != 0:
+            kwargs['z'] = round(float(z), 3)
+        
+        # Only execute if at least one axis has movement
+        if any(k in kwargs for k in ['x', 'y', 'z']):
+            self._execute_cnc_command(uid, 'move_by', **kwargs)
 
     async def move_to_location(self, uid, location: LocationModel, block, timeout):
         await self._execute_cnc_command(uid, 'move_to_location_j', location=location, block=block, timeout=timeout)

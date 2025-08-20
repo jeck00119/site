@@ -74,32 +74,8 @@ export function useCncMovement(axisUid: string) {
     });
   };
 
-  /**
-   * Execute movement for a single axis
-   */
-  const moveAxis = async (
-    axis: 'x' | 'y' | 'z',
-    delta: number,
-    feedrate: number
-  ): Promise<void> => {
-    if (delta === 0) return;
-
-    const movement = delta > 0 
-      ? cncStore.increaseAxis({
-          cncUid: axisUid,
-          axis,
-          step: Math.abs(delta),
-          feedrate
-        })
-      : cncStore.decreaseAxis({
-          cncUid: axisUid,
-          axis,
-          step: Math.abs(delta),
-          feedrate
-        });
-
-    await movement;
-  };
+  // Note: Individual axis movement is now handled by the simultaneous movement endpoint
+  // The old moveAxis function has been removed in favor of moveRelative
 
   /**
    * Execute movement to a specific position
@@ -124,9 +100,15 @@ export function useCncMovement(axisUid: string) {
 
       // Get current position from CNC store
       const currentPos = cncStore.pos?.value || { x: 0, y: 0, z: 0 };
+      
+      console.log(`[DEBUG] Current position:`, currentPos);
+      console.log(`[DEBUG] Current position values: x=${currentPos.x}, y=${currentPos.y}, z=${currentPos.z}`);
+      console.log(`[DEBUG] Target location:`, targetLocation);
 
       // Calculate movement deltas
       const { deltaX, deltaY, deltaZ } = calculateMovementDeltas(currentPos, targetLocation);
+      
+      console.log(`[DEBUG] Calculated deltas: deltaX=${deltaX}, deltaY=${deltaY}, deltaZ=${deltaZ}`);
 
       logger.info(`[CNC-MOVEMENT] Moving to ${targetLocation.name || 'position'}`, {
         from: currentPos,
@@ -135,24 +117,18 @@ export function useCncMovement(axisUid: string) {
         feedrate
       });
 
-      // Execute movements for all axes simultaneously
-      const movements: Promise<void>[] = [];
-
-      if (deltaX !== 0) {
-        movements.push(moveAxis('x', deltaX, feedrate));
-      }
-
-      if (deltaY !== 0) {
-        movements.push(moveAxis('y', deltaY, feedrate));
-      }
-
-      if (deltaZ !== 0) {
-        movements.push(moveAxis('z', deltaZ, feedrate));
-      }
-
-      // Wait for all movement commands to be sent
-      if (movements.length > 0) {
-        await Promise.all(movements);
+      // Execute simultaneous movement using the new endpoint
+      const hasMovement = deltaX !== 0 || deltaY !== 0 || deltaZ !== 0;
+      
+      if (hasMovement) {
+        // Use the new moveRelative endpoint for simultaneous movement with float precision
+        await cncStore.moveRelative({
+          cncUid: axisUid,
+          x: parseFloat(deltaX.toFixed(3)),
+          y: parseFloat(deltaY.toFixed(3)),
+          z: parseFloat(deltaZ.toFixed(3)),
+          feedrate
+        });
 
         // Wait for CNC to complete all movements and return to idle
         if (waitForIdle) {
