@@ -1191,68 +1191,87 @@ export default {
       return sprite;
     };
     
-    const createXAxis = (materials) => {
-      if (props.cncConfig.xAxisLength <= 0) return;
-      
-      const xAxisGeometry = createTrackedGeometry(THREE.CylinderGeometry, 2, 2, props.cncConfig.xAxisLength);
-      xAxisMesh = createTrackedMesh(xAxisGeometry, materials.xAxis);
-      xAxisMesh.position.set(props.cncConfig.xAxisLength / 2, 0, 0);
-      xAxisMesh.rotation.z = Math.PI / 2;
-      cncGroup.add(xAxisMesh);
-      
-      // X-Axis arrow
-      const xArrowGeometry = createTrackedGeometry(THREE.ConeGeometry, 5, 15, 8);
-      xArrowMesh = createTrackedMesh(xArrowGeometry, materials.xAxis);
-      xArrowMesh.position.set(props.cncConfig.xAxisLength, 0, 0);
-      xArrowMesh.rotation.z = -Math.PI / 2;
-      cncGroup.add(xArrowMesh);
-
-      // X-Axis label - initial position (will be updated by updateLabelPositions)
-      xAxisLabel = createTextSprite('X', '#ff1744');
-      xAxisLabel.position.set(props.cncConfig.xAxisLength, -50, 40);
-      cncGroup.add(xAxisLabel);
+    // Axis configuration for unified creation
+    const AXIS_CONFIGS = {
+      x: {
+        lengthProp: 'xAxisLength',
+        label: 'X',
+        color: '#ff1744',
+        materialKey: 'xAxis',
+        axisPosition: (length) => [length / 2, 0, 0],
+        axisRotation: [0, 0, Math.PI / 2],
+        arrowPosition: (length) => [length, 0, 0],
+        arrowRotation: [0, 0, -Math.PI / 2],
+        labelPosition: (length) => [length, -50, 40],
+        meshRef: () => ({ axis: 'xAxisMesh', arrow: 'xArrowMesh', label: 'xAxisLabel' })
+      },
+      y: {
+        lengthProp: 'yAxisLength',
+        label: 'Y',
+        color: '#00e676',
+        materialKey: 'yAxis',
+        axisPosition: (length) => [0, length / 2, 0],
+        axisRotation: [0, 0, 0],
+        arrowPosition: (length) => [0, length, 0],
+        arrowRotation: [0, 0, 0],
+        labelPosition: (length) => [-50, length, 40],
+        meshRef: () => ({ axis: 'yAxisMesh', arrow: 'yArrowMesh', label: 'yAxisLabel' })
+      },
+      z: {
+        lengthProp: 'zAxisLength',
+        label: 'Z',
+        color: '#2196f3',
+        materialKey: 'zAxis',
+        axisPosition: (length) => [0, 0, length / 2],
+        axisRotation: [Math.PI / 2, 0, 0],
+        arrowPosition: (length) => [0, 0, length],
+        arrowRotation: [Math.PI / 2, 0, 0],
+        labelPosition: (length) => [-50, 40, length],
+        meshRef: () => ({ axis: 'zAxisMesh', arrow: 'zArrowMesh', label: 'zAxisLabel' })
+      }
     };
     
-    const createYAxis = (materials) => {
-      if (props.cncConfig.yAxisLength <= 0) return;
+    const createAxis = (axisType, materials) => {
+      const config = AXIS_CONFIGS[axisType];
+      const length = props.cncConfig[config.lengthProp];
       
-      const yAxisGeometry = createTrackedGeometry(THREE.CylinderGeometry, 2, 2, props.cncConfig.yAxisLength);
-      yAxisMesh = createTrackedMesh(yAxisGeometry, materials.yAxis);
-      yAxisMesh.position.set(0, props.cncConfig.yAxisLength / 2, 0);
-      cncGroup.add(yAxisMesh);
+      if (length <= 0) return;
       
-      // Y-Axis arrow
-      const yArrowGeometry = createTrackedGeometry(THREE.ConeGeometry, 5, 15, 8);
-      yArrowMesh = createTrackedMesh(yArrowGeometry, materials.yAxis);
-      yArrowMesh.position.set(0, props.cncConfig.yAxisLength, 0);
-      cncGroup.add(yArrowMesh);
-
-      // Y-Axis label - initial position (will be updated by updateLabelPositions)
-      yAxisLabel = createTextSprite('Y', '#00e676');
-      yAxisLabel.position.set(-50, props.cncConfig.yAxisLength, 40);
-      cncGroup.add(yAxisLabel);
-    };
-    
-    const createZAxis = (materials) => {
-      if (props.cncConfig.zAxisLength <= 0) return;
+      // Create axis cylinder
+      const axisGeometry = createTrackedGeometry(THREE.CylinderGeometry, 2, 2, length);
+      const axisMesh = createTrackedMesh(axisGeometry, materials[config.materialKey]);
+      axisMesh.position.set(...config.axisPosition(length));
+      axisMesh.rotation.set(...config.axisRotation);
+      cncGroup.add(axisMesh);
       
-      const zAxisGeometry = createTrackedGeometry(THREE.CylinderGeometry, 2, 2, props.cncConfig.zAxisLength);
-      zAxisMesh = createTrackedMesh(zAxisGeometry, materials.zAxis);
-      zAxisMesh.position.set(0, 0, props.cncConfig.zAxisLength / 2);
-      zAxisMesh.rotation.x = Math.PI / 2;
-      cncGroup.add(zAxisMesh);
+      // Create arrow
+      const arrowGeometry = createTrackedGeometry(THREE.ConeGeometry, 5, 15, 8);
+      const arrowMesh = createTrackedMesh(arrowGeometry, materials[config.materialKey]);
+      arrowMesh.position.set(...config.arrowPosition(length));
+      arrowMesh.rotation.set(...config.arrowRotation);
+      cncGroup.add(arrowMesh);
       
-      // Z-Axis arrow
-      const zArrowGeometry = createTrackedGeometry(THREE.ConeGeometry, 5, 15, 8);
-      zArrowMesh = createTrackedMesh(zArrowGeometry, materials.zAxis);
-      zArrowMesh.position.set(0, 0, props.cncConfig.zAxisLength);
-      zArrowMesh.rotation.x = Math.PI / 2;
-      cncGroup.add(zArrowMesh);
-
-      // Z-Axis label - initial position (will be updated by updateLabelPositions)
-      zAxisLabel = createTextSprite('Z', '#2196f3');
-      zAxisLabel.position.set(-50, 40, props.cncConfig.zAxisLength);
-      cncGroup.add(zAxisLabel);
+      // Create label
+      const label = createTextSprite(config.label, config.color);
+      label.position.set(...config.labelPosition(length));
+      cncGroup.add(label);
+      
+      // Store references for later use
+      if (axisType === 'x') {
+        xAxisMesh = axisMesh;
+        xArrowMesh = arrowMesh;
+        xAxisLabel = label;
+      } else if (axisType === 'y') {
+        yAxisMesh = axisMesh;
+        yArrowMesh = arrowMesh;
+        yAxisLabel = label;
+      } else if (axisType === 'z') {
+        zAxisMesh = axisMesh;
+        zArrowMesh = arrowMesh;
+        zAxisLabel = label;
+      }
+      
+      return { axis: axisMesh, arrow: arrowMesh, label };
     };
     
     const initializeToolPosition = () => {
@@ -1269,26 +1288,38 @@ export default {
       cachedValues.lastDisplayPosition.z = props.currentPos.z;
     };
     
+    // Crosshair configuration for unified creation
+    const CROSSHAIR_CONFIG = {
+      size: 20,
+      radius: 0.5,
+      directions: [
+        { name: 'horizontal', rotation: [0, 0, Math.PI / 2] }, // X direction
+        { name: 'vertical', rotation: [Math.PI / 2, 0, 0] },   // Y direction  
+        { name: 'depth', rotation: [0, 0, 0] }                 // Z direction
+      ]
+    };
+    
+    const createCrosshairs = (parent, material) => {
+      const crosshairs = [];
+      
+      CROSSHAIR_CONFIG.directions.forEach(direction => {
+        const geometry = createTrackedGeometry(
+          THREE.CylinderGeometry, 
+          CROSSHAIR_CONFIG.radius, 
+          CROSSHAIR_CONFIG.radius, 
+          CROSSHAIR_CONFIG.size
+        );
+        const crosshair = createTrackedMesh(geometry, material);
+        crosshair.rotation.set(...direction.rotation);
+        parent.add(crosshair);
+        crosshairs.push(crosshair);
+      });
+      
+      return crosshairs;
+    };
+    
     const createToolCrosshairs = (materials) => {
-      const crosshairSize = 20;
-      const crosshairRadius = 0.5;
-      
-      // Horizontal crosshair (X direction)
-      const hCrosshairGeometry = createTrackedGeometry(THREE.CylinderGeometry, crosshairRadius, crosshairRadius, crosshairSize);
-      const hCrosshair = createTrackedMesh(hCrosshairGeometry, materials.crosshair);
-      hCrosshair.rotation.z = Math.PI / 2;
-      toolHead.add(hCrosshair);
-      
-      // Vertical crosshair (Y direction)
-      const vCrosshairGeometry = createTrackedGeometry(THREE.CylinderGeometry, crosshairRadius, crosshairRadius, crosshairSize);
-      const vCrosshair = createTrackedMesh(vCrosshairGeometry, materials.crosshair);
-      vCrosshair.rotation.x = Math.PI / 2;
-      toolHead.add(vCrosshair);
-      
-      // Z crosshair (Z direction)
-      const zCrosshairGeometry = createTrackedGeometry(THREE.CylinderGeometry, crosshairRadius, crosshairRadius, crosshairSize);
-      const zCrosshair = createTrackedMesh(zCrosshairGeometry, materials.crosshair);
-      toolHead.add(zCrosshair);
+      return createCrosshairs(toolHead, materials.crosshair);
     };
     
     const createToolHead = (materials) => {
@@ -1301,114 +1332,150 @@ export default {
       createToolCrosshairs(materials);
     };
     
-    const createXYGrid = () => {
-      const workingX = props.cncConfig.workingZoneX;
-      const workingY = props.cncConfig.workingZoneY;
-      const gridDivisionsX = Math.max(Math.floor(workingX / 25), 4);
-      const gridDivisionsY = Math.max(Math.floor(workingY / 25), 4);
-      
-      const xyGridGeometry = trackResource(new THREE.BufferGeometry(), 'geometries');
-      const xyGridVertices = [];
-      
-      // Vertical lines (parallel to Y axis)
-      for (let i = 0; i <= gridDivisionsX; i++) {
-        const x = (i / gridDivisionsX) * workingX;
-        xyGridVertices.push(x, 0, 0);
-        xyGridVertices.push(x, workingY, 0);
+    // Grid configurations for unified creation
+    const GRID_CONFIGS = {
+      xy: {
+        dimensions: ['workingZoneX', 'workingZoneY'],
+        position: [0, 0, -1],
+        visibilityCondition: () => showGrid && currentCameraView.value === 'Top',
+        meshRef: 'gridHelper',
+        lineConfigs: [
+          { // Vertical lines (parallel to Y axis)
+            axis: 0, // X axis divisions
+            startCoords: (pos, dims) => [pos, 0, 0],
+            endCoords: (pos, dims) => [pos, dims[1], 0]
+          },
+          { // Horizontal lines (parallel to X axis)  
+            axis: 1, // Y axis divisions
+            startCoords: (pos, dims) => [0, pos, 0],
+            endCoords: (pos, dims) => [dims[0], pos, 0]
+          }
+        ]
+      },
+      xz: {
+        dimensions: ['workingZoneX', 'workingZoneZ'],
+        position: [0, -1, 0],
+        visibilityCondition: () => showGrid && currentCameraView.value === 'Side',
+        meshRef: 'fineGridHelper',
+        lineConfigs: [
+          { // Vertical lines (parallel to Z axis)
+            axis: 0, // X axis divisions
+            startCoords: (pos, dims) => [pos, 0, 0],
+            endCoords: (pos, dims) => [pos, 0, dims[1]]
+          },
+          { // Horizontal lines (parallel to X axis)
+            axis: 1, // Z axis divisions  
+            startCoords: (pos, dims) => [0, 0, pos],
+            endCoords: (pos, dims) => [dims[0], 0, pos]
+          }
+        ]
       }
-      
-      // Horizontal lines (parallel to X axis)
-      for (let i = 0; i <= gridDivisionsY; i++) {
-        const y = (i / gridDivisionsY) * workingY;
-        xyGridVertices.push(0, y, 0);
-        xyGridVertices.push(workingX, y, 0);
-      }
-      
-      xyGridGeometry.setAttribute('position', new THREE.Float32BufferAttribute(xyGridVertices, 3));
-      const xyGridMaterial = createTrackedMaterial(THREE.LineBasicMaterial, {
-        color: 0x2a2a3a,
-        opacity: 0.6,
-        transparent: true
-      });
-      
-      gridHelper = trackResource(new THREE.LineSegments(xyGridGeometry, xyGridMaterial), 'meshes');
-      gridHelper.position.set(0, 0, -1);
-      gridHelper.visible = showGrid && currentCameraView.value === 'Top';
-      cncGroup.add(gridHelper);
     };
     
-    const createXZGrid = () => {
-      const workingX = props.cncConfig.workingZoneX;
-      const workingZ = props.cncConfig.workingZoneZ;
-      const gridDivisionsX = Math.max(Math.floor(workingX / 25), 4);
-      const gridDivisionsZ = Math.max(Math.floor(workingZ / 25), 4);
+    const createGrid = (gridType) => {
+      const config = GRID_CONFIGS[gridType];
+      const dimensions = config.dimensions.map(prop => props.cncConfig[prop]);
+      const divisions = dimensions.map(dim => Math.max(Math.floor(dim / 25), 4));
       
-      const xzGridGeometry = trackResource(new THREE.BufferGeometry(), 'geometries');
-      const xzGridVertices = [];
+      const geometry = trackResource(new THREE.BufferGeometry(), 'geometries');
+      const vertices = [];
       
-      // Vertical lines (parallel to Z axis)
-      for (let i = 0; i <= gridDivisionsX; i++) {
-        const x = (i / gridDivisionsX) * workingX;
-        xzGridVertices.push(x, 0, 0);
-        xzGridVertices.push(x, 0, workingZ);
-      }
+      // Generate lines based on configuration
+      config.lineConfigs.forEach((lineConfig, index) => {
+        const divisionCount = divisions[lineConfig.axis];
+        const dimensionValue = dimensions[lineConfig.axis];
+        
+        for (let i = 0; i <= divisionCount; i++) {
+          const pos = (i / divisionCount) * dimensionValue;
+          vertices.push(...lineConfig.startCoords(pos, dimensions));
+          vertices.push(...lineConfig.endCoords(pos, dimensions));
+        }
+      });
       
-      // Horizontal lines (parallel to X axis)
-      for (let i = 0; i <= gridDivisionsZ; i++) {
-        const z = (i / gridDivisionsZ) * workingZ;
-        xzGridVertices.push(0, 0, z);
-        xzGridVertices.push(workingX, 0, z);
-      }
-      
-      xzGridGeometry.setAttribute('position', new THREE.Float32BufferAttribute(xzGridVertices, 3));
-      const xzGridMaterial = createTrackedMaterial(THREE.LineBasicMaterial, {
+      geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+      const material = createTrackedMaterial(THREE.LineBasicMaterial, {
         color: 0x2a2a3a,
         opacity: 0.6,
         transparent: true
       });
       
-      fineGridHelper = trackResource(new THREE.LineSegments(xzGridGeometry, xzGridMaterial), 'meshes');
-      fineGridHelper.position.set(0, -1, 0);
-      fineGridHelper.visible = showGrid && currentCameraView.value === 'Side';
-      cncGroup.add(fineGridHelper);
+      const mesh = trackResource(new THREE.LineSegments(geometry, material), 'meshes');
+      mesh.position.set(...config.position);
+      mesh.visible = config.visibilityCondition();
+      cncGroup.add(mesh);
+      
+      // Store reference for later use
+      if (config.meshRef === 'gridHelper') {
+        gridHelper = mesh;
+      } else if (config.meshRef === 'fineGridHelper') {
+        fineGridHelper = mesh;
+      }
+      
+      return mesh;
     };
     
     const createSimpleAxisVisualization = () => {
       const materials = createAxisMaterials();
       
       createOriginPoint(materials);
-      createXAxis(materials);
-      createYAxis(materials);
-      createZAxis(materials);
+      createAxis('x', materials);
+      createAxis('y', materials);
+      createAxis('z', materials);
       createToolHead(materials);
-      createXYGrid();
-      createXZGrid();
+      createGrid('xy');
+      createGrid('xz');
       createClickTarget();
     };
     
-    const createWorkingZone = () => {
-      const workingZoneGeometry = createTrackedGeometry(THREE.BoxGeometry,
-        props.cncConfig.workingZoneX,
-        props.cncConfig.workingZoneY,
-        props.cncConfig.workingZoneZ
-      );
-      // Use EdgesGeometry to show only edges without diagonals
-      const edgesGeometry = trackResource(new THREE.EdgesGeometry(workingZoneGeometry), 'geometries');
-      const workingZoneMaterial = createTrackedMaterial(THREE.LineBasicMaterial, {
-        color: 0xffa500,  // Orange color - distinct from axes
-        opacity: 0.8,     // Much more visible
-        transparent: true,
-        linewidth: 2      // Thicker lines
-      });
-      workingZoneMesh = trackResource(new THREE.LineSegments(edgesGeometry, workingZoneMaterial), 'meshes');
-      // Position working zone starting from origin (0,0,0)
+    // Working zone material configuration
+    const WORKING_ZONE_MATERIAL = {
+      color: 0xffa500,  // Orange color - distinct from axes
+      opacity: 0.8,     // Much more visible
+      transparent: true,
+      linewidth: 2      // Thicker lines
+    };
+    
+    const createWorkingZoneGeometry = (dimensions) => {
+      const { x, y, z } = dimensions;
+      const geometry = createTrackedGeometry(THREE.BoxGeometry, x, y, z);
+      return trackResource(new THREE.EdgesGeometry(geometry), 'geometries');
+    };
+    
+    const createWorkingZone = (swapXY = false) => {
+      // Remove existing working zone if present
+      if (workingZoneMesh) {
+        cncGroup.remove(workingZoneMesh);
+      }
+      
+      // Calculate dimensions based on swap flag
+      const dimensions = swapXY ? {
+        x: props.cncConfig.workingZoneY,
+        y: props.cncConfig.workingZoneX,
+        z: props.cncConfig.workingZoneZ
+      } : {
+        x: props.cncConfig.workingZoneX,
+        y: props.cncConfig.workingZoneY,
+        z: props.cncConfig.workingZoneZ
+      };
+      
+      // Create geometry and material
+      const edgesGeometry = createWorkingZoneGeometry(dimensions);
+      const material = createTrackedMaterial(THREE.LineBasicMaterial, WORKING_ZONE_MATERIAL);
+      
+      // Create mesh
+      workingZoneMesh = trackResource(new THREE.LineSegments(edgesGeometry, material), 'meshes');
+      
+      // Position working zone (centered at half dimensions)
       workingZoneMesh.position.set(
-        props.cncConfig.workingZoneX / 2,
-        props.cncConfig.workingZoneY / 2,
-        props.cncConfig.workingZoneZ / 2
+        dimensions.x / 2,
+        dimensions.y / 2,
+        dimensions.z / 2
       );
-      workingZoneMesh.visible = showWorkingZone.value; // Set initial visibility from state (now true by default)
+      
+      workingZoneMesh.visible = showWorkingZone.value;
       cncGroup.add(workingZoneMesh);
+      
+      return workingZoneMesh;
     };
     
     
@@ -1440,35 +1507,14 @@ export default {
       ghostToolHead = createTrackedMesh(ghostGeometry, ghostMaterial);
       ghostToolHead.visible = false; // Initially hidden
       
-      // Add ghost crosshairs identical to original but transparent
+      // Add ghost crosshairs using unified creation function
       const ghostCrosshairMaterial = createTrackedMaterial(THREE.MeshBasicMaterial, { 
         color: 0x000000, // Same black color as original
         transparent: true,
         opacity: 0.3 // Semi-transparent
       });
       
-      // Horizontal crosshair (X direction) - identical to original
-      const hGhostCrosshair = createTrackedMesh(
-        createTrackedGeometry(THREE.CylinderGeometry, 0.5, 0.5, 20),
-        ghostCrosshairMaterial
-      );
-      hGhostCrosshair.rotation.z = Math.PI / 2;
-      ghostToolHead.add(hGhostCrosshair);
-      
-      // Vertical crosshair (Y direction) - identical to original
-      const vGhostCrosshair = createTrackedMesh(
-        createTrackedGeometry(THREE.CylinderGeometry, 0.5, 0.5, 20),
-        ghostCrosshairMaterial
-      );
-      vGhostCrosshair.rotation.x = Math.PI / 2;
-      ghostToolHead.add(vGhostCrosshair);
-      
-      // Z crosshair (Z direction) - identical to original
-      const zGhostCrosshair = createTrackedMesh(
-        createTrackedGeometry(THREE.CylinderGeometry, 0.5, 0.5, 20),
-        ghostCrosshairMaterial
-      );
-      ghostToolHead.add(zGhostCrosshair);
+      createCrosshairs(ghostToolHead, ghostCrosshairMaterial);
       
       cncGroup.add(ghostToolHead);
       
@@ -2493,56 +2539,7 @@ export default {
     };
 
     const swapWorkingZone = (isTopView) => {
-      if (!workingZoneMesh) return;
-      
-      cncGroup.remove(workingZoneMesh);
-      
-      if (isTopView) {
-        // Create working zone with swapped X and Y dimensions
-        const workingZoneGeometry = createTrackedGeometry(THREE.BoxGeometry,
-          props.cncConfig.workingZoneY, // Use Y config for X dimension
-          props.cncConfig.workingZoneX, // Use X config for Y dimension  
-          props.cncConfig.workingZoneZ
-        );
-        const edgesGeometry = trackResource(new THREE.EdgesGeometry(workingZoneGeometry), 'geometries');
-        const workingZoneMaterial = createTrackedMaterial(THREE.LineBasicMaterial, {
-          color: 0xffa500,
-          opacity: 0.8,
-          transparent: true,
-          linewidth: 2
-        });
-        workingZoneMesh = trackResource(new THREE.LineSegments(edgesGeometry, workingZoneMaterial), 'meshes');
-        // Position with swapped dimensions
-        workingZoneMesh.position.set(
-          props.cncConfig.workingZoneY / 2, // Use Y config for X position
-          props.cncConfig.workingZoneX / 2, // Use X config for Y position
-          props.cncConfig.workingZoneZ / 2
-        );
-      } else {
-        // Restore normal working zone
-        const workingZoneGeometry = createTrackedGeometry(THREE.BoxGeometry,
-          props.cncConfig.workingZoneX,
-          props.cncConfig.workingZoneY,
-          props.cncConfig.workingZoneZ
-        );
-        const edgesGeometry = trackResource(new THREE.EdgesGeometry(workingZoneGeometry), 'geometries');
-        const workingZoneMaterial = createTrackedMaterial(THREE.LineBasicMaterial, {
-          color: 0xffa500,
-          opacity: 0.8,
-          transparent: true,
-          linewidth: 2
-        });
-        workingZoneMesh = trackResource(new THREE.LineSegments(edgesGeometry, workingZoneMaterial), 'meshes');
-        // Position with normal dimensions
-        workingZoneMesh.position.set(
-          props.cncConfig.workingZoneX / 2,
-          props.cncConfig.workingZoneY / 2,
-          props.cncConfig.workingZoneZ / 2
-        );
-      }
-      
-      workingZoneMesh.visible = showWorkingZone.value;
-      cncGroup.add(workingZoneMesh);
+      createWorkingZone(isTopView);
     };
 
     const updateSwappedGrid = (isTopView) => {
