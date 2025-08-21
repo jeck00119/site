@@ -11,6 +11,10 @@
           <font-awesome-icon icon="cog" />
           Working Zone
         </button>
+        <button @click="toggleBoundingBox" class="control-button debug-button" :class="{ 'debug-active': showBoundingBox }">
+          <font-awesome-icon icon="vector-square" />
+          Debug Box
+        </button>
         <button @click="switchCameraView" class="control-button">
           <font-awesome-icon icon="eye" />
           {{ currentCameraView }}
@@ -84,7 +88,14 @@
       </div>
       
       <!-- Normal 3D Container -->
-      <div v-else class="three-container" ref="threeContainer">
+      <div v-else class="three-container" ref="threeContainer" :class="{ 'debug-border': showBoundingBox }">
+        <!-- Debug overlay to show margins -->
+        <div v-if="showBoundingBox" class="debug-overlay">
+          <div class="margin-visualization">
+            <div class="margin-info">0.5cm margins</div>
+          </div>
+        </div>
+        
         <!-- Loading indicator -->
         <div v-if="!isInitialized" class="loading-container">
           <div class="loading-content">
@@ -186,7 +197,7 @@
 </template>
 
 <script>
-import { ref, onMounted, onUnmounted, watch, computed } from 'vue';
+import { ref, onMounted, onUnmounted, watch, computed, nextTick } from 'vue';
 import * as THREE from 'three';
 import { logger } from '@/utils/logger';
 
@@ -234,11 +245,17 @@ export default {
     let xAxisMesh = null;
     let yAxisMesh = null;
     let zAxisMesh = null;
+    let xArrowMesh = null;
+    let yArrowMesh = null;
+    let zArrowMesh = null;
     let gridHelper = null;
     let fineGridHelper = null;
     let xAxisLabel = null;
     let yAxisLabel = null;
     let zAxisLabel = null;
+    let sceneBoundingBox = null; // Invisible bounding box containing entire scene
+    let cachedBoundingBox = null; // Cached bounding box to avoid redundant calculations
+    let lastBoundingBoxViewType = null; // Track which view the cached box is for
     
     // State
     const isAnimating = ref(true);
@@ -246,6 +263,9 @@ export default {
     // Internal grid state - doesn't need reactivity (not bound to template)
     let showGrid = true; // Grid visible in fixed views
     const isSimulationMode = ref(false); // Simulation mode for testing without real CNC
+    const showBoundingBox = ref(false); // Debug: Show scene bounding box
+    
+    let boundingBoxMesh = null; // Debug mesh for bounding box visualization
     
     // Error handling state
     const webglError = ref(null);
@@ -751,6 +771,7 @@ export default {
       xAxisLabel = null;
       yAxisLabel = null;
       zAxisLabel = null;
+      boundingBoxMesh = null;
       raycaster = null;
       clickTarget = null;
       mouse = null;
@@ -1072,6 +1093,13 @@ export default {
           createSimpleAxisVisualization();
         }
         
+        // Scene bounding box is now calculated on-demand with caching
+        
+        // Create bounding box visualization (initially hidden) - only if debug mode is on
+        if (showBoundingBox.value) {
+          createBoundingBoxVisualization();
+        }
+        
         // Working zone visualization - always create but control visibility
         try {
           createWorkingZone();
@@ -1167,17 +1195,17 @@ export default {
       if (props.cncConfig.xAxisLength <= 0) return;
       
       const xAxisGeometry = createTrackedGeometry(THREE.CylinderGeometry, 2, 2, props.cncConfig.xAxisLength);
-      const xAxis = createTrackedMesh(xAxisGeometry, materials.xAxis);
-      xAxis.position.set(props.cncConfig.xAxisLength / 2, 0, 0);
-      xAxis.rotation.z = Math.PI / 2;
-      cncGroup.add(xAxis);
+      xAxisMesh = createTrackedMesh(xAxisGeometry, materials.xAxis);
+      xAxisMesh.position.set(props.cncConfig.xAxisLength / 2, 0, 0);
+      xAxisMesh.rotation.z = Math.PI / 2;
+      cncGroup.add(xAxisMesh);
       
       // X-Axis arrow
       const xArrowGeometry = createTrackedGeometry(THREE.ConeGeometry, 5, 15, 8);
-      const xArrow = createTrackedMesh(xArrowGeometry, materials.xAxis);
-      xArrow.position.set(props.cncConfig.xAxisLength, 0, 0);
-      xArrow.rotation.z = -Math.PI / 2;
-      cncGroup.add(xArrow);
+      xArrowMesh = createTrackedMesh(xArrowGeometry, materials.xAxis);
+      xArrowMesh.position.set(props.cncConfig.xAxisLength, 0, 0);
+      xArrowMesh.rotation.z = -Math.PI / 2;
+      cncGroup.add(xArrowMesh);
 
       // X-Axis label - initial position (will be updated by updateLabelPositions)
       xAxisLabel = createTextSprite('X', '#ff1744');
@@ -1189,15 +1217,15 @@ export default {
       if (props.cncConfig.yAxisLength <= 0) return;
       
       const yAxisGeometry = createTrackedGeometry(THREE.CylinderGeometry, 2, 2, props.cncConfig.yAxisLength);
-      const yAxis = createTrackedMesh(yAxisGeometry, materials.yAxis);
-      yAxis.position.set(0, props.cncConfig.yAxisLength / 2, 0);
-      cncGroup.add(yAxis);
+      yAxisMesh = createTrackedMesh(yAxisGeometry, materials.yAxis);
+      yAxisMesh.position.set(0, props.cncConfig.yAxisLength / 2, 0);
+      cncGroup.add(yAxisMesh);
       
       // Y-Axis arrow
       const yArrowGeometry = createTrackedGeometry(THREE.ConeGeometry, 5, 15, 8);
-      const yArrow = createTrackedMesh(yArrowGeometry, materials.yAxis);
-      yArrow.position.set(0, props.cncConfig.yAxisLength, 0);
-      cncGroup.add(yArrow);
+      yArrowMesh = createTrackedMesh(yArrowGeometry, materials.yAxis);
+      yArrowMesh.position.set(0, props.cncConfig.yAxisLength, 0);
+      cncGroup.add(yArrowMesh);
 
       // Y-Axis label - initial position (will be updated by updateLabelPositions)
       yAxisLabel = createTextSprite('Y', '#00e676');
@@ -1209,17 +1237,17 @@ export default {
       if (props.cncConfig.zAxisLength <= 0) return;
       
       const zAxisGeometry = createTrackedGeometry(THREE.CylinderGeometry, 2, 2, props.cncConfig.zAxisLength);
-      const zAxis = createTrackedMesh(zAxisGeometry, materials.zAxis);
-      zAxis.position.set(0, 0, props.cncConfig.zAxisLength / 2);
-      zAxis.rotation.x = Math.PI / 2;
-      cncGroup.add(zAxis);
+      zAxisMesh = createTrackedMesh(zAxisGeometry, materials.zAxis);
+      zAxisMesh.position.set(0, 0, props.cncConfig.zAxisLength / 2);
+      zAxisMesh.rotation.x = Math.PI / 2;
+      cncGroup.add(zAxisMesh);
       
       // Z-Axis arrow
       const zArrowGeometry = createTrackedGeometry(THREE.ConeGeometry, 5, 15, 8);
-      const zArrow = createTrackedMesh(zArrowGeometry, materials.zAxis);
-      zArrow.position.set(0, 0, props.cncConfig.zAxisLength);
-      zArrow.rotation.x = Math.PI / 2;
-      cncGroup.add(zArrow);
+      zArrowMesh = createTrackedMesh(zArrowGeometry, materials.zAxis);
+      zArrowMesh.position.set(0, 0, props.cncConfig.zAxisLength);
+      zArrowMesh.rotation.x = Math.PI / 2;
+      cncGroup.add(zArrowMesh);
 
       // Z-Axis label - initial position (will be updated by updateLabelPositions)
       zAxisLabel = createTextSprite('Z', '#2196f3');
@@ -1344,47 +1372,6 @@ export default {
       fineGridHelper.visible = showGrid && currentCameraView.value === 'Side';
       cncGroup.add(fineGridHelper);
     };
-
-    
-    // Debug rotation axes - separate from cncGroup so they don't rotate
-    let debugAxesGroup = null;
-    let debugVerticalAxis = null;
-    let debugHorizontalAxis = null;
-    
-    const createDebugRotationAxes = () => {
-      // Create a separate group for debug axes that won't rotate with the CNC
-      debugAxesGroup = new THREE.Group();
-      scene.add(debugAxesGroup);
-      
-      // Get the center of the working zone box
-      const centerX = props.cncConfig.xAxisLength / 2;
-      const centerY = props.cncConfig.yAxisLength / 2;
-      const centerZ = props.cncConfig.zAxisLength / 2;
-      
-      // Create vertical axis (Z-axis through center) - always stays vertical
-      const verticalGeometry = createTrackedGeometry(THREE.CylinderGeometry, 1, 1, props.cncConfig.zAxisLength * 2);
-      const verticalMaterial = createTrackedMaterial(THREE.MeshBasicMaterial, {
-        color: 0xff00ff,  // Magenta for visibility
-        opacity: 0.5,
-        transparent: true
-      });
-      debugVerticalAxis = createTrackedMesh(verticalGeometry, verticalMaterial);
-      debugVerticalAxis.position.set(centerX, centerY, centerZ);
-      debugVerticalAxis.rotation.x = Math.PI / 2;  // Rotate to align with Z-axis
-      debugAxesGroup.add(debugVerticalAxis);  // Add to separate group, not cncGroup
-      
-      // Create horizontal axis (X-axis through center for initial view) - always stays horizontal
-      const horizontalGeometry = createTrackedGeometry(THREE.CylinderGeometry, 1, 1, Math.max(props.cncConfig.xAxisLength, props.cncConfig.yAxisLength) * 2);
-      const horizontalMaterial = createTrackedMaterial(THREE.MeshBasicMaterial, {
-        color: 0x00ffff,  // Cyan for visibility
-        opacity: 0.5,
-        transparent: true
-      });
-      debugHorizontalAxis = createTrackedMesh(horizontalGeometry, horizontalMaterial);
-      debugHorizontalAxis.position.set(centerX, centerY, centerZ);
-      debugHorizontalAxis.rotation.z = Math.PI / 2;
-      debugAxesGroup.add(debugHorizontalAxis);  // Add to separate group, not cncGroup
-    };
     
     const createSimpleAxisVisualization = () => {
       const materials = createAxisMaterials();
@@ -1397,7 +1384,6 @@ export default {
       createXYGrid();
       createXZGrid();
       createClickTarget();
-      createDebugRotationAxes(); // Add debug axes
     };
     
     const createWorkingZone = () => {
@@ -1423,6 +1409,24 @@ export default {
       );
       workingZoneMesh.visible = showWorkingZone.value; // Set initial visibility from state (now true by default)
       cncGroup.add(workingZoneMesh);
+    };
+    
+    
+    const getSceneBounds = () => {
+      // Always use the cached dynamic bounds
+      const currentBounds = getBoundingBoxForView(currentCameraView.value);
+      
+      // Store dimensions for compatibility with existing code
+      const size = new THREE.Vector3();
+      currentBounds.getSize(size);
+      currentBounds.dimensions = {
+        x: size.x,
+        y: size.y, 
+        z: size.z,
+        diagonal: Math.sqrt(size.x * size.x + size.y * size.y + size.z * size.z)
+      };
+      
+      return currentBounds;
     };
     
     const createClickTarget = () => {
@@ -1571,8 +1575,30 @@ export default {
     };
 
     const applyPanningLimits = (newPosition) => {
-      // No panning limits - allow free movement
-      return newPosition;
+      // Use cached camera properties to avoid redundant calculations
+      const cameraProps = getCameraPropertiesForView();
+      const bounds = cameraProps.bounds;
+      const center = cameraProps.center.vector;
+      
+      // Allow panning within 2x the bounding box diagonal from center
+      // This gives freedom while ensuring the scene remains accessible
+      const panLimit = bounds.dimensions.diagonal;
+      
+      const constrainedPosition = newPosition.clone();
+      
+      // Constrain each axis independently
+      const offsetFromCenter = constrainedPosition.clone().sub(center);
+      if (Math.abs(offsetFromCenter.x) > panLimit) {
+        constrainedPosition.x = center.x + Math.sign(offsetFromCenter.x) * panLimit;
+      }
+      if (Math.abs(offsetFromCenter.y) > panLimit) {
+        constrainedPosition.y = center.y + Math.sign(offsetFromCenter.y) * panLimit;
+      }
+      if (Math.abs(offsetFromCenter.z) > panLimit) {
+        constrainedPosition.z = center.z + Math.sign(offsetFromCenter.z) * panLimit;
+      }
+      
+      return constrainedPosition;
     };
     
     const handleCameraPanning = (deltaX, deltaY) => {
@@ -1678,19 +1704,31 @@ export default {
     let lastZoomConfigHash = null;
 
     const getCachedZoomLimits = () => {
-      const configHash = `${props.cncConfig.xAxisLength}-${props.cncConfig.yAxisLength}-${props.cncConfig.zAxisLength}`;
+      const configHash = `${props.cncConfig.xAxisLength}-${props.cncConfig.yAxisLength}-${props.cncConfig.zAxisLength}-${props.cncConfig.workingZoneX}-${props.cncConfig.workingZoneY}-${props.cncConfig.workingZoneZ}-${currentCameraView.value}`;
       
       if (configHash !== lastZoomConfigHash) {
-        const maxDimension = Math.max(
-          props.cncConfig.xAxisLength,
-          props.cncConfig.yAxisLength,
-          props.cncConfig.zAxisLength
-        );
+        // Calculate optimal distance for 0.5cm margin (this is our baseline)
+        const optimalDistance = getCameraPropertiesForView().distance;
+        
+        // Minimum distance: allow getting closer but not too close to avoid clipping
+        // Allow zooming to 50% of optimal distance
+        const minDistance = optimalDistance * 0.5;
+        
+        // Maximum distance: allow zooming out to 3x optimal distance
+        // This gives freedom while maintaining reasonable limits
+        const maxDistance = optimalDistance * 3;
+        
         cachedZoomLimits = {
-          minDistance: maxDimension * 0.5,
-          maxDistance: maxDimension * 1.5
+          minDistance: minDistance,
+          maxDistance: maxDistance
         };
         lastZoomConfigHash = configHash;
+        
+        logger.debug('Updated zoom limits:', {
+          configHash,
+          minDistance,
+          maxDistance
+        });
       }
       
       return cachedZoomLimits;
@@ -1787,19 +1825,13 @@ export default {
         }
       }
       
-      console.log('Target position calculated:', clickedPosition);
-      console.log('Working zone check:', clickedPosition ? isWithinWorkingZone(clickedPosition) : 'No target position');
-      
       if (clickedPosition && isWithinWorkingZone(clickedPosition)) {
-        console.log('Target position is valid, checking connection/simulation...');
-        
         // Check if CNC is connected OR simulation mode is enabled
         if (!props.isCncConnected && !isSimulationMode.value) {
           logger.warn('Click-to-move blocked: CNC not connected and simulation disabled');
           return;
         }
         
-        console.log('Showing click target...');
         // Show click target indicator
         showClickTarget(clickedPosition);
         
@@ -1816,15 +1848,7 @@ export default {
           emit('targetUpdate', clickedPosition);
         }
       } else if (clickedPosition && !isWithinWorkingZone(clickedPosition)) {
-        console.log('Target outside working zone:', clickedPosition);
-        console.log('Working zone bounds:', {
-          x: props.cncConfig.workingZoneX,
-          y: props.cncConfig.workingZoneY,
-          z: props.cncConfig.workingZoneZ
-        });
         logger.warn('Click-to-move blocked: Target outside working zone', clickedPosition);
-      } else {
-        console.log('No valid target position calculated');
       }
       } catch (error) {
         logger.error('Error in handleClickToMove:', error);
@@ -2268,24 +2292,117 @@ export default {
     };
     
     // Camera management functions
-    const getCameraCenter = () => {
-      const maxX = props.cncConfig.xAxisLength;
-      const maxY = props.cncConfig.yAxisLength;
-      const maxZ = props.cncConfig.zAxisLength;
+    const getCameraPropertiesForView = (viewType = null) => {
+      // Get bounds once and reuse for both center and distance calculations
+      const bounds = getBoundingBoxForView(viewType || currentCameraView.value);
+      
+      // Add dimensions for compatibility if needed
+      if (viewType && !bounds.dimensions) {
+        const size = new THREE.Vector3();
+        bounds.getSize(size);
+        bounds.dimensions = {
+          x: size.x,
+          y: size.y, 
+          z: size.z,
+          diagonal: Math.sqrt(size.x * size.x + size.y * size.y + size.z * size.z)
+        };
+      }
+      
+      // Calculate center
+      const center = new THREE.Vector3();
+      bounds.getCenter(center);
+      
+      // Calculate distance to keep bounding box 0.5cm from viewport edges
+      
+      // Get viewport dimensions - use renderer dimensions for consistency
+      const viewportWidth = renderer?.domElement?.width || threeContainer.value?.clientWidth || 800;
+      const viewportHeight = renderer?.domElement?.height || threeContainer.value?.clientHeight || 600;
+      
+      // Convert 0.5cm to pixels (assuming ~96 DPI)
+      const cmToPixels = 96 / 2.54; // 96 DPI conversion
+      const marginPixels = 0.5 * cmToPixels; // 0.5cm margin
+      
+      // Calculate available viewport space after margins
+      const availableWidth = viewportWidth - (2 * marginPixels);
+      const availableHeight = viewportHeight - (2 * marginPixels);
+      
+      // Get bounding box dimensions in the view plane
+      let boundingWidth, boundingHeight;
+      
+      if (viewType === 'Top') {
+        // Top view: X and Y dimensions are visible
+        boundingWidth = bounds.dimensions.x;
+        boundingHeight = bounds.dimensions.y;
+      } else if (viewType === 'Side') {
+        // Side view: X and Z dimensions are visible
+        boundingWidth = bounds.dimensions.x;
+        boundingHeight = bounds.dimensions.z;
+      } else {
+        // 3D view: Use diagonal projections
+        // In isometric view, we see X, Y, and Z projected
+        boundingWidth = Math.sqrt(bounds.dimensions.x * bounds.dimensions.x + bounds.dimensions.y * bounds.dimensions.y);
+        boundingHeight = bounds.dimensions.z;
+      }
+      
+      // Calculate distance needed to fit bounding box in available viewport
+      const currentCamera = camera || { fov: 60, aspect: viewportWidth / viewportHeight };
+      const fov = THREE.MathUtils.degToRad(currentCamera.fov);
+      const aspect = currentCamera.aspect;
+      
+      // Calculate distance based on field of view to fit the bounding box
+      // We want the bounding box to fill the AVAILABLE viewport space (after margins)
+      
+      // First calculate distance needed for full viewport
+      const distanceForWidth = (boundingWidth / 2) / (Math.tan(fov / 2) * aspect);
+      const distanceForHeight = (boundingHeight / 2) / Math.tan(fov / 2);
+      const baseDistance = Math.max(distanceForWidth, distanceForHeight);
+      
+      // Calculate how much smaller the available space is compared to full viewport
+      const widthRatio = availableWidth / viewportWidth;  // e.g. 0.9 for 0.5cm margins
+      const heightRatio = availableHeight / viewportHeight; // e.g. 0.9 for 0.5cm margins
+      const ratio = Math.min(widthRatio, heightRatio); // Use the more restrictive ratio
+      
+      // To fit in smaller available space, we need to move camera farther away
+      // The smaller the ratio, the farther we need to be
+      // Add a generous safety buffer (20%) to ensure comfortable fit within margins
+      // This accounts for floating-point precision and projection variations
+      const safetyFactor = 0.80; // Make bounding box 20% smaller than available space
+      const finalDistance = baseDistance / (ratio * safetyFactor);
+      
+      // Always store calculation details for debugging (not just when showBoundingBox is true)
+      window.debugBoundingBoxCalc = {
+        viewport: { width: viewportWidth, height: viewportHeight },
+        marginPixels,
+        availableWidth,
+        availableHeight,
+        boundingWidth,
+        boundingHeight,
+        baseDistance,
+        ratios: { width: widthRatio.toFixed(3), height: heightRatio.toFixed(3), applied: ratio.toFixed(3) },
+        safetyFactor,
+        finalDistance,
+        viewType: viewType || currentCameraView.value
+      };
       
       return {
-        x: maxX / 2,
-        y: maxY / 2,
-        z: maxZ / 2,
-        vector: new THREE.Vector3(maxX / 2, maxY / 2, maxZ / 2)
+        center: {
+          x: center.x,
+          y: center.y,
+          z: center.z,
+          vector: center
+        },
+        distance: finalDistance,
+        bounds: bounds
       };
     };
     
-    const getCameraDistance = () => {
-      const maxX = props.cncConfig.xAxisLength;
-      const maxY = props.cncConfig.yAxisLength;
-      const maxZ = props.cncConfig.zAxisLength;
-      return Math.max(maxX, maxY, maxZ) * 0.7;
+    // Simplified helper functions that use the cached system
+    const getCameraCenter = (viewType = null) => {
+      return getCameraPropertiesForView(viewType).center;
+    };
+    
+    const getCameraDistance = (viewType = null) => {
+      return getCameraPropertiesForView(viewType).distance;
     };
     
     const easeInOutCubic = (t) => {
@@ -2334,16 +2451,212 @@ export default {
       activeTransitionId = requestAnimationFrame(transitionAnimate);
     };
     
+    const swapXYAxes = (isTopView) => {
+      if (!xAxisMesh || !yAxisMesh || !xArrowMesh || !yArrowMesh) return;
+      
+      if (isTopView) {
+        // Swap X and Y axis positions and rotations
+        // X axis goes to Y position
+        xAxisMesh.position.set(0, props.cncConfig.xAxisLength / 2, 0);
+        xAxisMesh.rotation.set(0, 0, 0); // Remove Z rotation for Y-like orientation
+        
+        xArrowMesh.position.set(0, props.cncConfig.xAxisLength, 0);
+        xArrowMesh.rotation.set(0, 0, 0); // Remove Z rotation for Y-like orientation
+        
+        // Y axis goes to X position  
+        yAxisMesh.position.set(props.cncConfig.yAxisLength / 2, 0, 0);
+        yAxisMesh.rotation.z = Math.PI / 2; // Add Z rotation for X-like orientation
+        
+        yArrowMesh.position.set(props.cncConfig.yAxisLength, 0, 0);
+        yArrowMesh.rotation.z = -Math.PI / 2; // Add Z rotation for X-like orientation
+        yArrowMesh.rotation.x = 0; // Remove any X rotation
+        yArrowMesh.rotation.y = 0; // Remove any Y rotation
+        
+      } else {
+        // Restore normal positions
+        // X axis back to X position
+        xAxisMesh.position.set(props.cncConfig.xAxisLength / 2, 0, 0);
+        xAxisMesh.rotation.z = Math.PI / 2;
+        
+        xArrowMesh.position.set(props.cncConfig.xAxisLength, 0, 0);
+        xArrowMesh.rotation.z = -Math.PI / 2;
+        xArrowMesh.rotation.x = 0;
+        xArrowMesh.rotation.y = 0;
+        
+        // Y axis back to Y position
+        yAxisMesh.position.set(0, props.cncConfig.yAxisLength / 2, 0);
+        yAxisMesh.rotation.set(0, 0, 0);
+        
+        yArrowMesh.position.set(0, props.cncConfig.yAxisLength, 0);
+        yArrowMesh.rotation.set(0, 0, 0);
+      }
+    };
+
+    const swapWorkingZone = (isTopView) => {
+      if (!workingZoneMesh) return;
+      
+      cncGroup.remove(workingZoneMesh);
+      
+      if (isTopView) {
+        // Create working zone with swapped X and Y dimensions
+        const workingZoneGeometry = createTrackedGeometry(THREE.BoxGeometry,
+          props.cncConfig.workingZoneY, // Use Y config for X dimension
+          props.cncConfig.workingZoneX, // Use X config for Y dimension  
+          props.cncConfig.workingZoneZ
+        );
+        const edgesGeometry = trackResource(new THREE.EdgesGeometry(workingZoneGeometry), 'geometries');
+        const workingZoneMaterial = createTrackedMaterial(THREE.LineBasicMaterial, {
+          color: 0xffa500,
+          opacity: 0.8,
+          transparent: true,
+          linewidth: 2
+        });
+        workingZoneMesh = trackResource(new THREE.LineSegments(edgesGeometry, workingZoneMaterial), 'meshes');
+        // Position with swapped dimensions
+        workingZoneMesh.position.set(
+          props.cncConfig.workingZoneY / 2, // Use Y config for X position
+          props.cncConfig.workingZoneX / 2, // Use X config for Y position
+          props.cncConfig.workingZoneZ / 2
+        );
+      } else {
+        // Restore normal working zone
+        const workingZoneGeometry = createTrackedGeometry(THREE.BoxGeometry,
+          props.cncConfig.workingZoneX,
+          props.cncConfig.workingZoneY,
+          props.cncConfig.workingZoneZ
+        );
+        const edgesGeometry = trackResource(new THREE.EdgesGeometry(workingZoneGeometry), 'geometries');
+        const workingZoneMaterial = createTrackedMaterial(THREE.LineBasicMaterial, {
+          color: 0xffa500,
+          opacity: 0.8,
+          transparent: true,
+          linewidth: 2
+        });
+        workingZoneMesh = trackResource(new THREE.LineSegments(edgesGeometry, workingZoneMaterial), 'meshes');
+        // Position with normal dimensions
+        workingZoneMesh.position.set(
+          props.cncConfig.workingZoneX / 2,
+          props.cncConfig.workingZoneY / 2,
+          props.cncConfig.workingZoneZ / 2
+        );
+      }
+      
+      workingZoneMesh.visible = showWorkingZone.value;
+      cncGroup.add(workingZoneMesh);
+    };
+
+    const updateSwappedGrid = (isTopView) => {
+      if (!gridHelper) return;
+      
+      if (isTopView) {
+        // Recreate grid with swapped dimensions for top view
+        // Since axes are swapped, grid should reflect swapped working zone
+        cncGroup.remove(gridHelper);
+        
+        const workingX = props.cncConfig.workingZoneY; // Use Y config for X grid lines  
+        const workingY = props.cncConfig.workingZoneX; // Use X config for Y grid lines
+        const gridDivisionsX = Math.max(Math.floor(workingX / 25), 4);
+        const gridDivisionsY = Math.max(Math.floor(workingY / 25), 4);
+        
+        const xyGridGeometry = trackResource(new THREE.BufferGeometry(), 'geometries');
+        const xyGridVertices = [];
+        
+        // Vertical lines (now parallel to swapped Y axis)
+        for (let i = 0; i <= gridDivisionsX; i++) {
+          const x = (i / gridDivisionsX) * workingX;
+          xyGridVertices.push(x, 0, 0);
+          xyGridVertices.push(x, workingY, 0);
+        }
+        
+        // Horizontal lines (now parallel to swapped X axis)
+        for (let i = 0; i <= gridDivisionsY; i++) {
+          const y = (i / gridDivisionsY) * workingY;
+          xyGridVertices.push(0, y, 0);
+          xyGridVertices.push(workingX, y, 0);
+        }
+        
+        xyGridGeometry.setAttribute('position', new THREE.Float32BufferAttribute(xyGridVertices, 3));
+        
+        const xyGridMaterial = trackResource(new THREE.LineBasicMaterial({
+          color: 0x444444,
+          opacity: 0.6,
+          transparent: true
+        }), 'materials');
+        
+        gridHelper = trackResource(new THREE.LineSegments(xyGridGeometry, xyGridMaterial), 'meshes');
+        gridHelper.position.set(0, 0, -1);
+        cncGroup.add(gridHelper);
+      } else {
+        // Restore original grid when not in top view
+        if (gridHelper) {
+          cncGroup.remove(gridHelper);
+          
+          // Recreate original XY grid
+          const workingX = props.cncConfig.workingZoneX;
+          const workingY = props.cncConfig.workingZoneY;
+          const gridDivisionsX = Math.max(Math.floor(workingX / 25), 4);
+          const gridDivisionsY = Math.max(Math.floor(workingY / 25), 4);
+          
+          const xyGridGeometry = trackResource(new THREE.BufferGeometry(), 'geometries');
+          const xyGridVertices = [];
+          
+          // Vertical lines (parallel to Y axis)
+          for (let i = 0; i <= gridDivisionsX; i++) {
+            const x = (i / gridDivisionsX) * workingX;
+            xyGridVertices.push(x, 0, 0);
+            xyGridVertices.push(x, workingY, 0);
+          }
+          
+          // Horizontal lines (parallel to X axis)
+          for (let i = 0; i <= gridDivisionsY; i++) {
+            const y = (i / gridDivisionsY) * workingY;
+            xyGridVertices.push(0, y, 0);
+            xyGridVertices.push(workingX, y, 0);
+          }
+          
+          xyGridGeometry.setAttribute('position', new THREE.Float32BufferAttribute(xyGridVertices, 3));
+          
+          const xyGridMaterial = trackResource(new THREE.LineBasicMaterial({
+            color: 0x444444,
+            opacity: 0.6,
+            transparent: true
+          }), 'materials');
+          
+          gridHelper = trackResource(new THREE.LineSegments(xyGridGeometry, xyGridMaterial), 'meshes');
+          gridHelper.position.set(0, 0, -1);
+          cncGroup.add(gridHelper);
+        }
+      }
+    };
+
     const updateLabelPositions = (viewType) => {
+      // Swap physical axes geometry based on view
+      swapXYAxes(viewType === 'Top');
+      // Update grid to match swapped axes
+      updateSwappedGrid(viewType === 'Top');
+      // Update working zone to match swapped axes
+      swapWorkingZone(viewType === 'Top');
+      
+      
       switch (viewType) {
         case '3D':
-          // In 3D view, show all three axis labels
-          if (xAxisLabel) {
+          // In 3D view, show all three axis labels in normal positions
+          if (xAxisLabel && yAxisLabel) {
+            // Restore normal labels if they were swapped
+            cncGroup.remove(xAxisLabel);
+            cncGroup.remove(yAxisLabel);
+            
+            // Create normal labels
+            xAxisLabel = createTextSprite('X', '#ff1744');
+            yAxisLabel = createTextSprite('Y', '#00e676');
+            
             xAxisLabel.position.set(props.cncConfig.xAxisLength, -50, 40);
-            xAxisLabel.visible = true;
-          }
-          if (yAxisLabel) {
             yAxisLabel.position.set(-50, props.cncConfig.yAxisLength, 40);
+            
+            cncGroup.add(xAxisLabel);
+            cncGroup.add(yAxisLabel);
+            
+            xAxisLabel.visible = true;
             yAxisLabel.visible = true;
           }
           if (zAxisLabel) {
@@ -2352,24 +2665,60 @@ export default {
           }
           break;
         case 'Top':
-          // In top view, show only X and Y labels (front axes), hide Z label (behind)
-          if (xAxisLabel) {
-            xAxisLabel.position.set(props.cncConfig.xAxisLength, -50, 40);
+          // In top view - swap X and Y axes and labels to match physically swapped axes
+          if (xAxisLabel && yAxisLabel) {
+            // Since axes are physically swapped, labels should follow the physical positions
+            cncGroup.remove(xAxisLabel);
+            cncGroup.remove(yAxisLabel);
+            
+            // Create labels that match the swapped physical axes
+            // X axis (red) should still show "X" label at its swapped position
+            // Y axis (green) should still show "Y" label at its swapped position  
+            const tempXLabel = createTextSprite('X', '#ff1744'); // X sprite shows "X" at swapped position
+            const tempYLabel = createTextSprite('Y', '#00e676'); // Y sprite shows "Y" at swapped position
+            
+            // Position labels exactly where the swapped arrowheads are
+            // X arrowhead is at (0, xAxisLength, 0), so X label near there
+            tempXLabel.position.set(-20, props.cncConfig.xAxisLength + 20, -10); 
+            // Y arrowhead is at (yAxisLength, 0, 0), so Y label near there  
+            tempYLabel.position.set(props.cncConfig.yAxisLength + 20, -20, -10);
+            
+            cncGroup.add(tempXLabel);
+            cncGroup.add(tempYLabel);
+            
+            // Update references
+            xAxisLabel = tempXLabel;
+            yAxisLabel = tempYLabel;
+            
             xAxisLabel.visible = true;
-          }
-          if (yAxisLabel) {
-            yAxisLabel.position.set(-50, props.cncConfig.yAxisLength, 40);
             yAxisLabel.visible = true;
           }
-          if (zAxisLabel) zAxisLabel.visible = false; // Hide Z label (behind in top view)
+          if (zAxisLabel) {
+            // Z label near origin to indicate depth axis
+            zAxisLabel.position.set(-20, -20, props.cncConfig.zAxisLength);
+            zAxisLabel.visible = true;
+          }
           break;
         case 'Side':
           // In side view, show only X and Z labels (front axes), hide Y label (behind)
-          if (xAxisLabel) {
+          if (xAxisLabel && yAxisLabel) {
+            // Restore normal labels if they were swapped
+            cncGroup.remove(xAxisLabel);
+            cncGroup.remove(yAxisLabel);
+            
+            // Create normal labels
+            xAxisLabel = createTextSprite('X', '#ff1744');
+            yAxisLabel = createTextSprite('Y', '#00e676');
+            
             xAxisLabel.position.set(props.cncConfig.xAxisLength, 50, -50);
+            yAxisLabel.position.set(-50, props.cncConfig.yAxisLength, 40); // Normal Y position
+            
+            cncGroup.add(xAxisLabel);
+            cncGroup.add(yAxisLabel);
+            
             xAxisLabel.visible = true;
+            yAxisLabel.visible = false; // Hide Y label (behind in side view)
           }
-          if (yAxisLabel) yAxisLabel.visible = false; // Hide Y label (behind in side view)
           if (zAxisLabel) {
             zAxisLabel.position.set(-50, 50, props.cncConfig.zAxisLength);
             zAxisLabel.visible = true;
@@ -2409,20 +2758,25 @@ export default {
     };
     
     const setCameraPosition = (viewType) => {
-      const center = getCameraCenter();
-      const distance = getCameraDistance();
-      
+      // FIRST: Update grid visibility and swap axes
       setGridVisibility(viewType);
+      
+      // THEN: Get camera properties AFTER axes are in correct positions
+      const cameraProps = getCameraPropertiesForView(viewType);
+      const center = cameraProps.center;
+      const distance = cameraProps.distance;
+      const bounds = cameraProps.bounds;
       
       let targetPosition;
       
       switch (viewType) {
         case '3D':
-          // Isometric 3D view - camera positioned so Z-axis appears perfectly vertical on screen
-          const isoDistance = Math.max(props.cncConfig.xAxisLength, props.cncConfig.yAxisLength, props.cncConfig.zAxisLength) * 1.45;
-          const boxCenterX = props.cncConfig.xAxisLength * 0.5;
-          const boxCenterY = props.cncConfig.yAxisLength * 0.5;
-          const boxCenterZ = props.cncConfig.zAxisLength * 0.5;
+          // Isometric 3D view - use cached bounding box
+          const isoDistance = distance; // Use the calculated optimal distance
+          const boxCenter3D = center.vector;
+          const boxCenterX = boxCenter3D.x;
+          const boxCenterY = boxCenter3D.y;
+          const boxCenterZ = boxCenter3D.z;
           
           // Position camera diagonally but ensure Z-axis appears vertical
           targetPosition = new THREE.Vector3(
@@ -2454,15 +2808,55 @@ export default {
           smoothCameraTransition(targetPosition, lookAtPoint, 600);
           break;
         case 'Top':
-          // Adjust zoom for Top view to show labels better
-          const topDistance = Math.max(props.cncConfig.xAxisLength, props.cncConfig.yAxisLength, props.cncConfig.zAxisLength) * 0.75;
-          targetPosition = new THREE.Vector3(center.x, center.y, -topDistance);
-          smoothCameraTransition(targetPosition, new THREE.Vector3(center.x, center.y, 0), 600);
+          // Top view - use cached bounding box (with swapped dimensions)
+          const boxCenterTop = center.vector;
+          const topDistance = distance; // Use the calculated optimal distance
+          
+          // Position camera below the bounding box center looking up so Z axis points to background
+          // Position just below the minimum Z of the bounding box
+          // This ensures we see the XY plane (at Z=0) from below
+          const cameraZ = bounds.min.z - topDistance;
+          targetPosition = new THREE.Vector3(boxCenterTop.x, boxCenterTop.y, cameraZ);
+          
+          // Custom transition that respects camera.up from the start
+          const startPositionTop = camera.position.clone();
+          const startQuaternionTop = camera.quaternion.clone();
+          
+          // Create target quaternion with the up vector we want
+          const tempCamera = new THREE.PerspectiveCamera();
+          tempCamera.up.set(0, 0, 1); // Set up vector BEFORE positioning (Z-up so Z points to background)
+          tempCamera.position.copy(targetPosition);
+          tempCamera.lookAt(boxCenterTop);
+          const targetQuaternionTop = tempCamera.quaternion.clone();
+          
+          const startTime = Date.now();
+          
+          const topTransition = () => {
+            const elapsed = Date.now() - startTime;
+            const progress = Math.min(elapsed / 600, 1);
+            const easedProgress = progress < 0.5 ? 4 * progress * progress * progress : 1 - Math.pow(-2 * progress + 2, 3) / 2;
+            
+            camera.position.lerpVectors(startPositionTop, targetPosition, easedProgress);
+            camera.quaternion.slerpQuaternions(startQuaternionTop, targetQuaternionTop, easedProgress);
+            markDirty('rendering');
+            
+            if (progress < 1) {
+              requestAnimationFrame(topTransition);
+            } else {
+              markDirty('rendering');
+            }
+          };
+          
+          requestAnimationFrame(topTransition);
           break;
         case 'Side':
-          // Adjust distance for Side view - slightly zoomed out
-          const sideDistance = Math.max(props.cncConfig.xAxisLength, props.cncConfig.zAxisLength) * 1.1;
+          // Side view - use cached bounding box for accurate framing
+          const sideDistance = distance; // Use the calculated optimal distance
           targetPosition = new THREE.Vector3(center.x, -sideDistance, center.z);
+          
+          // Set camera up vector to align with world Z-axis for proper side view orientation
+          camera.up.set(0, 0, 1);
+          
           smoothCameraTransition(targetPosition, center.vector, 600);
           break;
         default:
@@ -2481,6 +2875,10 @@ export default {
       const previousView = currentCameraView.value;
       currentCameraIndex.value = (currentCameraIndex.value + 1) % cameraViews.length;
       const newView = currentCameraView.value;
+      
+      
+      // Clear cache to force recalculation for new view
+      clearBoundingBoxCache();
       
       // Handle 3D view rotation transitions
       if (cncGroup) {
@@ -2516,6 +2914,18 @@ export default {
       }
       
       setCameraPosition(newView);
+      
+      // Update bounding box visualization immediately (axes are now in correct positions)
+      if (showBoundingBox.value) {
+        createBoundingBoxVisualization();
+        logger.info(`Bounding box updated after axis swapping for view change: ${previousView} → ${newView}`);
+      }
+      
+      // Always run verification when view changes (even if debug box is off) to catch issues
+      const bounds = getBoundingBoxForView(newView);
+      if (bounds) {
+        verifyBoundingBoxContainsAxes(bounds, newView);
+      }
     };
     
     // UI Interaction Functions
@@ -2563,6 +2973,201 @@ export default {
         workingZoneMesh.visible = showWorkingZone.value;
         markDirty('rendering');
       }
+    };
+
+    const getBoundingBoxForView = (viewType = null) => {
+      // Use current view type if not provided
+      const currentView = viewType || currentCameraView.value;
+      
+      // Return cached box if it's for the same view
+      if (cachedBoundingBox && lastBoundingBoxViewType === currentView) {
+        return cachedBoundingBox;
+      }
+      
+      // Get the actual axis lengths from configuration
+      let axisX = props.cncConfig.xAxisLength;
+      let axisY = props.cncConfig.yAxisLength;
+      const axisZ = props.cncConfig.zAxisLength;
+      
+      // Get working zone dimensions  
+      let workingX = props.cncConfig.workingZoneX || 0;
+      let workingY = props.cncConfig.workingZoneY || 0;
+      const workingZ = props.cncConfig.workingZoneZ || 0;
+      
+      
+      // In Top view, X and Y axes are swapped, so swap their dimensions too
+      if (currentView === 'Top') {
+        // Swap X and Y dimensions to match the swapped axes
+        [axisX, axisY] = [axisY, axisX];
+        [workingX, workingY] = [workingY, workingX];
+        
+      }
+      
+      // Calculate the maximum extent in each direction
+      const maxX = Math.max(axisX, workingX);
+      const maxY = Math.max(axisY, workingY);
+      const maxZ = Math.max(axisZ, workingZ);
+      
+      // Small uniform margin around the axes
+      const uniformMargin = 20;
+      
+      // Create bounding box that closely matches the axes with small uniform margin
+      const currentBounds = new THREE.Box3(
+        new THREE.Vector3(
+          -uniformMargin,     // Small negative space for origin
+          -uniformMargin,     // Small negative space for origin
+          -uniformMargin      // Small negative space for origin
+        ),
+        new THREE.Vector3(
+          maxX + uniformMargin,  // Axis length plus small margin
+          maxY + uniformMargin,  // Axis length plus small margin
+          maxZ + uniformMargin   // Axis length plus small margin
+        )
+      );
+      
+      
+      // Cache the result
+      cachedBoundingBox = currentBounds;
+      lastBoundingBoxViewType = currentView;
+      
+      return currentBounds;
+    };
+    
+    // Function to verify if bounding box correctly contains all axes
+    const verifyBoundingBoxContainsAxes = (bounds, viewType) => {
+      if (!xAxisMesh || !yAxisMesh || !zAxisMesh || !xArrowMesh || !yArrowMesh || !zArrowMesh) {
+        return { valid: false, reason: 'Axes not initialized' };
+      }
+      
+      // Get actual axis endpoint positions (where arrows are)
+      const xAxisEnd = { x: xArrowMesh.position.x, y: xArrowMesh.position.y, z: xArrowMesh.position.z };
+      const yAxisEnd = { x: yArrowMesh.position.x, y: yArrowMesh.position.y, z: yArrowMesh.position.z };
+      const zAxisEnd = { x: zArrowMesh.position.x, y: zArrowMesh.position.y, z: zArrowMesh.position.z };
+      
+      // Check if all axis endpoints are within the bounding box
+      const xInside = xAxisEnd.x >= bounds.min.x && xAxisEnd.x <= bounds.max.x &&
+                     xAxisEnd.y >= bounds.min.y && xAxisEnd.y <= bounds.max.y &&
+                     xAxisEnd.z >= bounds.min.z && xAxisEnd.z <= bounds.max.z;
+      
+      const yInside = yAxisEnd.x >= bounds.min.x && yAxisEnd.x <= bounds.max.x &&
+                     yAxisEnd.y >= bounds.min.y && yAxisEnd.y <= bounds.max.y &&
+                     yAxisEnd.z >= bounds.min.z && yAxisEnd.z <= bounds.max.z;
+      
+      const zInside = zAxisEnd.x >= bounds.min.x && zAxisEnd.x <= bounds.max.x &&
+                     zAxisEnd.y >= bounds.min.y && zAxisEnd.y <= bounds.max.y &&
+                     zAxisEnd.z >= bounds.min.z && zAxisEnd.z <= bounds.max.z;
+      
+      const allInside = xInside && yInside && zInside;
+      
+      logger.info(`${viewType} View Bounding Box Verification:`, {
+        boundingBox: { 
+          min: { x: bounds.min.x, y: bounds.min.y, z: bounds.min.z },
+          max: { x: bounds.max.x, y: bounds.max.y, z: bounds.max.z },
+          size: { x: bounds.max.x - bounds.min.x, y: bounds.max.y - bounds.min.y, z: bounds.max.z - bounds.min.z }
+        },
+        axisEndpoints: { xAxisEnd, yAxisEnd, zAxisEnd },
+        containment: { xInside, yInside, zInside },
+        result: allInside ? '✅ CORRECT' : '❌ WRONG'
+      });
+      
+      return { valid: allInside, xInside, yInside, zInside };
+    };
+    
+    // Function to clear cache when configuration changes
+    const clearBoundingBoxCache = () => {
+      cachedBoundingBox = null;
+      lastBoundingBoxViewType = null;
+    };
+
+    const createBoundingBoxVisualization = () => {
+      // Remove existing visualization if it exists
+      if (boundingBoxMesh) {
+        scene.remove(boundingBoxMesh);
+        boundingBoxMesh = null;
+      }
+      
+      // Get current cached bounding box for current view
+      const currentBounds = getBoundingBoxForView(currentCameraView.value);
+      
+      // Get bounding box dimensions
+      const size = new THREE.Vector3();
+      currentBounds.getSize(size);
+      const center = new THREE.Vector3();
+      currentBounds.getCenter(center);
+      
+      // Create box geometry with bounding box dimensions
+      const boxGeometry = createTrackedGeometry(THREE.BoxGeometry, size.x, size.y, size.z);
+      const edgesGeometry = trackResource(new THREE.EdgesGeometry(boxGeometry), 'geometries');
+      
+      // Create material with distinctive debug color
+      const boxMaterial = createTrackedMaterial(THREE.LineBasicMaterial, {
+        color: 0xff00ff,  // Magenta for visibility
+        opacity: 0.6,
+        transparent: true,
+        linewidth: 1
+      });
+      
+      boundingBoxMesh = trackResource(new THREE.LineSegments(edgesGeometry, boxMaterial), 'meshes');
+      boundingBoxMesh.position.copy(center);
+      boundingBoxMesh.visible = showBoundingBox.value;
+      
+      scene.add(boundingBoxMesh); // Add to scene, not cncGroup, so it doesn't rotate
+      
+      // Debug: Verify if bounding box fits within margins
+      if (showBoundingBox.value && camera && renderer) {
+        // Project bounding box corners to screen space
+        const corners = [
+          new THREE.Vector3(currentBounds.min.x, currentBounds.min.y, currentBounds.min.z),
+          new THREE.Vector3(currentBounds.max.x, currentBounds.min.y, currentBounds.min.z),
+          new THREE.Vector3(currentBounds.min.x, currentBounds.max.y, currentBounds.min.z),
+          new THREE.Vector3(currentBounds.max.x, currentBounds.max.y, currentBounds.min.z),
+          new THREE.Vector3(currentBounds.min.x, currentBounds.min.y, currentBounds.max.z),
+          new THREE.Vector3(currentBounds.max.x, currentBounds.min.y, currentBounds.max.z),
+          new THREE.Vector3(currentBounds.min.x, currentBounds.max.y, currentBounds.max.z),
+          new THREE.Vector3(currentBounds.max.x, currentBounds.max.y, currentBounds.max.z)
+        ];
+
+        let minScreenX = Infinity, maxScreenX = -Infinity;
+        let minScreenY = Infinity, maxScreenY = -Infinity;
+
+        corners.forEach(corner => {
+          const screenPos = corner.clone().project(camera);
+          const x = (screenPos.x * 0.5 + 0.5) * renderer.domElement.width;
+          const y = (1 - (screenPos.y * 0.5 + 0.5)) * renderer.domElement.height;
+          
+          minScreenX = Math.min(minScreenX, x);
+          maxScreenX = Math.max(maxScreenX, x);
+          minScreenY = Math.min(minScreenY, y);
+          maxScreenY = Math.max(maxScreenY, y);
+        });
+
+        const marginPixels = window.debugBoundingBoxCalc?.marginPixels || 19;
+        const exceedsLeft = minScreenX < marginPixels;
+        const exceedsRight = maxScreenX > (renderer.domElement.width - marginPixels);
+        const exceedsTop = minScreenY < marginPixels;
+        const exceedsBottom = maxScreenY > (renderer.domElement.height - marginPixels);
+        
+        const exceeds = exceedsLeft || exceedsRight || exceedsTop || exceedsBottom;
+      }
+      
+      // Verify if the bounding box correctly contains all axes
+      verifyBoundingBoxContainsAxes(currentBounds, currentCameraView.value);
+    };
+
+    const toggleBoundingBox = () => {
+      showBoundingBox.value = !showBoundingBox.value;
+      
+      if (showBoundingBox.value) {
+        // Always recreate visualization to ensure it's up to date
+        createBoundingBoxVisualization();
+      } else {
+        // Hide visualization
+        if (boundingBoxMesh) {
+          boundingBoxMesh.visible = false;
+        }
+      }
+      
+      markDirty('rendering');
     };
     
     const closeViewer = () => {
@@ -2637,6 +3242,15 @@ export default {
       try {
         validateCanvas();
         initThreeJS();
+        
+        // Immediately update bounding box after full initialization
+        nextTick(() => {
+          if (showBoundingBox.value && boundingBoxMesh) {
+            createBoundingBoxVisualization();
+            logger.info('Bounding box calculated immediately after initialization');
+          }
+        });
+        
         window.addEventListener('resize', onWindowResize);
       } catch (error) {
         logger.error('Failed to initialize viewer:', error);
@@ -2727,9 +3341,11 @@ export default {
       threeContainer,
       isAnimating,
       showWorkingZone,
+      showBoundingBox,
       currentCameraView,
       resetCamera,
       toggleWorkingZone,
+      toggleBoundingBox,
       switchCameraView,
       toggleSimulationMode,
       closeViewer,
@@ -2835,6 +3451,56 @@ export default {
 .three-container {
   flex: 1;
   background-color: var(--color-bg-tertiary);
+  position: relative;
+}
+
+.three-container.debug-border {
+  box-shadow: inset 0 0 0 3px rgba(255, 0, 0, 0.5);
+}
+
+.debug-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+  z-index: 10;
+}
+
+.margin-visualization {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  border: 2px dashed rgba(0, 255, 0, 0.5);
+  /* 0.5cm margins - approximately 19px at 96 DPI (0.5 * 96 / 2.54) */
+  margin: 19px;
+}
+
+.margin-visualization::before {
+  content: '';
+  position: absolute;
+  top: -2px;
+  left: -2px;
+  right: -2px;
+  bottom: -2px;
+  border: 1px solid rgba(0, 255, 0, 0.2);
+}
+
+.margin-info {
+  position: absolute;
+  top: -25px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.8);
+  color: #00ff00;
+  padding: 2px 8px;
+  border-radius: 3px;
+  font-size: 12px;
+  font-family: monospace;
+  white-space: nowrap;
 }
 
 .info-panel {
@@ -3005,6 +3671,24 @@ export default {
   background-color: var(--color-warning-dark) !important;
   transform: translateY(-1px);
   box-shadow: 0 0 12px rgba(255, 193, 7, 0.6);
+}
+
+/* Debug Button Styles */
+.debug-button {
+  transition: all 0.3s ease;
+}
+
+.debug-button.debug-active {
+  background-color: #ff00ff !important; /* Magenta to match bounding box */
+  color: white !important;
+  border-color: #cc00cc !important;
+  box-shadow: 0 0 8px rgba(255, 0, 255, 0.4);
+}
+
+.debug-button.debug-active:hover {
+  background-color: #cc00cc !important;
+  transform: translateY(-1px);
+  box-shadow: 0 0 12px rgba(255, 0, 255, 0.6);
 }
 
 /* Play Button Styles */
