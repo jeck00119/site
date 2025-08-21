@@ -12,7 +12,7 @@
           Working Zone
         </button>
         <button @click="toggleBoundingBox" class="control-button debug-button" :class="{ 'debug-active': showBoundingBox }">
-          <font-awesome-icon icon="vector-square" />
+          <font-awesome-icon icon="square" />
           Debug Box
         </button>
         <button @click="switchCameraView" class="control-button">
@@ -859,7 +859,7 @@ export default {
           throw new Error('Failed to create Three.js Camera');
         }
         
-        setCameraPosition(currentCameraView.value);
+        // Note: setCameraPosition will be called after createCNCRig() in initThreeJS
       }, 'initialize camera');
     };
     
