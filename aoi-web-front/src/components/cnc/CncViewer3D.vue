@@ -2191,6 +2191,11 @@ export default {
         // Update trajectory line to show path to partial target
         markDirty('trajectoryLine');
         updateTrajectoryLine(partialPosition);
+        
+        // Update target position and emit for display
+        targetPosition.value = partialPosition;
+        targetArrived.value = false;
+        emit('targetUpdate', partialPosition);
       }
       
       logger.info(`Partial target set in ${viewType} view: (${formatCoordinate(position.x)}, ${formatCoordinate(position.y)}, ${formatCoordinate(position.z)})`);
