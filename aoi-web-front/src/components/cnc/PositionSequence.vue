@@ -82,9 +82,9 @@
             </div>
           </div>
           <div class="item-coords">
-            <span>X: {{ item.x?.toFixed(3) || '---' }}</span>
-            <span>Y: {{ item.y?.toFixed(3) || '---' }}</span>
-            <span>Z: {{ item.z?.toFixed(3) || '---' }}</span>
+            <span>X: {{ getItemCoordinate(item, 'x')?.toFixed(2) || '---' }}</span>
+            <span>Y: {{ getItemCoordinate(item, 'y')?.toFixed(2) || '---' }}</span>
+            <span>Z: {{ getItemCoordinate(item, 'z')?.toFixed(2) || '---' }}</span>
           </div>
         </div>
       </div>
@@ -150,15 +150,15 @@
             <div class="coord-inputs">
               <div class="coord-group">
                 <label>X:</label>
-                <input type="number" v-model.number="editingItem.x" step="0.001" />
+                <input type="number" v-model.number="editingItem.x" step="1" />
               </div>
               <div class="coord-group">
                 <label>Y:</label>
-                <input type="number" v-model.number="editingItem.y" step="0.001" />
+                <input type="number" v-model.number="editingItem.y" step="1" />
               </div>
               <div class="coord-group">
                 <label>Z:</label>
-                <input type="number" v-model.number="editingItem.z" step="0.001" />
+                <input type="number" v-model.number="editingItem.z" step="1" />
               </div>
             </div>
           </div>
@@ -234,6 +234,23 @@ export default {
       const sequenceLocationUids = sequenceList.value.map(item => item.locationUid);
       return locations.value.filter(loc => !sequenceLocationUids.includes(loc.uid));
     });
+
+    // Helper function to resolve coordinates from locations store
+    // This provides backward compatibility while supporting data centralization
+    function getItemCoordinate(item, coordinate) {
+      // If item has coordinate directly (old format), use it
+      if (item[coordinate] !== undefined) {
+        return item[coordinate];
+      }
+      
+      // Otherwise, resolve from locations store using locationUid (new format)
+      if (item.locationUid && locations.value) {
+        const location = locations.value.find(loc => loc.uid === item.locationUid);
+        return location ? location[coordinate] : undefined;
+      }
+      
+      return undefined;
+    }
     
     // Sequence management functions
     function addToSequence() {
@@ -463,7 +480,8 @@ export default {
                typeof editingItem.value.y === 'number' && 
                typeof editingItem.value.z === 'number' && 
                editingItem.value.feedrate > 0;
-      })
+      }),
+      getItemCoordinate
     };
   }
 };

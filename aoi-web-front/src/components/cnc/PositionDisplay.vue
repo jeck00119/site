@@ -8,24 +8,24 @@
         title="CNC Setup & 3D Viewer"
       >
         <font-awesome-icon icon="cog" />
-        Setup 3D
+        3D CNC
       </button>
     </div>
 
     <div class="position-layout">
       <div class="data-row">
         <div class="axis-label">X</div>
-        <div class="boxed">{{ pos.x.toFixed(3) }}</div>
+        <div class="boxed">{{ pos.x.toFixed(2) }}</div>
       </div>
       
       <div class="data-row">
         <div class="axis-label">Y</div>
-        <div class="boxed">{{ pos.y.toFixed(3) }}</div>
+        <div class="boxed">{{ pos.y.toFixed(2) }}</div>
       </div>
       
       <div class="data-row">
         <div class="axis-label">Z</div>
-        <div class="boxed">{{ pos.z.toFixed(3) }}</div>
+        <div class="boxed">{{ pos.z.toFixed(2) }}</div>
       </div>
     </div>
 
@@ -188,7 +188,7 @@ export default {
   setup(props) {
     
     // Use centralized CNC store composable
-    const { pos, cncState } = useCncStore(props.axisUid);
+    const { pos, cncState, cncs, saveCNC3DConfig } = useCncStore(props.axisUid);
     
     // Use CNC movement composable for click-to-move functionality
     const { executeMovementToPosition, isMoving } = useCncMovement(props.axisUid);
@@ -218,6 +218,28 @@ export default {
     const configKey = `cnc-3d-config-${props.axisUid}`;
     const loadCncConfig = () => {
       try {
+        // First, try to load from backend CNC configuration
+        const currentCnc = cncs.value?.find(cnc => cnc.uid === props.axisUid);
+        if (currentCnc && currentCnc.xAxisLength !== undefined) {
+          // Load from backend CNC config
+          cncConfig.value = {
+            xAxisLength: currentCnc.xAxisLength || defaultCncConfig.xAxisLength,
+            yAxisLength: currentCnc.yAxisLength || defaultCncConfig.yAxisLength,
+            zAxisLength: currentCnc.zAxisLength || defaultCncConfig.zAxisLength,
+            workingZoneX: currentCnc.workingZoneX || defaultCncConfig.workingZoneX,
+            workingZoneY: currentCnc.workingZoneY || defaultCncConfig.workingZoneY,
+            workingZoneZ: currentCnc.workingZoneZ || defaultCncConfig.workingZoneZ
+          };
+          
+          if (currentCnc.selectedAxes) {
+            selectedAxes.value = { ...selectedAxes.value, ...currentCnc.selectedAxes };
+          }
+          
+          logger.info('CNC 3D config loaded from backend:', cncConfig.value);
+          return;
+        }
+        
+        // Fallback to localStorage if backend doesn't have config
         const saved = localStorage.getItem(configKey);
         if (saved) {
           const parsed = JSON.parse(saved);
@@ -227,23 +249,59 @@ export default {
           if (parsed.selectedAxes) {
             selectedAxes.value = { ...selectedAxes.value, ...parsed.selectedAxes };
           }
+          
+          logger.info('CNC 3D config loaded from localStorage:', cncConfig.value);
         }
       } catch (error) {
         logger.warn('Failed to load CNC 3D config:', error);
       }
     };
     
-    // Save configuration to localStorage
-    const saveCncConfig = () => {
+    // Save configuration to backend CNC config
+    const saveCncConfig = async () => {
       try {
         const configToSave = {
-          ...cncConfig.value,
+          xAxisLength: cncConfig.value.xAxisLength,
+          yAxisLength: cncConfig.value.yAxisLength,
+          zAxisLength: cncConfig.value.zAxisLength,
+          workingZoneX: cncConfig.value.workingZoneX,
+          workingZoneY: cncConfig.value.workingZoneY,
+          workingZoneZ: cncConfig.value.workingZoneZ,
           selectedAxes: selectedAxes.value
         };
-        localStorage.setItem(configKey, JSON.stringify(configToSave));
-        logger.info('CNC 3D configuration saved:', configToSave);
+        
+        // Save to backend CNC configuration
+        const result = await saveCNC3DConfig(props.axisUid, configToSave);
+        
+        if (result.success) {
+          logger.info('CNC 3D configuration saved to backend:', configToSave);
+          
+          // Also save to localStorage as backup
+          localStorage.setItem(configKey, JSON.stringify({
+            ...cncConfig.value,
+            selectedAxes: selectedAxes.value
+          }));
+        } else {
+          logger.warn('Failed to save CNC 3D config to backend, saving to localStorage only');
+          // Save to localStorage as fallback
+          localStorage.setItem(configKey, JSON.stringify({
+            ...cncConfig.value,
+            selectedAxes: selectedAxes.value
+          }));
+        }
       } catch (error) {
         logger.error('Failed to save CNC 3D config:', error);
+        
+        // Try to save to localStorage as last resort
+        try {
+          localStorage.setItem(configKey, JSON.stringify({
+            ...cncConfig.value,
+            selectedAxes: selectedAxes.value
+          }));
+          logger.info('CNC 3D config saved to localStorage as fallback');
+        } catch (localError) {
+          logger.error('Failed to save to localStorage as well:', localError);
+        }
       }
     };
     
@@ -289,7 +347,7 @@ export default {
     };
     
     // Main function to save config and open 3D viewer
-    const saveCncConfigAndOpen3D = () => {
+    const saveCncConfigAndOpen3D = async () => {
       // Validate configuration based on selected axes
       const validationErrors = validateConfiguration();
       if (validationErrors.length > 0) {
@@ -297,14 +355,19 @@ export default {
         return;
       }
       
-      // Save configuration including selected axes
-      saveCncConfig();
-      
-      // Close modal
-      closeCncSetupModal();
-      
-      // Open 3D viewer in new window
-      open3DViewer();
+      try {
+        // Save configuration including selected axes
+        await saveCncConfig();
+        
+        // Close modal
+        closeCncSetupModal();
+        
+        // Open 3D viewer
+        open3DViewer();
+      } catch (error) {
+        logger.error('Error saving 3D configuration:', error);
+        alert('Failed to save configuration. Please try again.');
+      }
     };
     
     // Function to open 3D viewer
@@ -396,6 +459,11 @@ export default {
       if (newPos) {
         simulatedPos.value = { ...newPos };
       }
+    }, { deep: true });
+
+    // Watch for changes in CNCs array to reload config
+    watch(cncs, () => {
+      loadCncConfig();
     }, { deep: true });
 
     onMounted(() => {
@@ -549,8 +617,11 @@ export default {
   background-color: rgba(0, 0, 0, 0.7);
   display: flex;
   justify-content: center;
-  align-items: center;
+  align-items: flex-start; /* Changed from center to flex-start */
+  padding-top: 5vh; /* Add top padding for better positioning */
+  padding-bottom: 120px; /* Account for footer height */
   z-index: 1000;
+  overflow-y: auto; /* Allow scrolling of the overlay itself */
 }
 
 .modal-content {
@@ -559,9 +630,11 @@ export default {
   box-shadow: var(--shadow-lg);
   width: 90%;
   max-width: 500px;
-  max-height: 90vh;
-  overflow-y: auto;
+  max-height: calc(100vh - 200px); /* Account for footer and top padding */
+  display: flex;
+  flex-direction: column;
   border: var(--border-width-1) solid var(--color-border-primary);
+  margin-bottom: 20px; /* Extra margin from footer */
 }
 
 .modal-header {
@@ -573,6 +646,10 @@ export default {
   background-color: var(--color-bg-secondary);
   border-top-left-radius: var(--border-radius-card);
   border-top-right-radius: var(--border-radius-card);
+  flex-shrink: 0; /* Prevent header from shrinking */
+  position: sticky;
+  top: 0;
+  z-index: 10;
 }
 
 .modal-header h3 {
@@ -604,6 +681,9 @@ export default {
 
 .modal-body {
   padding: var(--space-4);
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0; /* Allow flex shrinking */
 }
 
 .setup-form h4 {
@@ -654,6 +734,7 @@ export default {
   background-color: var(--color-bg-secondary);
   border-bottom-left-radius: var(--border-radius-card);
   border-bottom-right-radius: var(--border-radius-card);
+  flex-shrink: 0; /* Prevent footer from shrinking */
 }
 
 .cancel-button {
@@ -759,7 +840,8 @@ export default {
 
 /* Axis Configuration Styles */
 .axis-config {
-  margin-bottom: var(--space-4);
+  margin-bottom: var(--space-6); /* Increased spacing */
+  padding-top: var(--space-2);
 }
 
 .axis-config h5 {
@@ -771,7 +853,8 @@ export default {
 
 /* Working Zone Configuration Styles */
 .working-zone-config {
-  margin-bottom: var(--space-4);
+  margin-bottom: var(--space-6); /* Increased spacing */
+  padding-top: var(--space-2);
 }
 
 .working-zone-config h5 {
@@ -779,6 +862,40 @@ export default {
   color: var(--color-primary);
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-bold);
+}
+
+/* Responsive adjustments for smaller screens */
+@media (max-height: 600px) {
+  .modal-overlay {
+    padding-top: 2vh; /* Less top padding on short screens */
+    padding-bottom: 100px; /* Slightly less footer space */
+  }
+  
+  .modal-content {
+    max-height: calc(100vh - 150px); /* Less aggressive height reduction */
+  }
+}
+
+@media (max-width: 768px) {
+  .modal-overlay {
+    padding-top: 2vh;
+    padding-left: var(--space-2);
+    padding-right: var(--space-2);
+  }
+  
+  .modal-content {
+    width: 95%; /* More width on mobile */
+    max-width: none;
+  }
+  
+  .modal-body {
+    padding: var(--space-3); /* Less padding on mobile */
+  }
+  
+  .modal-header,
+  .modal-footer {
+    padding: var(--space-3); /* Consistent padding reduction */
+  }
 }
 </style>
 

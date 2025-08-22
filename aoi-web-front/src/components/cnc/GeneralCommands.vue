@@ -166,8 +166,8 @@
               type="number" 
               id="movement-step"
               v-model="keyboardSettings.stepSize"
-              min="0.001"
-              step="0.001"
+              min="1"
+              step="1"
             />
           </div>
           <div class="setting-group">

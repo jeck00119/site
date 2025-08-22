@@ -48,8 +48,8 @@
             :class="{ 'custom-active': isCustomActive }"
             @input="updateCustomStep"
             @blur="validateCustomStep"
-            min="0.001"
-            step="0.001"
+            min="1"
+            step="1"
             placeholder="Custom"
           />
         </div>

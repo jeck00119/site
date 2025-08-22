@@ -118,6 +118,47 @@ export default {
         context.commit('updateCNCType', payload);
     },
 
+    // Update 3D configuration for a specific CNC
+    async saveCNC3DConfig(context, payload) {
+        const { cncUid, config3D } = payload;
+        
+        // Find the CNC in the store
+        const cncs = [...context.getters.getCNCs];
+        const cncIndex = cncs.findIndex(cnc => cnc.uid === cncUid);
+        
+        if (cncIndex === -1) {
+            const error = new Error(`CNC with UID ${cncUid} not found`);
+            logger.error('CNC 3D Config Save Error', error);
+            throw error;
+        }
+        
+        // Update CNC with 3D configuration
+        cncs[cncIndex] = {
+            ...cncs[cncIndex],
+            xAxisLength: config3D.xAxisLength,
+            yAxisLength: config3D.yAxisLength,
+            zAxisLength: config3D.zAxisLength,
+            workingZoneX: config3D.workingZoneX,
+            workingZoneY: config3D.workingZoneY,
+            workingZoneZ: config3D.workingZoneZ,
+            selectedAxes: config3D.selectedAxes
+        };
+        
+        // Update store state
+        context.commit('loadCNCs', cncs);
+        
+        // Save all CNCs to backend
+        const result = await context.dispatch('saveCNCs');
+        
+        if (result.success) {
+            logger.info('CNC 3D configuration saved successfully', { cncUid, config3D });
+        } else {
+            logger.warn('CNC 3D configuration save had issues', { message: result.message });
+        }
+        
+        return result;
+    },
+
     async fetchLocations(context, payload){
         const {response, responseData} = await api.get(`/location/axis/${payload}`);
 

@@ -87,6 +87,7 @@ export function useCncStore(axisUid = null) {
   const updateCNCPort = (uid: any, port: string) => dispatch('cnc/updateCNCPort', { uid, port });
   const updateCNCType = (uid: any, type: string) => dispatch('cnc/updateCNCType', { uid, type });
   const saveCNCs = () => dispatch('cnc/saveCNCs', {});
+  const saveCNC3DConfig = (cncUid: string, config3D: any) => dispatch('cnc/saveCNC3DConfig', { cncUid, config3D });
   
   // Batch CNC updates
   const updateCncData = (uid, data) => {
@@ -167,6 +168,7 @@ export function useCncStore(axisUid = null) {
     updateCNCPort,
     updateCNCType,
     saveCNCs,
+    saveCNC3DConfig,
     
     // Raw store access
     store,

@@ -611,11 +611,11 @@ class CncService(metaclass=Singleton):
         if feed_rate is not None:
             kwargs['feed_rate'] = int(feed_rate)
         if x is not None and x != 0:
-            kwargs['x'] = round(float(x), 3)
+            kwargs['x'] = round(float(x), 2)  # 2 decimal places for 0.01mm precision
         if y is not None and y != 0:
-            kwargs['y'] = round(float(y), 3)
+            kwargs['y'] = round(float(y), 2)  # 2 decimal places for 0.01mm precision
         if z is not None and z != 0:
-            kwargs['z'] = round(float(z), 3)
+            kwargs['z'] = round(float(z), 2)  # 2 decimal places for 0.01mm precision
         
         # Only execute if at least one axis has movement
         if any(k in kwargs for k in ['x', 'y', 'z']):

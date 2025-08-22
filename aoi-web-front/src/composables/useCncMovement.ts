@@ -34,10 +34,10 @@ export function useCncMovement(axisUid: string) {
    * Calculate movement deltas between current and target positions
    */
   const calculateMovementDeltas = (currentPos: Position, targetPos: Position) => {
-    // Round to avoid floating point precision issues
-    const deltaX = Math.round((targetPos.x - currentPos.x) * 1000) / 1000;
-    const deltaY = Math.round((targetPos.y - currentPos.y) * 1000) / 1000;
-    const deltaZ = Math.round((targetPos.z - currentPos.z) * 1000) / 1000;
+    // Round to 2 decimal places (0.01mm precision)
+    const deltaX = Math.round((targetPos.x - currentPos.x) * 100) / 100;
+    const deltaY = Math.round((targetPos.y - currentPos.y) * 100) / 100;
+    const deltaZ = Math.round((targetPos.z - currentPos.z) * 100) / 100;
 
     return { deltaX, deltaY, deltaZ };
   };
@@ -121,12 +121,12 @@ export function useCncMovement(axisUid: string) {
       const hasMovement = deltaX !== 0 || deltaY !== 0 || deltaZ !== 0;
       
       if (hasMovement) {
-        // Use the new moveRelative endpoint for simultaneous movement with float precision
+        // Use the new moveRelative endpoint for simultaneous movement with 2 decimal precision
         await cncStore.moveRelative({
           cncUid: axisUid,
-          x: parseFloat(deltaX.toFixed(3)),
-          y: parseFloat(deltaY.toFixed(3)),
-          z: parseFloat(deltaZ.toFixed(3)),
+          x: parseFloat(deltaX.toFixed(2)),
+          y: parseFloat(deltaY.toFixed(2)),
+          z: parseFloat(deltaZ.toFixed(2)),
           feedrate
         });
 

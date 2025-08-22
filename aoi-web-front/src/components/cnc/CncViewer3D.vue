@@ -72,15 +72,15 @@
             <div class="fallback-position">
               <div class="fallback-row">
                 <span class="axis">X:</span>
-                <span class="value">{{ displayPosition.x.toFixed(3) }}mm</span>
+                <span class="value">{{ displayPosition.x.toFixed(2) }}mm</span>
               </div>
               <div class="fallback-row">
                 <span class="axis">Y:</span>
-                <span class="value">{{ displayPosition.y.toFixed(3) }}mm</span>
+                <span class="value">{{ displayPosition.y.toFixed(2) }}mm</span>
               </div>
               <div class="fallback-row">
                 <span class="axis">Z:</span>
-                <span class="value">{{ displayPosition.z.toFixed(3) }}mm</span>
+                <span class="value">{{ displayPosition.z.toFixed(2) }}mm</span>
               </div>
             </div>
           </div>
@@ -132,15 +132,15 @@
           <h4>Current Position</h4>
           <div v-if="cncConfig.selectedAxes?.x !== false" class="position-row">
             <span class="axis">X:</span>
-            <span class="value">{{ displayPosition.x.toFixed(3) }}mm</span>
+            <span class="value">{{ displayPosition.x.toFixed(2) }}mm</span>
           </div>
           <div v-if="cncConfig.selectedAxes?.y !== false" class="position-row">
             <span class="axis">Y:</span>
-            <span class="value">{{ displayPosition.y.toFixed(3) }}mm</span>
+            <span class="value">{{ displayPosition.y.toFixed(2) }}mm</span>
           </div>
           <div v-if="cncConfig.selectedAxes?.z !== false" class="position-row">
             <span class="axis">Z:</span>
-            <span class="value">{{ displayPosition.z.toFixed(3) }}mm</span>
+            <span class="value">{{ displayPosition.z.toFixed(2) }}mm</span>
           </div>
         </div>
         
@@ -149,29 +149,29 @@
           <div v-if="targetArrived && lastTargetPosition">
             <div v-if="cncConfig.selectedAxes?.x !== false" class="position-row">
               <span class="axis">X:</span>
-              <span class="value target arrived">{{ lastTargetPosition.x?.toFixed(3) || '0.000' }}mm</span>
+              <span class="value target arrived">{{ lastTargetPosition.x?.toFixed(2) || '0.00' }}mm</span>
             </div>
             <div v-if="cncConfig.selectedAxes?.y !== false" class="position-row">
               <span class="axis">Y:</span>
-              <span class="value target arrived">{{ lastTargetPosition.y?.toFixed(3) || '0.000' }}mm</span>
+              <span class="value target arrived">{{ lastTargetPosition.y?.toFixed(2) || '0.00' }}mm</span>
             </div>
             <div v-if="cncConfig.selectedAxes?.z !== false" class="position-row">
               <span class="axis">Z:</span>
-              <span class="value target arrived">{{ lastTargetPosition.z?.toFixed(3) || '0.000' }}mm</span>
+              <span class="value target arrived">{{ lastTargetPosition.z?.toFixed(2) || '0.00' }}mm</span>
             </div>
           </div>
           <div v-else-if="targetPosition">
             <div v-if="cncConfig.selectedAxes?.x !== false" class="position-row">
               <span class="axis">X:</span>
-              <span class="value target">{{ targetPosition.x?.toFixed(3) || '0.000' }}mm</span>
+              <span class="value target">{{ targetPosition.x?.toFixed(2) || '0.00' }}mm</span>
             </div>
             <div v-if="cncConfig.selectedAxes?.y !== false" class="position-row">
               <span class="axis">Y:</span>
-              <span class="value target">{{ targetPosition.y?.toFixed(3) || '0.000' }}mm</span>
+              <span class="value target">{{ targetPosition.y?.toFixed(2) || '0.00' }}mm</span>
             </div>
             <div v-if="cncConfig.selectedAxes?.z !== false" class="position-row">
               <span class="axis">Z:</span>
-              <span class="value target">{{ targetPosition.z?.toFixed(3) || '0.000' }}mm</span>
+              <span class="value target">{{ targetPosition.z?.toFixed(2) || '0.00' }}mm</span>
             </div>
           </div>
         </div>
@@ -930,9 +930,9 @@ export default {
           throw new Error('Failed to create Three.js Raycaster');
         }
         
-        // Configure raycaster for better performance
-        raycaster.params.Line.threshold = 0.1;
-        raycaster.params.Points.threshold = 0.1;
+        // Configure raycaster for better accuracy (reduced threshold)
+        raycaster.params.Line.threshold = 0.01;
+        raycaster.params.Points.threshold = 0.01;
       }, 'initialize raycaster');
     };
     
@@ -1070,25 +1070,15 @@ export default {
         }
         
         // Validate CNC configuration
-        if (!props.cncConfig || !props.cncConfig.cncType) {
+        if (!props.cncConfig) {
           throw new Error('Invalid CNC configuration');
         }
         
+        // Create standard cartesian machine visualization
         try {
-          switch (props.cncConfig.cncType) {
-            case 'corexy':
-              createCoreXYMachine();
-              break;
-            case 'delta':
-              createDeltaMachine();
-              break;
-            case 'cartesian':
-            default:
-              createCartesianMachine();
-              break;
-          }
+          createCartesianMachine();
         } catch (machineError) {
-          logger.error(`Error creating ${props.cncConfig.cncType} machine:`, machineError);
+          logger.error('Error creating CNC machine:', machineError);
           // Create a basic fallback visualization
           createSimpleAxisVisualization();
         }
@@ -1109,7 +1099,7 @@ export default {
         
         scene.add(cncGroup);
         
-        logger.info(`${props.cncConfig.cncType.toUpperCase()} CNC rig 3D model created successfully`);
+        logger.info('CNC rig 3D model created successfully');
       }, 'create CNC rig');
     };
     
@@ -1813,6 +1803,32 @@ export default {
       renderer.domElement.addEventListener('wheel', handleWheel);
     };
     
+    // Helper functions for improved click-to-move accuracy
+    const roundPosition = (value, precision = 0.01) => {
+      // Round to 2 decimal places (0.01mm precision)
+      return Math.round(value / precision) * precision;
+    };
+    
+    const snapToGrid = (value, gridSize = 0.5) => {
+      return Math.round(value / gridSize) * gridSize;
+    };
+    
+    const processClickPosition = (position) => {
+      // Apply grid snapping for better accuracy
+      const snappedPosition = {
+        x: snapToGrid(position.x),
+        y: snapToGrid(position.y),
+        z: snapToGrid(position.z)
+      };
+      
+      // Apply 2 decimal place rounding (0.01mm precision)
+      return {
+        x: roundPosition(snappedPosition.x, 0.01),
+        y: roundPosition(snappedPosition.y, 0.01),
+        z: roundPosition(snappedPosition.z, 0.01)
+      };
+    };
+    
     const handleClickToMove = (event) => {
       try {
         // Check if WebGL is available and renderer is ready
@@ -1831,25 +1847,33 @@ export default {
         // Ensure we don't interfere with mouse state
         event.stopPropagation();
         
-        // Get mouse position relative to the renderer canvas
+        // Get mouse position relative to the renderer canvas with improved precision
         const rect = renderer.domElement.getBoundingClientRect();
         if (rect.width <= 0 || rect.height <= 0) {
           logger.warn('Click-to-move blocked: invalid canvas dimensions');
           return;
         }
         
-        mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
-        mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+        // Use double precision for mouse coordinates calculation
+        const clientX = event.clientX;
+        const clientY = event.clientY;
+        const rectLeft = rect.left;
+        const rectTop = rect.top;
+        const rectWidth = rect.width;
+        const rectHeight = rect.height;
+        
+        mouse.x = ((clientX - rectLeft) / rectWidth) * 2.0 - 1.0;
+        mouse.y = -((clientY - rectTop) / rectHeight) * 2.0 + 1.0;
       
       // Update raycaster
       raycaster.setFromCamera(mouse, camera);
       
-      // Create intersection plane based on current view
+      // Create intersection plane based on current view using fixed reference planes
       let clickedPosition = null;
       
       if (currentCameraView.value === 'Top') {
-        // Top view: intersect with XY plane, preserve Z from previous target or use current Z
-        const plane = new THREE.Plane(new THREE.Vector3(0, 0, 1), -props.currentPos.z);
+        // Top view: intersect with XY plane at Z=0 for better accuracy
+        const plane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0); // Fixed Z=0 plane
         const intersectionPoint = new THREE.Vector3();
         if (raycaster.ray.intersectPlane(plane, intersectionPoint)) {
           clickedPosition = {
@@ -1859,8 +1883,8 @@ export default {
           };
         }
       } else if (currentCameraView.value === 'Side') {
-        // Side view: only set Z-axis from click, keep X,Y from previous target or current position
-        const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -props.currentPos.y);
+        // Side view: intersect with XZ plane at Y=0 for better accuracy
+        const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0); // Fixed Y=0 plane
         const intersectionPoint = new THREE.Vector3();
         if (raycaster.ray.intersectPlane(plane, intersectionPoint)) {
           clickedPosition = {
@@ -1869,6 +1893,11 @@ export default {
             z: intersectionPoint.z   // Only set Z from click
           };
         }
+      }
+      
+      if (clickedPosition) {
+        // Process position for improved accuracy (grid snapping and precision rounding)
+        clickedPosition = processClickPosition(clickedPosition);
       }
       
       if (clickedPosition && isWithinWorkingZone(clickedPosition)) {
@@ -1908,9 +1937,10 @@ export default {
     };
     
     const isWithinWorkingZone = (position) => {
-      return position.x >= 0 && position.x <= props.cncConfig.workingZoneX &&
-             position.y >= 0 && position.y <= props.cncConfig.workingZoneY &&
-             position.z >= 0 && position.z <= props.cncConfig.workingZoneZ;
+      const tolerance = 0.01; // 0.01mm tolerance to match 2 decimal precision
+      return position.x >= -tolerance && position.x <= (props.cncConfig.workingZoneX + tolerance) &&
+             position.y >= -tolerance && position.y <= (props.cncConfig.workingZoneY + tolerance) &&
+             position.z >= -tolerance && position.z <= (props.cncConfig.workingZoneZ + tolerance);
     };
     
     const showClickTarget = (position) => {

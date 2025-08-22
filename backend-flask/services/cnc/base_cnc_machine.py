@@ -14,11 +14,15 @@ class BaseCncMachine:
 
     @staticmethod
     def _is_at(x, current_x):
-        """Check if coordinate matches current position with tolerance"""
+        """Check if coordinate matches current position with tolerance
+        
+        Uses 0.01mm tolerance to match 2 decimal place precision.
+        """
         if x is None:
             return True
         else:
-            return abs(x) == abs(current_x)
+            # Use tolerance of 0.01mm for position comparison
+            return abs(abs(x) - abs(current_x)) < 0.01
 
     def is_at(self, x, y, z):
         """Check if machine is at specified coordinates"""
@@ -37,14 +41,18 @@ class BaseCncMachine:
         return self.is_at(x, y, z)
 
     def parse_coordinates(self, x, y, z, feed_rate):
-        """Parse coordinates into G-code parameter string with proper formatting"""
+        """Parse coordinates into G-code parameter string with proper formatting
+        
+        Uses 2 decimal places (0.01mm precision) for coordinates for optimal
+        balance between precision and compatibility with all CNC controllers.
+        """
         parts = []
         if x is not None:
-            parts.append(f"X{x:.1f}")
+            parts.append(f"X{x:.2f}")  # 2 decimal places for 0.01mm precision
         if y is not None:
-            parts.append(f"Y{y:.1f}")
+            parts.append(f"Y{y:.2f}")  # 2 decimal places for 0.01mm precision
         if z is not None:
-            parts.append(f"Z{z:.1f}")
+            parts.append(f"Z{z:.2f}")  # 2 decimal places for 0.01mm precision
         if feed_rate is not None:
             parts.append(f"F{int(feed_rate)}")
         return " ".join(parts)

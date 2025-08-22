@@ -101,13 +101,13 @@
             <tbody>
               <tr>
                 <td>
-                  <div class="boxed">{{ currentPosition.x.toFixed(3) }}</div>
+                  <div class="boxed">{{ currentPosition.x.toFixed(2) }}</div>
                 </td>
                 <td>
-                  <div class="boxed">{{ currentPosition.y.toFixed(3) }}</div>
+                  <div class="boxed">{{ currentPosition.y.toFixed(2) }}</div>
                 </td>
                 <td>
-                  <div class="boxed">{{ currentPosition.z.toFixed(3) }}</div>
+                  <div class="boxed">{{ currentPosition.z.toFixed(2) }}</div>
                 </td>
               </tr>
             </tbody>
