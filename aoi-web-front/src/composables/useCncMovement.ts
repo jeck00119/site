@@ -6,6 +6,7 @@
 import { ref } from 'vue';
 import { useCncStore } from '@/composables/useStore';
 import { logger } from '@/utils/logger';
+import { formatPrecision } from '@/utils/validation';
 
 interface Position {
   x: number;
@@ -124,9 +125,9 @@ export function useCncMovement(axisUid: string) {
         // Use the new moveRelative endpoint for simultaneous movement with 2 decimal precision
         await cncStore.moveRelative({
           cncUid: axisUid,
-          x: parseFloat(deltaX.toFixed(2)),
-          y: parseFloat(deltaY.toFixed(2)),
-          z: parseFloat(deltaZ.toFixed(2)),
+          x: formatPrecision(deltaX),
+          y: formatPrecision(deltaY),
+          z: formatPrecision(deltaZ),
           feedrate
         });
 

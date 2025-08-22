@@ -101,13 +101,13 @@
             <tbody>
               <tr>
                 <td>
-                  <div class="boxed">{{ currentPosition.x.toFixed(2) }}</div>
+                  <div class="boxed">{{ formatCoordinate(currentPosition.x) }}</div>
                 </td>
                 <td>
-                  <div class="boxed">{{ currentPosition.y.toFixed(2) }}</div>
+                  <div class="boxed">{{ formatCoordinate(currentPosition.y) }}</div>
                 </td>
                 <td>
-                  <div class="boxed">{{ currentPosition.z.toFixed(2) }}</div>
+                  <div class="boxed">{{ formatCoordinate(currentPosition.z) }}</div>
                 </td>
               </tr>
             </tbody>
@@ -176,6 +176,7 @@ import { ref, computed } from "vue";
 import { useCncStore, useLoadingState } from '@/composables/useStore';
 import { logger } from '@/utils/logger';
 import { handleApiError, addErrorToStore } from '@/utils/errorHandler';
+import { formatCoordinate } from '@/utils/validation';
 
 export default {
   name: "LocationManagement",
@@ -336,7 +337,8 @@ export default {
       openDeleteDialog,
       closeDeleteDialog,
       saveLocation,
-      deleteLocation
+      deleteLocation,
+      formatCoordinate
     };
   }
 };

@@ -15,22 +15,23 @@
     <div class="position-layout">
       <div class="data-row">
         <div class="axis-label">X</div>
-        <div class="boxed">{{ pos.x.toFixed(2) }}</div>
+        <div class="boxed">{{ formatCoordinate(pos.x) }}</div>
       </div>
       
       <div class="data-row">
         <div class="axis-label">Y</div>
-        <div class="boxed">{{ pos.y.toFixed(2) }}</div>
+        <div class="boxed">{{ formatCoordinate(pos.y) }}</div>
       </div>
       
       <div class="data-row">
         <div class="axis-label">Z</div>
-        <div class="boxed">{{ pos.z.toFixed(2) }}</div>
+        <div class="boxed">{{ formatCoordinate(pos.z) }}</div>
       </div>
     </div>
 
     <!-- 3D Viewer -->
     <CncViewer3D 
+      ref="cncViewer3D"
       v-if="show3DViewer"
       :cnc-config="cncConfig"
       :axis-uid="axisUid"
@@ -39,6 +40,7 @@
       @close="show3DViewer = false"
       @moveTo="handleMoveTo"
       @simulateMoveTo="handleSimulateMoveTo"
+      @simulationModeChanged="handleSimulationModeChanged"
     />
 
     <!-- CNC Setup Modal -->
@@ -164,9 +166,10 @@
 </template>
 
 <script>
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, onMounted, ref, watch, nextTick } from "vue";
 import { useCncStore } from '@/composables/useStore';
 import { useCncMovement } from '@/composables/useCncMovement';
+import { formatCoordinate } from '@/utils/validation';
 import { logger } from '@/utils/logger';
 import CncViewer3D from './CncViewer3D.vue';
 
@@ -198,6 +201,7 @@ export default {
     
     // 3D Viewer state
     const show3DViewer = ref(false);
+    const cncViewer3D = ref(null);
     
     // Simulated position for testing (starts with real position)
     const simulatedPos = ref({ ...pos.value });
@@ -228,12 +232,15 @@ export default {
             zAxisLength: currentCnc.zAxisLength || defaultCncConfig.zAxisLength,
             workingZoneX: currentCnc.workingZoneX || defaultCncConfig.workingZoneX,
             workingZoneY: currentCnc.workingZoneY || defaultCncConfig.workingZoneY,
-            workingZoneZ: currentCnc.workingZoneZ || defaultCncConfig.workingZoneZ
+            workingZoneZ: currentCnc.workingZoneZ || defaultCncConfig.workingZoneZ,
+            selectedAxes: currentCnc.selectedAxes || { x: true, y: true, z: true } // Include selectedAxes in config
           };
           
           if (currentCnc.selectedAxes) {
             selectedAxes.value = { ...selectedAxes.value, ...currentCnc.selectedAxes };
+            
           }
+          
           
           logger.info('CNC 3D config loaded from backend:', cncConfig.value);
           return;
@@ -260,6 +267,7 @@ export default {
     // Save configuration to backend CNC config
     const saveCncConfig = async () => {
       try {
+        
         const configToSave = {
           xAxisLength: cncConfig.value.xAxisLength,
           yAxisLength: cncConfig.value.yAxisLength,
@@ -269,6 +277,7 @@ export default {
           workingZoneZ: cncConfig.value.workingZoneZ,
           selectedAxes: selectedAxes.value
         };
+        
         
         // Save to backend CNC configuration
         const result = await saveCNC3DConfig(props.axisUid, configToSave);
@@ -372,6 +381,7 @@ export default {
     
     // Function to open 3D viewer
     const open3DViewer = () => {
+      
       logger.info('Opening 3D CNC viewer with config:', cncConfig.value);
       show3DViewer.value = true;
     };
@@ -438,6 +448,14 @@ export default {
         });
         
         logger.info('Click-to-move completed successfully');
+        
+        // Notify 3D viewer that movement is complete for target arrival indication
+        // Use nextTick to ensure the position update has been processed
+        await nextTick();
+        // Call completion method to trigger green target indication
+        if (show3DViewer.value && cncViewer3D.value) {
+          cncViewer3D.value.completeRealCNCMovement();
+        }
       } catch (error) {
         logger.error('Click-to-move failed:', error);
         // Could add a notification here for user feedback
@@ -454,6 +472,15 @@ export default {
       };
     };
     
+    // Handle simulation mode changes
+    const handleSimulationModeChanged = (event) => {
+      if (!event.isSimulationMode && event.realPosition) {
+        // Simulation mode disabled - reset simulated position to real position
+        logger.info('Simulation mode disabled, resetting simulated position to real position:', event.realPosition);
+        simulatedPos.value = { ...event.realPosition };
+      }
+    };
+    
     // Watch for real position changes to update simulated position
     watch(pos, (newPos) => {
       if (newPos) {
@@ -464,6 +491,12 @@ export default {
     // Watch for changes in CNCs array to reload config
     watch(cncs, () => {
       loadCncConfig();
+    }, { deep: true });
+    
+    // Watch for changes in selectedAxes and keep cncConfig in sync
+    watch(selectedAxes, (newAxes) => {
+      cncConfig.value.selectedAxes = { ...newAxes };
+      
     }, { deep: true });
 
     onMounted(() => {
@@ -480,15 +513,19 @@ export default {
       saveCncConfigAndOpen3D,
       handleMoveTo,
       handleSimulateMoveTo,
+      handleSimulationModeChanged,
       isMoving,
       isCncConnected,
       simulatedPos,
+      cncViewer3D,
       // Manual axis selection
       selectedAxes,
       selectedAxesCount,
       selectedAxesList,
       hasSelectedLinearAxes,
-      isSelectedCartesian
+      isSelectedCartesian,
+      // Utilities
+      formatCoordinate
     };
   }
 };

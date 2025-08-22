@@ -15,11 +15,11 @@
           <font-awesome-icon icon="square" />
           Debug Box
         </button>
-        <button @click="switchCameraView" class="control-button">
+        <button v-if="cameraViews.length > 1" @click="switchCameraView" class="control-button">
           <font-awesome-icon icon="eye" />
           {{ currentCameraView }}
         </button>
-        <button @click="toggleSimulationMode" class="control-button simulation-button" :class="{ 'simulation-active': isSimulationMode }">
+        <button @click="toggleSimulationMode" class="control-button simulation-button" :class="{ 'simulation-active': isSimulationMode }" :disabled="isCncMoving">
           <font-awesome-icon icon="cog" />
           Simulation
         </button>
@@ -72,15 +72,15 @@
             <div class="fallback-position">
               <div class="fallback-row">
                 <span class="axis">X:</span>
-                <span class="value">{{ displayPosition.x.toFixed(2) }}mm</span>
+                <span class="value">{{ formatCoordinate(displayPosition.x) }}mm</span>
               </div>
               <div class="fallback-row">
                 <span class="axis">Y:</span>
-                <span class="value">{{ displayPosition.y.toFixed(2) }}mm</span>
+                <span class="value">{{ formatCoordinate(displayPosition.y) }}mm</span>
               </div>
               <div class="fallback-row">
                 <span class="axis">Z:</span>
-                <span class="value">{{ displayPosition.z.toFixed(2) }}mm</span>
+                <span class="value">{{ formatCoordinate(displayPosition.z) }}mm</span>
               </div>
             </div>
           </div>
@@ -107,15 +107,15 @@
         <!-- Fixed axis legend in top-left corner -->
         <div v-if="isInitialized" class="axis-legend">
           <div class="legend-title">Axes</div>
-          <div class="legend-item">
+          <div v-if="cncConfig?.selectedAxes?.x === true" class="legend-item">
             <div class="legend-color x-color"></div>
             <span class="legend-label">X-Axis</span>
           </div>
-          <div class="legend-item">
+          <div v-if="cncConfig?.selectedAxes?.y === true" class="legend-item">
             <div class="legend-color y-color"></div>
             <span class="legend-label">Y-Axis</span>
           </div>
-          <div class="legend-item">
+          <div v-if="cncConfig?.selectedAxes?.z === true" class="legend-item">
             <div class="legend-color z-color"></div>
             <span class="legend-label">Z-Axis</span>
           </div>
@@ -130,48 +130,48 @@
       <div class="info-panel">
         <div class="position-info">
           <h4>Current Position</h4>
-          <div v-if="cncConfig.selectedAxes?.x !== false" class="position-row">
+          <div v-if="cncConfig.selectedAxes?.x === true" class="position-row">
             <span class="axis">X:</span>
-            <span class="value">{{ displayPosition.x.toFixed(2) }}mm</span>
+            <span class="value">{{ formatCoordinate(displayPosition.x) }}mm</span>
           </div>
-          <div v-if="cncConfig.selectedAxes?.y !== false" class="position-row">
+          <div v-if="cncConfig.selectedAxes?.y === true" class="position-row">
             <span class="axis">Y:</span>
-            <span class="value">{{ displayPosition.y.toFixed(2) }}mm</span>
+            <span class="value">{{ formatCoordinate(displayPosition.y) }}mm</span>
           </div>
-          <div v-if="cncConfig.selectedAxes?.z !== false" class="position-row">
+          <div v-if="cncConfig.selectedAxes?.z === true" class="position-row">
             <span class="axis">Z:</span>
-            <span class="value">{{ displayPosition.z.toFixed(2) }}mm</span>
+            <span class="value">{{ formatCoordinate(displayPosition.z) }}mm</span>
           </div>
         </div>
         
         <div class="target-info" v-if="targetPosition || (targetArrived && lastTargetPosition)">
           <h4>Target Position</h4>
           <div v-if="targetArrived && lastTargetPosition">
-            <div v-if="cncConfig.selectedAxes?.x !== false" class="position-row">
+            <div v-if="cncConfig.selectedAxes?.x === true" class="position-row">
               <span class="axis">X:</span>
-              <span class="value target arrived">{{ lastTargetPosition.x?.toFixed(2) || '0.00' }}mm</span>
+              <span class="value target arrived">{{ formatCoordinate(lastTargetPosition.x || 0) }}mm</span>
             </div>
-            <div v-if="cncConfig.selectedAxes?.y !== false" class="position-row">
+            <div v-if="cncConfig.selectedAxes?.y === true" class="position-row">
               <span class="axis">Y:</span>
-              <span class="value target arrived">{{ lastTargetPosition.y?.toFixed(2) || '0.00' }}mm</span>
+              <span class="value target arrived">{{ formatCoordinate(lastTargetPosition.y || 0) }}mm</span>
             </div>
-            <div v-if="cncConfig.selectedAxes?.z !== false" class="position-row">
+            <div v-if="cncConfig.selectedAxes?.z === true" class="position-row">
               <span class="axis">Z:</span>
-              <span class="value target arrived">{{ lastTargetPosition.z?.toFixed(2) || '0.00' }}mm</span>
+              <span class="value target arrived">{{ formatCoordinate(lastTargetPosition.z || 0) }}mm</span>
             </div>
           </div>
           <div v-else-if="targetPosition">
-            <div v-if="cncConfig.selectedAxes?.x !== false" class="position-row">
+            <div v-if="cncConfig.selectedAxes?.x === true" class="position-row">
               <span class="axis">X:</span>
-              <span class="value target">{{ targetPosition.x?.toFixed(2) || '0.00' }}mm</span>
+              <span class="value target">{{ formatCoordinate(targetPosition.x || 0) }}mm</span>
             </div>
-            <div v-if="cncConfig.selectedAxes?.y !== false" class="position-row">
+            <div v-if="cncConfig.selectedAxes?.y === true" class="position-row">
               <span class="axis">Y:</span>
-              <span class="value target">{{ targetPosition.y?.toFixed(2) || '0.00' }}mm</span>
+              <span class="value target">{{ formatCoordinate(targetPosition.y || 0) }}mm</span>
             </div>
-            <div v-if="cncConfig.selectedAxes?.z !== false" class="position-row">
+            <div v-if="cncConfig.selectedAxes?.z === true" class="position-row">
               <span class="axis">Z:</span>
-              <span class="value target">{{ targetPosition.z?.toFixed(2) || '0.00' }}mm</span>
+              <span class="value target">{{ formatCoordinate(targetPosition.z || 0) }}mm</span>
             </div>
           </div>
         </div>
@@ -200,6 +200,8 @@
 import { ref, onMounted, onUnmounted, watch, computed, nextTick } from 'vue';
 import * as THREE from 'three';
 import { logger } from '@/utils/logger';
+import { useCncStore } from '@/composables/useStore';
+import { formatPrecision, formatCoordinate, formatPosition, getWorkingZoneBounds, isWithinWorkingZone, setTargetForRealMovement } from '@/utils/validation';
 
 export default {
   name: 'CncViewer3D',
@@ -221,10 +223,13 @@ export default {
       default: false
     }
   },
-  emits: ['close', 'moveTo', 'simulateMoveTo', 'positionUpdate', 'targetUpdate'],
+  emits: ['close', 'moveTo', 'simulateMoveTo', 'positionUpdate', 'targetUpdate', 'simulationModeChanged'],
   setup(props, { emit }) {
     // DOM reference - needs to be reactive for template ref
     const threeContainer = ref(null);
+    
+    // Access CNC state from store
+    const { cncState } = useCncStore(props.axisUid);
     
     // Constants
     const DEFAULT_FEEDRATE = 1500; // mm/min
@@ -319,10 +324,23 @@ export default {
     // Play control for simulation
     const isExecutingSimulation = ref(false);
     
-    // Camera views
-    const cameraViews = ['3D', 'Top', 'Side'];
+    // Camera views - now dynamic based on axis count
+    const cameraViews = computed(() => {
+      const axisCount = selectedLinearAxes.value.length;
+      
+      if (axisCount === 2) {
+        return ['Top']; // Only top view for 2-axis systems
+      }
+      return ['3D', 'Top', 'Side']; // All views for 3-axis systems
+    });
     const currentCameraIndex = ref(0);
-    const currentCameraView = computed(() => cameraViews[currentCameraIndex.value]);
+    const currentCameraView = computed(() => cameraViews.value[currentCameraIndex.value]);
+    
+    // Click state tracking for 3-axis systems
+    const topViewClicked = ref(false);
+    const sideViewClicked = ref(false);
+    const topViewPosition = ref(null);
+    const sideViewPosition = ref(null);
     
     // Click-to-move status indicators
     const canClickToMove = computed(() => {
@@ -338,17 +356,38 @@ export default {
       if (currentCameraView.value === '3D') {
         return 'Presentation View';
       }
+      
+      const axisCount = selectedLinearAxes.value.length;
+      
       if (isSimulationMode.value) {
         if (currentCameraView.value === 'Top' || currentCameraView.value === 'Side') {
-          return targetPosition.value ? 'Click Play to Execute' : 'Click to Set Target';
+          if (axisCount === 2) {
+            return targetPosition.value ? 'Click Play to Execute' : 'Click to Set Target';
+          } else if (axisCount === 3) {
+            return targetPosition.value ? 'Click Play to Execute' : 'Click Both Views to Set Target';
+          }
         }
         return 'Fixed View Only';
       }
+      
       if (!props.isCncConnected) {
         return 'CNC Disconnected';
       }
+      
       if (currentCameraView.value === 'Top' || currentCameraView.value === 'Side') {
-        return 'Click to Move';
+        if (axisCount === 2) {
+          return 'Click to Move';
+        } else if (axisCount === 3) {
+          if (!topViewClicked.value && !sideViewClicked.value) {
+            return 'Click Both Top & Side Views';
+          } else if (topViewClicked.value && !sideViewClicked.value) {
+            return 'Now Click Side View';
+          } else if (!topViewClicked.value && sideViewClicked.value) {
+            return 'Now Click Top View';
+          } else {
+            return 'Ready to Move';
+          }
+        }
       }
       return 'Fixed View Only';
     });
@@ -357,13 +396,20 @@ export default {
     const canExecuteSimulation = computed(() => {
       return isSimulationMode.value && targetPosition.value && !isExecutingSimulation.value;
     });
+    
+    // Check if CNC is currently moving (disable simulation button during real movements)
+    const isCncMoving = computed(() => {
+      const state = cncState.value;
+      return state && state.toUpperCase() === 'JOG';
+    });
 
     // Computed properties for display strings based on selected axes
     const selectedLinearAxes = computed(() => {
       const axes = [];
-      if (props.cncConfig.selectedAxes?.x !== false) axes.push('X');
-      if (props.cncConfig.selectedAxes?.y !== false) axes.push('Y');  
-      if (props.cncConfig.selectedAxes?.z !== false) axes.push('Z');
+      if (props.cncConfig.selectedAxes?.x === true) axes.push('X');
+      if (props.cncConfig.selectedAxes?.y === true) axes.push('Y');  
+      if (props.cncConfig.selectedAxes?.z === true) axes.push('Z');
+      
       return axes;
     });
 
@@ -373,13 +419,13 @@ export default {
 
     const axisLengthsDisplay = computed(() => {
       const lengths = [];
-      if (props.cncConfig.selectedAxes?.x !== false && props.cncConfig.xAxisLength) {
+      if (props.cncConfig.selectedAxes?.x === true && props.cncConfig.xAxisLength) {
         lengths.push(`X:${props.cncConfig.xAxisLength}mm`);
       }
-      if (props.cncConfig.selectedAxes?.y !== false && props.cncConfig.yAxisLength) {
+      if (props.cncConfig.selectedAxes?.y === true && props.cncConfig.yAxisLength) {
         lengths.push(`Y:${props.cncConfig.yAxisLength}mm`);
       }
-      if (props.cncConfig.selectedAxes?.z !== false && props.cncConfig.zAxisLength) {
+      if (props.cncConfig.selectedAxes?.z === true && props.cncConfig.zAxisLength) {
         lengths.push(`Z:${props.cncConfig.zAxisLength}mm`);
       }
       return lengths.join(' × ');
@@ -388,13 +434,13 @@ export default {
 
     const workZoneDisplay = computed(() => {
       const zones = [];
-      if (props.cncConfig.selectedAxes?.x !== false && props.cncConfig.workingZoneX) {
+      if (props.cncConfig.selectedAxes?.x === true && props.cncConfig.workingZoneX) {
         zones.push(`X:${props.cncConfig.workingZoneX}mm`);
       }
-      if (props.cncConfig.selectedAxes?.y !== false && props.cncConfig.workingZoneY) {
+      if (props.cncConfig.selectedAxes?.y === true && props.cncConfig.workingZoneY) {
         zones.push(`Y:${props.cncConfig.workingZoneY}mm`);
       }
-      if (props.cncConfig.selectedAxes?.z !== false && props.cncConfig.workingZoneZ) {
+      if (props.cncConfig.selectedAxes?.z === true && props.cncConfig.workingZoneZ) {
         zones.push(`Z:${props.cncConfig.workingZoneZ}mm`);
       }
       return zones.join(' × ');
@@ -1408,12 +1454,28 @@ export default {
       const materials = createAxisMaterials();
       
       createOriginPoint(materials);
-      createAxis('x', materials);
-      createAxis('y', materials);
-      createAxis('z', materials);
+      
+      // Only create axes that are selected
+      if (props.cncConfig.selectedAxes?.x === true) {
+        createAxis('x', materials);
+      }
+      if (props.cncConfig.selectedAxes?.y === true) {
+        createAxis('y', materials);
+      }
+      if (props.cncConfig.selectedAxes?.z === true) {
+        createAxis('z', materials);
+      }
+      
       createToolHead(materials);
-      createGrid('xy');
-      createGrid('xz');
+      
+      // Only create grids for selected axes
+      if (props.cncConfig.selectedAxes?.x === true && props.cncConfig.selectedAxes?.y === true) {
+        createGrid('xy');
+      }
+      if (props.cncConfig.selectedAxes?.x === true && props.cncConfig.selectedAxes?.z === true) {
+        createGrid('xz');
+      }
+      
       createClickTarget();
     };
     
@@ -1437,16 +1499,14 @@ export default {
         cncGroup.remove(workingZoneMesh);
       }
       
-      // Calculate dimensions based on swap flag
-      const dimensions = swapXY ? {
-        x: props.cncConfig.workingZoneY,
-        y: props.cncConfig.workingZoneX,
-        z: props.cncConfig.workingZoneZ
-      } : {
-        x: props.cncConfig.workingZoneX,
-        y: props.cncConfig.workingZoneY,
-        z: props.cncConfig.workingZoneZ
+      // Calculate dimensions using centralized utility
+      const bounds = getWorkingZoneBounds(props.cncConfig, swapXY);
+      const dimensions = {
+        x: bounds.x || 1, // Minimal dimension for unselected axis
+        y: bounds.y || 1,
+        z: bounds.z || 1
       };
+      
       
       // Create geometry and material
       const edgesGeometry = createWorkingZoneGeometry(dimensions);
@@ -1455,7 +1515,7 @@ export default {
       // Create mesh
       workingZoneMesh = trackResource(new THREE.LineSegments(edgesGeometry, material), 'meshes');
       
-      // Position working zone (centered at half dimensions)
+      // Position working zone at origin to align with grid (not centered)
       workingZoneMesh.position.set(
         dimensions.x / 2,
         dimensions.y / 2,
@@ -1864,6 +1924,7 @@ export default {
         
         mouse.x = ((clientX - rectLeft) / rectWidth) * 2.0 - 1.0;
         mouse.y = -((clientY - rectTop) / rectHeight) * 2.0 + 1.0;
+        
       
       // Update raycaster
       raycaster.setFromCamera(mouse, camera);
@@ -1881,6 +1942,7 @@ export default {
             y: intersectionPoint.y,
             z: targetPosition.value?.z || props.currentPos.z // Keep Z from previous target or current
           };
+          
         }
       } else if (currentCameraView.value === 'Side') {
         // Side view: intersect with XZ plane at Y=0 for better accuracy
@@ -1892,37 +1954,94 @@ export default {
             y: targetPosition.value?.y || props.currentPos.y, // Keep Y from previous target or current
             z: intersectionPoint.z   // Only set Z from click
           };
+          
         }
       }
       
       if (clickedPosition) {
         // Process position for improved accuracy (grid snapping and precision rounding)
         clickedPosition = processClickPosition(clickedPosition);
+        
+        // Also show what the ghost will be positioned at
+        const ghostPosition = formatPosition(clickedPosition);
       }
       
-      if (clickedPosition && isWithinWorkingZone(clickedPosition)) {
+      if (clickedPosition && isWithinWorkingZoneLocal(clickedPosition)) {
         // Check if CNC is connected OR simulation mode is enabled
         if (!props.isCncConnected && !isSimulationMode.value) {
           logger.warn('Click-to-move blocked: CNC not connected and simulation disabled');
           return;
         }
         
-        // Show click target indicator
-        showClickTarget(clickedPosition);
+        const axisCount = selectedLinearAxes.value.length;
         
-        if (isSimulationMode.value) {
-          // Simulation mode: just set target, don't execute until play button is pressed
-          logger.info(`Simulation: Target set at position (${clickedPosition.x.toFixed(2)}, ${clickedPosition.y.toFixed(2)}, ${clickedPosition.z.toFixed(2)})`);
-          setSimulationTarget(clickedPosition);
-        } else {
-          // Real mode: emit move command to parent component
-          emit('moveTo', clickedPosition);
-          logger.info(`Click-to-move: Target position (${clickedPosition.x.toFixed(2)}, ${clickedPosition.y.toFixed(2)}, ${clickedPosition.z.toFixed(2)})`);
+        if (axisCount === 2) {
+          // 2-axis system: immediate execution (existing behavior)
+          showClickTarget(clickedPosition);
           
-          // Also emit target update for real mode
-          emit('targetUpdate', clickedPosition);
+          if (isSimulationMode.value) {
+            logger.info(`Simulation: Target set at position (${formatCoordinate(clickedPosition.x)}, ${formatCoordinate(clickedPosition.y)}, ${formatCoordinate(clickedPosition.z)})`);
+            setSimulationTarget(clickedPosition);
+          } else {
+            // Set target position for real CNC movements too (for green indication)
+            setTargetForRealMovement(
+              clickedPosition,
+              { onMoveTo: (pos) => emit('moveTo', pos), onTargetUpdate: (pos) => emit('targetUpdate', pos) },
+              targetPosition,
+              targetArrived,
+              logger
+            );
+          }
+        } else if (axisCount === 3) {
+          // 3-axis system: require clicks in both Top and Side views
+          if (currentCameraView.value === 'Top') {
+            topViewClicked.value = true;
+            topViewPosition.value = { x: clickedPosition.x, y: clickedPosition.y };
+            logger.info(`Top view clicked: X=${formatCoordinate(clickedPosition.x)}, Y=${formatCoordinate(clickedPosition.y)}`);
+          } else if (currentCameraView.value === 'Side') {
+            sideViewClicked.value = true;
+            sideViewPosition.value = { z: clickedPosition.z };
+            logger.info(`Side view clicked: Z=${formatCoordinate(clickedPosition.z)}`);
+          }
+          
+          // Check if both views have been clicked
+          if (topViewClicked.value && sideViewClicked.value) {
+            // Combine coordinates from both views
+            const combinedPosition = {
+              x: topViewPosition.value.x,
+              y: topViewPosition.value.y,
+              z: sideViewPosition.value.z
+            };
+            
+            logger.info(`3-axis click complete: Combined position (${formatCoordinate(combinedPosition.x)}, ${formatCoordinate(combinedPosition.y)}, ${formatCoordinate(combinedPosition.z)})`);
+            
+            // Reset click states
+            topViewClicked.value = false;
+            sideViewClicked.value = false;
+            topViewPosition.value = null;
+            sideViewPosition.value = null;
+            
+            // Show target and execute movement
+            showClickTarget(combinedPosition);
+            
+            if (isSimulationMode.value) {
+              setSimulationTarget(combinedPosition);
+            } else {
+              // Set target position for real CNC movements too (for green indication)
+              setTargetForRealMovement(
+                combinedPosition,
+                { onMoveTo: (pos) => emit('moveTo', pos), onTargetUpdate: (pos) => emit('targetUpdate', pos) },
+                targetPosition,
+                targetArrived,
+                logger
+              );
+            }
+          } else {
+            // Show partial target for visual feedback
+            showPartialClickTarget(clickedPosition, currentCameraView.value);
+          }
         }
-      } else if (clickedPosition && !isWithinWorkingZone(clickedPosition)) {
+      } else if (clickedPosition && !isWithinWorkingZoneLocal(clickedPosition)) {
         logger.warn('Click-to-move blocked: Target outside working zone', clickedPosition);
       }
       } catch (error) {
@@ -1936,17 +2055,31 @@ export default {
       }
     };
     
-    const isWithinWorkingZone = (position) => {
-      const tolerance = 0.01; // 0.01mm tolerance to match 2 decimal precision
-      return position.x >= -tolerance && position.x <= (props.cncConfig.workingZoneX + tolerance) &&
-             position.y >= -tolerance && position.y <= (props.cncConfig.workingZoneY + tolerance) &&
-             position.z >= -tolerance && position.z <= (props.cncConfig.workingZoneZ + tolerance);
+    const isWithinWorkingZoneLocal = (position) => {
+      return isWithinWorkingZone(position, props.cncConfig, currentCameraView.value === 'Top', 0.01);
     };
     
     const showClickTarget = (position) => {
-      // Show ghost tool head at target position
+      // Show ghost tool head at target position with same precision and constraints as CNC movement
       if (ghostToolHead) {
-        ghostToolHead.position.set(position.x, position.y, position.z);
+        // Apply the same precision as CNC movement (2 decimal places)
+        let precisePosition = formatPosition(position);
+        
+        // Apply working zone constraints with safety margin using centralized utility
+        const bounds = getWorkingZoneBounds(props.cncConfig, currentCameraView.value === 'Top');
+        const safetyMargin = 10; // The CNC firmware appears to apply a ~10mm safety margin
+        
+        if (props.cncConfig.selectedAxes?.x === true) {
+          precisePosition.x = Math.max(0, Math.min(precisePosition.x, bounds.x - safetyMargin));
+        }
+        if (props.cncConfig.selectedAxes?.y === true) {
+          precisePosition.y = Math.max(0, Math.min(precisePosition.y, bounds.y - safetyMargin));
+        }
+        if (props.cncConfig.selectedAxes?.z === true) {
+          precisePosition.z = Math.max(0, Math.min(precisePosition.z, bounds.z - safetyMargin));
+        }
+        
+        ghostToolHead.position.set(precisePosition.x, precisePosition.y, precisePosition.z);
         ghostToolHead.visible = true;
         // Ghost stays visible until tool reaches exact position
         // No timeout - ghost only disappears when tool arrives
@@ -1985,6 +2118,46 @@ export default {
       // Create or update trajectory line
       markDirty('trajectoryLine');
       updateTrajectoryLine(position);
+    };
+    
+    const showPartialClickTarget = (position, viewType) => {
+      // Show partial target with different visual style
+      if (ghostToolHead) {
+        // For partial clicks, position ghost at current position but make it semi-transparent
+        const currentPos = toolHead ? toolHead.position : props.currentPos;
+        
+        if (viewType === 'Top') {
+          // Show X,Y from click, Z from current position
+          ghostToolHead.position.set(position.x, position.y, currentPos.z);
+        } else if (viewType === 'Side') {
+          // Show Z from click, X,Y from current position
+          ghostToolHead.position.set(currentPos.x, currentPos.y, position.z);
+        }
+        
+        ghostToolHead.visible = true;
+        // Make ghost more transparent for partial clicks
+        if (ghostToolHead.material) {
+          ghostToolHead.material.opacity = 0.3;
+        }
+      }
+      
+      logger.info(`Partial target set in ${viewType} view: (${formatCoordinate(position.x)}, ${formatCoordinate(position.y)}, ${formatCoordinate(position.z)})`);
+    };
+    
+    const clearPartialClicks = () => {
+      // Reset all click states
+      topViewClicked.value = false;
+      sideViewClicked.value = false;
+      topViewPosition.value = null;
+      sideViewPosition.value = null;
+      
+      // Reset ghost tool head opacity
+      if (ghostToolHead && ghostToolHead.material) {
+        ghostToolHead.material.opacity = 0.5; // Default opacity
+        ghostToolHead.visible = false;
+      }
+      
+      logger.info('Partial clicks cleared');
     };
     
     // Optimization: Smart trajectory line updates with dirty flags
@@ -2146,7 +2319,7 @@ export default {
         
         // Simulation movement will be handled in the animation loop
         
-        logger.info(`Simulation: Executing movement to (${target.x.toFixed(2)}, ${target.y.toFixed(2)}, ${target.z.toFixed(2)})`);
+        logger.info(`Simulation: Executing movement to (${formatCoordinate(target.x)}, ${formatCoordinate(target.y)}, ${formatCoordinate(target.z)})`);
       }
     };
     
@@ -2301,23 +2474,43 @@ export default {
         return false;
       }
       
-      // Smooth lerp to actual position
-      const lerpSpeed = 0.15;
-      const newPosition = {
-        x: toolHead.position.x + (targetPos.x - toolHead.position.x) * lerpSpeed,
-        y: toolHead.position.y + (targetPos.y - toolHead.position.y) * lerpSpeed,
-        z: toolHead.position.z + (targetPos.z - toolHead.position.z) * lerpSpeed
-      };
+      // Check if CNC is idle - if so, snap directly to position for accuracy
+      const isIdle = cncState.value && cncState.value.toLowerCase() === 'idle';
       
-      if (updateCachedPosition(newPosition, 'lastToolPosition')) {
+      let newPosition;
+      if (isIdle) {
+        // When idle, snap directly to exact position to eliminate precision drift
+        newPosition = { ...targetPos };
+      } else {
+        // When moving, use smooth interpolation but with higher precision near target
+        const distance = calculateDistance(toolHead.position, targetPos);
+        const lerpSpeed = distance < 0.1 ? 0.8 : 0.15; // Faster convergence when close
+        newPosition = {
+          x: toolHead.position.x + (targetPos.x - toolHead.position.x) * lerpSpeed,
+          y: toolHead.position.y + (targetPos.y - toolHead.position.y) * lerpSpeed,
+          z: toolHead.position.z + (targetPos.z - toolHead.position.z) * lerpSpeed
+        };
+        
+        // Snap to exact position when very close (within 0.01mm)
+        if (distance < 0.01) {
+          newPosition = { ...targetPos };
+        }
+      }
+      
+      // Force update when snapping to exact position (idle state or very close)
+      const forceUpdate = isIdle || calculateDistance(toolHead.position, targetPos) < 0.01;
+      
+      if (updateCachedPosition(newPosition, 'lastToolPosition') || forceUpdate) {
         toolHead.position.set(newPosition.x, newPosition.y, newPosition.z);
         
-        // Update display position only if it changed significantly
-        if (updateCachedPosition(newPosition, 'lastDisplayPosition')) {
+        // Always update display position when forcing exact position
+        if (updateCachedPosition(newPosition, 'lastDisplayPosition') || forceUpdate) {
           displayPosition.value.x = newPosition.x;
           displayPosition.value.y = newPosition.y;
           displayPosition.value.z = newPosition.z;
         }
+        
+        // Complex target arrival detection removed - now handled by completeRealCNCMovement() call
         
         return true;
       }
@@ -2365,6 +2558,19 @@ export default {
       cachedValues.movementProgress = 0;
       hideClickTarget();
       emit('targetUpdate', null);
+    };
+
+    const completeRealCNCMovement = () => {
+      // Handle target position state similar to simulation completion
+      if (targetPosition.value) {
+        lastTargetPosition.value = { ...targetPosition.value };
+        targetPosition.value = null;
+        emit('targetUpdate', null);
+      }
+      // Set target arrived to trigger green indication
+      targetArrived.value = true;
+      hideClickTarget();
+      logger.info('Real CNC movement completed, target arrived indication set');
     };
     
     // Camera management functions
@@ -2900,7 +3106,7 @@ export default {
     
     const switchCameraView = () => {
       const previousView = currentCameraView.value;
-      currentCameraIndex.value = (currentCameraIndex.value + 1) % cameraViews.length;
+      currentCameraIndex.value = (currentCameraIndex.value + 1) % cameraViews.value.length;
       const newView = currentCameraView.value;
       
       
@@ -2959,18 +3165,27 @@ export default {
     const syncToRealCNCPosition = () => {
       if (!toolHead) return;
       
+      logger.info('Syncing to real CNC position:', props.currentPos);
+      
+      // Force update tool head position to real position
       toolHead.position.set(props.currentPos.x, props.currentPos.y, props.currentPos.z);
+      
+      // Force update display position to real position
       displayPosition.value.x = props.currentPos.x;
       displayPosition.value.y = props.currentPos.y;
       displayPosition.value.z = props.currentPos.z;
       
-      // Update cached values when syncing position
+      // Update cached values to match real position (this prevents animation loop from overriding)
       cachedValues.lastToolPosition.x = props.currentPos.x;
       cachedValues.lastToolPosition.y = props.currentPos.y;
       cachedValues.lastToolPosition.z = props.currentPos.z;
       cachedValues.lastDisplayPosition.x = props.currentPos.x;
       cachedValues.lastDisplayPosition.y = props.currentPos.y;
       cachedValues.lastDisplayPosition.z = props.currentPos.z;
+      
+      // Force immediate render to show the position change
+      markDirty('rendering');
+      logger.info('Real CNC position restored after simulation exit');
     };
     
     const clearSimulationState = () => {
@@ -2987,10 +3202,17 @@ export default {
       isSimulationMode.value = !isSimulationMode.value;
       logger.info(`Simulation mode ${isSimulationMode.value ? 'enabled' : 'disabled'}`);
       
+      // Clear partial clicks when switching modes
+      clearPartialClicks();
+      
       // When exiting simulation mode, sync back to real CNC position
       if (!isSimulationMode.value) {
         syncToRealCNCPosition();
         clearSimulationState();
+        // Notify parent to reset simulated position to real position
+        emit('simulationModeChanged', { isSimulationMode: false, realPosition: props.currentPos });
+      } else {
+        emit('simulationModeChanged', { isSimulationMode: true });
       }
     };
     
@@ -3011,32 +3233,29 @@ export default {
         return cachedBoundingBox;
       }
       
-      // Get the actual axis lengths from configuration
-      let axisX = props.cncConfig.xAxisLength;
-      let axisY = props.cncConfig.yAxisLength;
-      const axisZ = props.cncConfig.zAxisLength;
+      // Get the actual axis lengths from configuration (only for selected axes)
+      let axisX = props.cncConfig.selectedAxes?.x === true ? props.cncConfig.xAxisLength : 0;
+      let axisY = props.cncConfig.selectedAxes?.y === true ? props.cncConfig.yAxisLength : 0;
+      const axisZ = props.cncConfig.selectedAxes?.z === true ? props.cncConfig.zAxisLength : 0;
       
-      // Get working zone dimensions  
-      let workingX = props.cncConfig.workingZoneX || 0;
-      let workingY = props.cncConfig.workingZoneY || 0;
-      const workingZ = props.cncConfig.workingZoneZ || 0;
-      
+      // Get working zone dimensions using centralized utility
+      const bounds = getWorkingZoneBounds(props.cncConfig, currentView === 'Top');
+      let { x: workingX, y: workingY, z: workingZ } = bounds;
       
       // In Top view, X and Y axes are swapped, so swap their dimensions too
       if (currentView === 'Top') {
         // Swap X and Y dimensions to match the swapped axes
         [axisX, axisY] = [axisY, axisX];
-        [workingX, workingY] = [workingY, workingX];
-        
       }
       
-      // Calculate the maximum extent in each direction
-      const maxX = Math.max(axisX, workingX);
-      const maxY = Math.max(axisY, workingY);
-      const maxZ = Math.max(axisZ, workingZ);
+      // Calculate the maximum extent in each direction (with minimums for unselected axes)
+      const maxX = Math.max(axisX, workingX, 10); // Minimum 10mm for visualization
+      const maxY = Math.max(axisY, workingY, 10); // Minimum 10mm for visualization
+      const maxZ = Math.max(axisZ, workingZ, 10); // Minimum 10mm for visualization
       
       // Small uniform margin around the axes
       const uniformMargin = 20;
+      
       
       // Create bounding box that closely matches the axes with small uniform margin
       const currentBounds = new THREE.Box3(
@@ -3362,6 +3581,25 @@ export default {
     
     // Watch for position changes
     watch(() => props.currentPos, handlePositionWatch, { deep: true });
+    
+    
+    // Watch for CNC connection changes and clear partial clicks when disconnected
+    watch(() => props.isCncConnected, (newConnected, oldConnected) => {
+      if (oldConnected && !newConnected) {
+        // CNC disconnected, clear any partial clicks
+        clearPartialClicks();
+        logger.info('CNC disconnected: cleared partial clicks');
+      }
+    });
+    
+    // Watch for camera views changes and adjust current index
+    watch(cameraViews, (newViews) => {
+      // Ensure current index is within bounds
+      if (currentCameraIndex.value >= newViews.length) {
+        currentCameraIndex.value = 0; // Reset to first view
+        logger.info(`Camera view reset to ${newViews[0]} due to view count change`);
+      }
+    });
 
     
     return {
@@ -3386,7 +3624,9 @@ export default {
       lastTargetPosition,
       currentPos: props.currentPos,
       canExecuteSimulation,
+      isCncMoving,
       executeSimulation,
+      completeRealCNCMovement,
       webglError,
       errorMessage,
       hasWebglSupport,
@@ -3396,7 +3636,16 @@ export default {
       selectedLinearAxes,
       selectedAxesDisplay,
       axisLengthsDisplay,
-      workZoneDisplay
+      workZoneDisplay,
+      
+      // Click state tracking for 3-axis systems
+      topViewClicked,
+      sideViewClicked,
+      topViewPosition,
+      sideViewPosition,
+      cameraViews,
+      // Utilities
+      formatCoordinate
     };
   }
 };
@@ -3698,6 +3947,12 @@ export default {
   background-color: var(--color-warning-dark) !important;
   transform: translateY(-1px);
   box-shadow: 0 0 12px rgba(255, 193, 7, 0.6);
+}
+
+.simulation-button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  background-color: var(--color-bg-tertiary) !important;
 }
 
 /* Debug Button Styles */

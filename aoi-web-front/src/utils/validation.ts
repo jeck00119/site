@@ -263,6 +263,132 @@ export function validateFileExtension(filename: string, allowedExtensions: strin
 }
 
 /**
+ * Precision Utilities for CNC coordinates
+ */
+export function formatPrecision(value: number): number {
+    return parseFloat(value.toFixed(2));
+}
+
+export function formatCoordinate(value: number): string {
+    return value.toFixed(2);
+}
+
+export interface Position {
+    x: number;
+    y: number;
+    z: number;
+}
+
+export function formatPosition(position: Position): Position {
+    return {
+        x: formatPrecision(position.x),
+        y: formatPrecision(position.y),
+        z: formatPrecision(position.z)
+    };
+}
+
+/**
+ * CNC Working Zone Utilities
+ */
+export interface CncConfig {
+    selectedAxes?: {
+        x?: boolean;
+        y?: boolean;
+        z?: boolean;
+    };
+    workingZoneX?: number;
+    workingZoneY?: number;
+    workingZoneZ?: number;
+    xAxisLength?: number;
+    yAxisLength?: number;
+    zAxisLength?: number;
+}
+
+export interface WorkingZoneBounds {
+    x: number;
+    y: number;
+    z: number;
+}
+
+export function getWorkingZoneBounds(cncConfig: CncConfig | null | undefined, isTopView: boolean = false): WorkingZoneBounds {
+    if (!cncConfig) {
+        return { x: 0, y: 0, z: 0 };
+    }
+
+    let workingX = cncConfig.selectedAxes?.x === true ? (cncConfig.workingZoneX || 0) : 0;
+    let workingY = cncConfig.selectedAxes?.y === true ? (cncConfig.workingZoneY || 0) : 0;
+    const workingZ = cncConfig.selectedAxes?.z === true ? (cncConfig.workingZoneZ || 0) : 0;
+
+    if (isTopView) {
+        // In Top view, coordinates are swapped: visual X maps to physical Y, visual Y maps to physical X
+        // So we need to swap the working zone bounds for validation
+        const tempX = workingX;
+        workingX = workingY;
+        workingY = tempX;
+    }
+
+    return { x: workingX, y: workingY, z: workingZ };
+}
+
+export function isWithinWorkingZone(position: Position, cncConfig: CncConfig | null | undefined, isTopView: boolean = false, tolerance: number = 0.5): boolean {
+    if (!cncConfig) {
+        return true; // Allow movement when config is not available
+    }
+
+    const bounds = getWorkingZoneBounds(cncConfig, isTopView);
+    let isValid = true;
+
+    if (cncConfig.selectedAxes?.x === true) {
+        const xValid = position.x >= -tolerance && position.x <= (bounds.x + tolerance);
+        if (!xValid) isValid = false;
+    }
+
+    if (cncConfig.selectedAxes?.y === true) {
+        const yValid = position.y >= -tolerance && position.y <= (bounds.y + tolerance);
+        if (!yValid) isValid = false;
+    }
+
+    if (cncConfig.selectedAxes?.z === true) {
+        const zValid = position.z >= -tolerance && position.z <= (bounds.z + tolerance);
+        if (!zValid) isValid = false;
+    }
+
+    return isValid;
+}
+
+/**
+ * CNC Movement Utilities
+ */
+export interface MovementCallbacks {
+    onMoveTo?: (position: Position) => void;
+    onTargetUpdate?: (position: Position | null) => void;
+    onSimulateMoveTo?: (position: Position) => void;
+}
+
+export function setTargetForRealMovement(
+    position: Position,
+    callbacks: MovementCallbacks,
+    targetPositionRef: { value: Position | null },
+    targetArrivedRef: { value: boolean },
+    logger: any
+): void {
+    const formattedPosition = formatPosition(position);
+    
+    targetPositionRef.value = formattedPosition;
+    targetArrivedRef.value = false;
+    
+    if (callbacks.onMoveTo) {
+        callbacks.onMoveTo(formattedPosition);
+    }
+    
+    if (callbacks.onTargetUpdate) {
+        callbacks.onTargetUpdate(formattedPosition);
+    }
+    
+    logger.info(`Click-to-move: Target position (${formatCoordinate(formattedPosition.x)}, ${formatCoordinate(formattedPosition.y)}, ${formatCoordinate(formattedPosition.z)})`);
+}
+
+/**
  * Validate form data and return first error message following existing patterns
  */
 export function getFirstValidationError(data: FormData): string | null {

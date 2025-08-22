@@ -82,9 +82,9 @@
             </div>
           </div>
           <div class="item-coords">
-            <span>X: {{ getItemCoordinate(item, 'x')?.toFixed(2) || '---' }}</span>
-            <span>Y: {{ getItemCoordinate(item, 'y')?.toFixed(2) || '---' }}</span>
-            <span>Z: {{ getItemCoordinate(item, 'z')?.toFixed(2) || '---' }}</span>
+            <span>X: {{ getItemCoordinate(item, 'x') ? formatCoordinate(getItemCoordinate(item, 'x')) : '---' }}</span>
+            <span>Y: {{ getItemCoordinate(item, 'y') ? formatCoordinate(getItemCoordinate(item, 'y')) : '---' }}</span>
+            <span>Z: {{ getItemCoordinate(item, 'z') ? formatCoordinate(getItemCoordinate(item, 'z')) : '---' }}</span>
           </div>
         </div>
       </div>
@@ -113,7 +113,7 @@
             :key="location.uid"
             :value="location"
           >
-            {{ location.name }} ({{ location.x?.toFixed(2) }}, {{ location.y?.toFixed(2) }}, {{ location.z?.toFixed(2) }})
+            {{ location.name }} ({{ formatCoordinate(location.x || 0) }}, {{ formatCoordinate(location.y || 0) }}, {{ formatCoordinate(location.z || 0) }})
           </option>
         </select>
         <button 
@@ -192,6 +192,7 @@ import useDualPersistence from '@/composables/useDualPersistence';
 import useCncMovement from '@/composables/useCncMovement';
 import { logger } from '@/utils/logger';
 import { handleApiError } from '@/utils/errorHandler';
+import { formatCoordinate } from '@/utils/validation';
 
 export default {
   name: "PositionSequence",
@@ -481,7 +482,8 @@ export default {
                typeof editingItem.value.z === 'number' && 
                editingItem.value.feedrate > 0;
       }),
-      getItemCoordinate
+      getItemCoordinate,
+      formatCoordinate
     };
   }
 };
