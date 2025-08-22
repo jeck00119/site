@@ -2008,14 +2008,12 @@ export default {
         } else if (axisCount === 3) {
           // 3-axis system: require clicks in both Top and Side views
           if (currentCameraView.value === 'Top') {
-            // Reset any previous states when clicking a new Top position
-            sideViewClicked.value = false;
-            sideViewPosition.value = null;
-            
+            // Don't reset Side view position - preserve Z if already set
             topViewClicked.value = true;
             topViewPosition.value = { x: clickedPosition.x, y: clickedPosition.y };
             logger.info(`Top view clicked: X=${formatCoordinate(clickedPosition.x)}, Y=${formatCoordinate(clickedPosition.y)}`);
           } else if (currentCameraView.value === 'Side') {
+            // Don't reset Top view position - preserve X,Y if already set
             sideViewClicked.value = true;
             sideViewPosition.value = { z: clickedPosition.z };
             logger.info(`Side view clicked: Z=${formatCoordinate(clickedPosition.z)}`);
@@ -2032,11 +2030,10 @@ export default {
             
             logger.info(`3-axis click complete: Combined position (${formatCoordinate(combinedPosition.x)}, ${formatCoordinate(combinedPosition.y)}, ${formatCoordinate(combinedPosition.z)})`);
             
-            // Reset only the completion flags, keep topViewPosition for subsequent Side clicks
+            // Reset only the completion flags, keep both positions for subsequent clicks
             topViewClicked.value = false;
             sideViewClicked.value = false;
-            // Don't reset topViewPosition.value - keep it for subsequent Side view clicks
-            sideViewPosition.value = null;
+            // Don't reset either position - keep them for subsequent clicks in any view
             
             // Show target and execute movement
             showClickTarget(combinedPosition);
@@ -2161,8 +2158,9 @@ export default {
         
         let partialPosition;
         if (viewType === 'Top') {
-          // Show X,Y from click, Z from current position
-          partialPosition = { x: position.x, y: position.y, z: currentPos.z };
+          // Show X,Y from click, Z from previous Side view click if available, otherwise current position
+          const zPos = sideViewPosition.value ? sideViewPosition.value.z : currentPos.z;
+          partialPosition = { x: position.x, y: position.y, z: zPos };
         } else if (viewType === 'Side') {
           // Show Z from click, X,Y from previous Top view click if available, otherwise current position
           // Use the most recent topViewPosition if it exists, otherwise use current position
@@ -2199,7 +2197,7 @@ export default {
     };
     
     const clearPartialClicks = () => {
-      // Reset all click states
+      // Reset all click states AND positions
       topViewClicked.value = false;
       sideViewClicked.value = false;
       topViewPosition.value = null;
@@ -2212,6 +2210,13 @@ export default {
       }
       
       logger.info('Partial clicks cleared');
+    };
+    
+    const resetClickFlags = () => {
+      // Reset only the click flags, preserve positions
+      topViewClicked.value = false;
+      sideViewClicked.value = false;
+      logger.info('Click flags reset, positions preserved');
     };
     
     // Optimization: Smart trajectory line updates with dirty flags

@@ -4,7 +4,10 @@
       "Bash(npm run build:*)",
       "Bash(python:*)",
       "Bash(dir:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git config:*)",
+      "Bash(git push:*)"
     ],
     "additionalDirectories": [
       "E:\\"
