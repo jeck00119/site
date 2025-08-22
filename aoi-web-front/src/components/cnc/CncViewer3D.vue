@@ -2008,6 +2008,10 @@ export default {
         } else if (axisCount === 3) {
           // 3-axis system: require clicks in both Top and Side views
           if (currentCameraView.value === 'Top') {
+            // Reset any previous states when clicking a new Top position
+            sideViewClicked.value = false;
+            sideViewPosition.value = null;
+            
             topViewClicked.value = true;
             topViewPosition.value = { x: clickedPosition.x, y: clickedPosition.y };
             logger.info(`Top view clicked: X=${formatCoordinate(clickedPosition.x)}, Y=${formatCoordinate(clickedPosition.y)}`);
@@ -2028,10 +2032,10 @@ export default {
             
             logger.info(`3-axis click complete: Combined position (${formatCoordinate(combinedPosition.x)}, ${formatCoordinate(combinedPosition.y)}, ${formatCoordinate(combinedPosition.z)})`);
             
-            // Reset click states
+            // Reset only the completion flags, keep topViewPosition for subsequent Side clicks
             topViewClicked.value = false;
             sideViewClicked.value = false;
-            topViewPosition.value = null;
+            // Don't reset topViewPosition.value - keep it for subsequent Side view clicks
             sideViewPosition.value = null;
             
             // Show target and execute movement
@@ -2160,8 +2164,17 @@ export default {
           // Show X,Y from click, Z from current position
           partialPosition = { x: position.x, y: position.y, z: currentPos.z };
         } else if (viewType === 'Side') {
-          // Show Z from click, X,Y from current position
-          partialPosition = { x: currentPos.x, y: currentPos.y, z: position.z };
+          // Show Z from click, X,Y from previous Top view click if available, otherwise current position
+          // Use the most recent topViewPosition if it exists, otherwise use current position
+          let xPos = currentPos.x;
+          let yPos = currentPos.y;
+          
+          if (topViewPosition.value) {
+            xPos = topViewPosition.value.x;
+            yPos = topViewPosition.value.y;
+          }
+          
+          partialPosition = { x: xPos, y: yPos, z: position.z };
         }
         
         // Convert to visual coordinates for proper display
@@ -2173,6 +2186,13 @@ export default {
         if (ghostToolHead.material) {
           ghostToolHead.material.opacity = 0.3;
         }
+        
+        // Force re-render to make ghost visible immediately
+        markDirty('rendering');
+        
+        // Update trajectory line to show path to partial target
+        markDirty('trajectoryLine');
+        updateTrajectoryLine(partialPosition);
       }
       
       logger.info(`Partial target set in ${viewType} view: (${formatCoordinate(position.x)}, ${formatCoordinate(position.y)}, ${formatCoordinate(position.z)})`);
