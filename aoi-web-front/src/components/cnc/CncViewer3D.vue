@@ -1361,7 +1361,9 @@ export default {
     const createToolHead = (materials) => {
       const toolGeometry = createTrackedGeometry(THREE.SphereGeometry, 12);
       toolHead = createTrackedMesh(toolGeometry, materials.tool);
-      toolHead.position.set(props.currentPos.x, props.currentPos.y, props.currentPos.z);
+      // Convert to visual coordinates for proper display
+      const visualPosition = getVisualPosition(props.currentPos);
+      toolHead.position.set(visualPosition.x, visualPosition.y, visualPosition.z);
       
       initializeToolPosition();
       cncGroup.add(toolHead);
@@ -1500,12 +1502,21 @@ export default {
       }
       
       // Calculate dimensions using centralized utility
-      const bounds = getWorkingZoneBounds(props.cncConfig, swapXY);
-      const dimensions = {
+      const bounds = getWorkingZoneBounds(props.cncConfig, false);
+      let dimensions = {
         x: bounds.x || 1, // Minimal dimension for unselected axis
         y: bounds.y || 1,
         z: bounds.z || 1
       };
+      
+      // For visual display only, swap X/Y dimensions in Top view
+      if (swapXY) {
+        dimensions = {
+          x: bounds.y || 1,  // Visual X shows physical Y bounds
+          y: bounds.x || 1,  // Visual Y shows physical X bounds  
+          z: bounds.z || 1
+        };
+      }
       
       
       // Create geometry and material
@@ -1937,9 +1948,11 @@ export default {
         const plane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0); // Fixed Z=0 plane
         const intersectionPoint = new THREE.Vector3();
         if (raycaster.ray.intersectPlane(plane, intersectionPoint)) {
+          // In Top view, visual X maps to physical Y and visual Y maps to physical X
+          // So we need to swap the coordinates to match the physical CNC axes
           clickedPosition = {
-            x: intersectionPoint.x,
-            y: intersectionPoint.y,
+            x: intersectionPoint.y,  // Visual Y becomes physical X
+            y: intersectionPoint.x,  // Visual X becomes physical Y
             z: targetPosition.value?.z || props.currentPos.z // Keep Z from previous target or current
           };
           
@@ -2056,7 +2069,21 @@ export default {
     };
     
     const isWithinWorkingZoneLocal = (position) => {
-      return isWithinWorkingZone(position, props.cncConfig, currentCameraView.value === 'Top', 0.01);
+      return isWithinWorkingZone(position, props.cncConfig, false, 0.01);
+    };
+    
+    // Helper function to convert physical coordinates to visual coordinates for display
+    const getVisualPosition = (physicalPosition) => {
+      if (currentCameraView.value === 'Top') {
+        // In Top view, visual coordinates need to be swapped for correct display
+        return {
+          x: physicalPosition.y,  // Physical Y becomes visual X
+          y: physicalPosition.x,  // Physical X becomes visual Y  
+          z: physicalPosition.z   // Z remains the same
+        };
+      }
+      // In other views, use physical coordinates directly
+      return { ...physicalPosition };
     };
     
     const showClickTarget = (position) => {
@@ -2066,7 +2093,7 @@ export default {
         let precisePosition = formatPosition(position);
         
         // Apply working zone constraints with safety margin using centralized utility
-        const bounds = getWorkingZoneBounds(props.cncConfig, currentCameraView.value === 'Top');
+        const bounds = getWorkingZoneBounds(props.cncConfig, false);
         const safetyMargin = 10; // The CNC firmware appears to apply a ~10mm safety margin
         
         if (props.cncConfig.selectedAxes?.x === true) {
@@ -2079,7 +2106,9 @@ export default {
           precisePosition.z = Math.max(0, Math.min(precisePosition.z, bounds.z - safetyMargin));
         }
         
-        ghostToolHead.position.set(precisePosition.x, precisePosition.y, precisePosition.z);
+        // Convert to visual coordinates for proper display
+        const visualPosition = getVisualPosition(precisePosition);
+        ghostToolHead.position.set(visualPosition.x, visualPosition.y, visualPosition.z);
         ghostToolHead.visible = true;
         // Ghost stays visible until tool reaches exact position
         // No timeout - ghost only disappears when tool arrives
@@ -2126,13 +2155,18 @@ export default {
         // For partial clicks, position ghost at current position but make it semi-transparent
         const currentPos = toolHead ? toolHead.position : props.currentPos;
         
+        let partialPosition;
         if (viewType === 'Top') {
           // Show X,Y from click, Z from current position
-          ghostToolHead.position.set(position.x, position.y, currentPos.z);
+          partialPosition = { x: position.x, y: position.y, z: currentPos.z };
         } else if (viewType === 'Side') {
           // Show Z from click, X,Y from current position
-          ghostToolHead.position.set(currentPos.x, currentPos.y, position.z);
+          partialPosition = { x: currentPos.x, y: currentPos.y, z: position.z };
         }
+        
+        // Convert to visual coordinates for proper display
+        const visualPosition = getVisualPosition(partialPosition);
+        ghostToolHead.position.set(visualPosition.x, visualPosition.y, visualPosition.z);
         
         ghostToolHead.visible = true;
         // Make ghost more transparent for partial clicks
@@ -2191,6 +2225,8 @@ export default {
       // Create new trajectory line from current tool position to target
       if (toolHead && targetPosition) {
         const currentPos = toolHead.position;
+        // Convert target position to visual coordinates to match toolHead positioning
+        const visualTargetPos = getVisualPosition(targetPosition);
         
         // Create line geometry showing simultaneous multi-axis movement
         // Direct straight line path from current to target position
@@ -2199,8 +2235,8 @@ export default {
         // Start position
         points.push(new THREE.Vector3(currentPos.x, currentPos.y, currentPos.z));
         
-        // Direct to target position (simultaneous movement)
-        points.push(new THREE.Vector3(targetPosition.x, targetPosition.y, targetPosition.z));
+        // Direct to target position (simultaneous movement) using visual coordinates
+        points.push(new THREE.Vector3(visualTargetPos.x, visualTargetPos.y, visualTargetPos.z));
         
         // Use tracked resources for trajectory line (temporary objects)
         const geometry = trackResource(new THREE.BufferGeometry().setFromPoints(points), 'geometries');
@@ -2283,7 +2319,9 @@ export default {
       
       // Show ghost tool and trajectory line
       if (ghostToolHead) {
-        ghostToolHead.position.set(position.x, position.y, position.z);
+        // Convert to visual coordinates for proper display
+        const visualPosition = getVisualPosition(position);
+        ghostToolHead.position.set(visualPosition.x, visualPosition.y, visualPosition.z);
         ghostToolHead.visible = true;
       }
       markDirty('trajectoryLine');
@@ -2440,7 +2478,9 @@ export default {
       
       // Only update if position changed significantly
       if (updateCachedPosition(newPosition, 'lastToolPosition')) {
-        toolHead.position.set(newPosition.x, newPosition.y, newPosition.z);
+        // Convert to visual coordinates for proper display
+        const visualPosition = getVisualPosition(newPosition);
+        toolHead.position.set(visualPosition.x, visualPosition.y, visualPosition.z);
         
         // Update display position only if it changed
         if (updateCachedPosition(newPosition, 'lastDisplayPosition')) {
@@ -2469,6 +2509,9 @@ export default {
         z: props.currentPos.z
       };
       
+      // Convert to visual coordinates for interpolation calculations (to match toolHead.position)
+      const visualTargetPos = getVisualPosition(targetPos);
+      
       // Only update if target position changed
       if (!hasPositionChanged(targetPos, cachedValues.lastToolPosition)) {
         return false;
@@ -2477,37 +2520,39 @@ export default {
       // Check if CNC is idle - if so, snap directly to position for accuracy
       const isIdle = cncState.value && cncState.value.toLowerCase() === 'idle';
       
-      let newPosition;
+      let newVisualPosition;
       if (isIdle) {
         // When idle, snap directly to exact position to eliminate precision drift
-        newPosition = { ...targetPos };
+        newVisualPosition = { ...visualTargetPos };
       } else {
         // When moving, use smooth interpolation but with higher precision near target
-        const distance = calculateDistance(toolHead.position, targetPos);
+        const distance = calculateDistance(toolHead.position, visualTargetPos);
         const lerpSpeed = distance < 0.1 ? 0.8 : 0.15; // Faster convergence when close
-        newPosition = {
-          x: toolHead.position.x + (targetPos.x - toolHead.position.x) * lerpSpeed,
-          y: toolHead.position.y + (targetPos.y - toolHead.position.y) * lerpSpeed,
-          z: toolHead.position.z + (targetPos.z - toolHead.position.z) * lerpSpeed
+        newVisualPosition = {
+          x: toolHead.position.x + (visualTargetPos.x - toolHead.position.x) * lerpSpeed,
+          y: toolHead.position.y + (visualTargetPos.y - toolHead.position.y) * lerpSpeed,
+          z: toolHead.position.z + (visualTargetPos.z - toolHead.position.z) * lerpSpeed
         };
         
         // Snap to exact position when very close (within 0.01mm)
         if (distance < 0.01) {
-          newPosition = { ...targetPos };
+          newVisualPosition = { ...visualTargetPos };
         }
       }
       
       // Force update when snapping to exact position (idle state or very close)
-      const forceUpdate = isIdle || calculateDistance(toolHead.position, targetPos) < 0.01;
+      const forceUpdate = isIdle || calculateDistance(toolHead.position, visualTargetPos) < 0.01;
       
-      if (updateCachedPosition(newPosition, 'lastToolPosition') || forceUpdate) {
-        toolHead.position.set(newPosition.x, newPosition.y, newPosition.z);
+      // Check if visual position changed significantly for smooth animation
+      if (updateCachedPosition(newVisualPosition, 'lastToolPosition') || forceUpdate) {
+        // Use the calculated visual position directly
+        toolHead.position.set(newVisualPosition.x, newVisualPosition.y, newVisualPosition.z);
         
-        // Always update display position when forcing exact position
-        if (updateCachedPosition(newPosition, 'lastDisplayPosition') || forceUpdate) {
-          displayPosition.value.x = newPosition.x;
-          displayPosition.value.y = newPosition.y;
-          displayPosition.value.z = newPosition.z;
+        // Always update display position when forcing exact position (use physical coords for display)
+        if (updateCachedPosition(targetPos, 'lastDisplayPosition') || forceUpdate) {
+          displayPosition.value.x = targetPos.x;
+          displayPosition.value.y = targetPos.y;
+          displayPosition.value.z = targetPos.z;
         }
         
         // Complex target arrival detection removed - now handled by completeRealCNCMovement() call
@@ -2537,7 +2582,9 @@ export default {
       
       // Keep tool head at current display position without unnecessary updates
       if (hasPositionChanged(currentPos, { x: toolHead.position.x, y: toolHead.position.y, z: toolHead.position.z })) {
-        toolHead.position.set(currentPos.x, currentPos.y, currentPos.z);
+        // Convert to visual coordinates for proper display
+        const visualPosition = getVisualPosition(currentPos);
+        toolHead.position.set(visualPosition.x, visualPosition.y, visualPosition.z);
         updateTrajectoryLinePositions();
         checkGhostToolHeadReached();
         return true;
@@ -3168,7 +3215,8 @@ export default {
       logger.info('Syncing to real CNC position:', props.currentPos);
       
       // Force update tool head position to real position
-      toolHead.position.set(props.currentPos.x, props.currentPos.y, props.currentPos.z);
+      const visualPosition = getVisualPosition(props.currentPos);
+      toolHead.position.set(visualPosition.x, visualPosition.y, visualPosition.z);
       
       // Force update display position to real position
       displayPosition.value.x = props.currentPos.x;
@@ -3239,7 +3287,7 @@ export default {
       const axisZ = props.cncConfig.selectedAxes?.z === true ? props.cncConfig.zAxisLength : 0;
       
       // Get working zone dimensions using centralized utility
-      const bounds = getWorkingZoneBounds(props.cncConfig, currentView === 'Top');
+      const bounds = getWorkingZoneBounds(props.cncConfig, false);
       let { x: workingX, y: workingY, z: workingZ } = bounds;
       
       // In Top view, X and Y axes are swapped, so swap their dimensions too

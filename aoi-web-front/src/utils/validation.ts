@@ -315,17 +315,11 @@ export function getWorkingZoneBounds(cncConfig: CncConfig | null | undefined, is
         return { x: 0, y: 0, z: 0 };
     }
 
-    let workingX = cncConfig.selectedAxes?.x === true ? (cncConfig.workingZoneX || 0) : 0;
-    let workingY = cncConfig.selectedAxes?.y === true ? (cncConfig.workingZoneY || 0) : 0;
+    // Always return the actual physical working zone bounds
+    // Coordinate swapping is now handled at the click intersection level
+    const workingX = cncConfig.selectedAxes?.x === true ? (cncConfig.workingZoneX || 0) : 0;
+    const workingY = cncConfig.selectedAxes?.y === true ? (cncConfig.workingZoneY || 0) : 0;
     const workingZ = cncConfig.selectedAxes?.z === true ? (cncConfig.workingZoneZ || 0) : 0;
-
-    if (isTopView) {
-        // In Top view, coordinates are swapped: visual X maps to physical Y, visual Y maps to physical X
-        // So we need to swap the working zone bounds for validation
-        const tempX = workingX;
-        workingX = workingY;
-        workingY = tempX;
-    }
 
     return { x: workingX, y: workingY, z: workingZ };
 }
