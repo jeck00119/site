@@ -97,32 +97,31 @@
           </div>
         </button>
       </div>
-      
-      
-      <!-- Keyboard Control Row -->
-      <div class="keyboard-control-row">
-        <div class="keyboard-control">
-          <div class="checkbox-container">
-            <input 
-              type="checkbox" 
-              id="keyboard-control"
-              v-model="keyboardControlEnabled"
-              @change="toggleKeyboardControl"
-            />
-            <label for="keyboard-control">
-              <font-awesome-icon icon="keyboard" /> Keyboard Control
-            </label>
-          </div>
-          <button 
-            class="gear-button"
-            :class="{ 'hidden-button': !keyboardControlEnabled }"
-            @click="showKeyboardSettings = true"
-            title="Keyboard Settings"
-            :disabled="!keyboardControlEnabled"
-          >
-            <font-awesome-icon icon="gear" />
-          </button>
+    </div>
+    
+    <!-- Keyboard Control Row -->
+    <div class="keyboard-control-row">
+      <div class="keyboard-control">
+        <div class="checkbox-container">
+          <input 
+            type="checkbox" 
+            id="keyboard-control"
+            v-model="keyboardControlEnabled"
+            @change="toggleKeyboardControl"
+          />
+          <label for="keyboard-control">
+            <font-awesome-icon icon="keyboard" /> Keyboard Control
+          </label>
         </div>
+        <button 
+          class="gear-button"
+          :class="{ 'hidden-button': !keyboardControlEnabled }"
+          @click="showKeyboardSettings = true"
+          title="Keyboard Settings"
+          :disabled="!keyboardControlEnabled"
+        >
+          <font-awesome-icon icon="gear" />
+        </button>
       </div>
     </div>
     
@@ -408,7 +407,7 @@ export default {
   padding: 0.5rem;
   text-align: center;
   margin-bottom: 1rem;
-  margin-top: -1rem;
+  margin-top: 0.5rem;
 }
 
 .actions-container {
@@ -416,7 +415,7 @@ export default {
   flex-direction: column;
   width: 100%;
   gap: 0.5rem;
-  margin-top: -2rem;
+  margin-top: 0.5rem;
 }
 
 .flex-row {
@@ -484,7 +483,8 @@ export default {
 
 /* Keyboard Control Styles */
 .keyboard-control-row {
-  margin-top: 1.25rem;
+  margin-top: auto;
+  margin-bottom: 0.6rem;
   padding-top: 0.5rem;
   border-top: 1px solid rgba(255, 255, 255, 0.1);
 }
@@ -495,6 +495,7 @@ export default {
   align-items: center;
   width: 90%;
   margin: auto;
+  margin-top: 0.75rem;
 }
 
 .checkbox-container {
@@ -516,19 +517,32 @@ export default {
 }
 
 .gear-button {
-  background: rgb(41, 41, 41);
-  border: 1px solid rgb(204, 161, 82);
-  color: rgb(204, 161, 82);
-  border-radius: 4px;
-  padding: 0.25rem 0.5rem;
+  background-color: var(--color-bg-tertiary);
+  color: var(--color-text-secondary);
+  border: var(--border-width-1) solid var(--color-border-secondary);
+  border-radius: var(--border-radius-lg);
+  padding: 0.35rem 0.65rem;
   cursor: pointer;
-  font-size: 1.2rem;
-  transition: all 0.2s ease;
+  font-size: 1.3rem;
+  transition: var(--transition-button);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: var(--font-weight-bold);
 }
 
-.gear-button:hover {
-  background: rgb(204, 161, 82);
-  color: rgb(41, 41, 41);
+.gear-button:hover:not(:disabled) {
+  background-color: var(--color-bg-secondary);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-button-hover);
+}
+
+.gear-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+  background-color: var(--color-bg-tertiary);
+  color: var(--color-text-disabled);
 }
 
 .hidden-button {

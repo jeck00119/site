@@ -184,9 +184,9 @@ import { formatCoordinate } from '@/utils/validation';
 import { logger } from '@/utils/logger';
 import CncViewer3D from './CncViewer3D.vue';
 import { library } from '@fortawesome/fontawesome-svg-core';
-import { faGear } from '@fortawesome/free-solid-svg-icons';
+import { faGear, faCube } from '@fortawesome/free-solid-svg-icons';
 
-library.add(faGear);
+library.add(faGear, faCube);
 
 export default {
   name: "PositionDisplay",
@@ -718,30 +718,34 @@ export default {
 }
 
 .gear-style-button {
-  background: rgb(41, 41, 41) !important;
-  border: 1px solid rgb(204, 161, 82) !important;
-  color: rgb(204, 161, 82) !important;
-  border-radius: 4px !important;
+  background-color: var(--color-bg-tertiary) !important;
+  color: var(--color-text-secondary) !important;
+  border: var(--border-width-1) solid var(--color-border-secondary) !important;
+  border-radius: var(--border-radius-lg) !important;
   padding: 0.25rem 0.5rem !important;
   font-size: 1.2rem !important;
-  transition: all 0.2s ease !important;
+  cursor: pointer !important;
+  transition: var(--transition-button) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: var(--space-1) !important;
+  font-weight: var(--font-weight-bold) !important;
   min-height: auto !important;
-  gap: 0 !important;
 }
 
 .gear-style-button:hover:not(:disabled) {
-  background: rgb(204, 161, 82) !important;
-  color: rgb(41, 41, 41) !important;
-  transform: none !important;
-  box-shadow: none !important;
+  background-color: var(--color-bg-secondary) !important;
+  transform: translateY(-1px) !important;
+  box-shadow: var(--shadow-button-hover) !important;
 }
 
 .gear-style-button:disabled {
-  background: rgb(60, 60, 60) !important;
-  border: 1px solid rgba(204, 161, 82, 0.3) !important;
-  color: rgba(204, 161, 82, 0.5) !important;
-  cursor: not-allowed !important;
   opacity: 0.6 !important;
+  cursor: not-allowed !important;
+  transform: none !important;
+  background-color: var(--color-bg-tertiary) !important;
+  color: var(--color-text-disabled) !important;
 }
 
 /* Modal Styles */
