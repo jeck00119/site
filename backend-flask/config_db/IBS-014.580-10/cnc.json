@@ -3,6 +3,11 @@
         "1": {
             "name": "Marlin_Top_Windows",
             "port": "COM10 (STMicroelectronics)",
+            "selected_axes": {
+                "x": true,
+                "y": true,
+                "z": false
+            },
             "sequences": [
                 {
                     "cncUid": "8a84a38d-1587-4705-b6f5-801abafa330d",
@@ -71,7 +76,13 @@
                 }
             ],
             "type": "Marlin",
-            "uid": "8a84a38d-1587-4705-b6f5-801abafa330d"
+            "uid": "8a84a38d-1587-4705-b6f5-801abafa330d",
+            "working_zone_x": 250,
+            "working_zone_y": 250,
+            "working_zone_z": 80,
+            "x_axis_length": 350,
+            "y_axis_length": 350,
+            "z_axis_length": 100
         }
     }
 }

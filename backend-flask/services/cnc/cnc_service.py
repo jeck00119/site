@@ -301,16 +301,17 @@ class CncService(metaclass=Singleton):
         for cnc_model in cnc_models:
             if cnc_model.uid in saved_uids:
                 found_axis[cnc_model.uid] = True
-                # Only check port changes and reinitialize if we're doing connection initialization
-                if initialize_connections and cnc_model.port != self._cnc_objects.get(cnc_model.uid, Mock()).get_port():
-                    self._deinit_cnc(cnc_model.uid)
-                    self._init_cnc_from_model(cnc_model)
-                    update.append(cnc_model.uid)
-                elif initialize_connections:
-                    # CNC exists but we're initializing - make sure it's connected
-                    if cnc_model.uid not in self._cnc_objects:
+                # Always add existing CNCs to update list for configuration saving
+                update.append(cnc_model.uid)
+                
+                # Only handle connection initialization if requested
+                if initialize_connections:
+                    if cnc_model.port != self._cnc_objects.get(cnc_model.uid, Mock()).get_port():
+                        self._deinit_cnc(cnc_model.uid)
                         self._init_cnc_from_model(cnc_model)
-                        update.append(cnc_model.uid)
+                    elif cnc_model.uid not in self._cnc_objects:
+                        # CNC exists but we're initializing - make sure it's connected
+                        self._init_cnc_from_model(cnc_model)
             else:
                 # New CNC - only initialize connection if requested
                 if initialize_connections:

@@ -2,14 +2,25 @@
   <div class="positions-grid">
     <div class="axis-info">
       <h3>{{ axisName }}</h3>
-      <button 
-        class="cnc-setup-button"
-        @click="showCncSetup = true"
-        title="CNC Setup & 3D Viewer"
-      >
-        <font-awesome-icon icon="cog" />
-        3D CNC
-      </button>
+      <div class="button-group">
+        <button 
+          class="cnc-setup-button"
+          @click="handleSetup3DClick"
+          title="Setup 3D Configuration"
+        >
+          <font-awesome-icon icon="cog" />
+          Setup 3D
+        </button>
+        <button 
+          class="cnc-3d-button"
+          @click="handle3DCNCClick"
+          title="3D CNC Viewer"
+          :disabled="!hasConfig"
+        >
+          <font-awesome-icon icon="cube" />
+          3D CNC
+        </button>
+      </div>
     </div>
 
     <div class="position-layout">
@@ -224,23 +235,27 @@ export default {
       try {
         // First, try to load from backend CNC configuration
         const currentCnc = cncs.value?.find(cnc => cnc.uid === props.axisUid);
-        if (currentCnc && currentCnc.xAxisLength !== undefined) {
-          // Load from backend CNC config
+        
+        // Check if backend has 3D config (either camelCase or snake_case field names)
+        const hasBackendConfig = currentCnc && (
+          (currentCnc.xAxisLength !== undefined && currentCnc.xAxisLength > 0) ||
+          (currentCnc.x_axis_length !== undefined && currentCnc.x_axis_length > 0)
+        );
+        
+        if (hasBackendConfig) {
+          // Load from backend CNC config - handle both camelCase and snake_case
           cncConfig.value = {
-            xAxisLength: currentCnc.xAxisLength || defaultCncConfig.xAxisLength,
-            yAxisLength: currentCnc.yAxisLength || defaultCncConfig.yAxisLength,
-            zAxisLength: currentCnc.zAxisLength || defaultCncConfig.zAxisLength,
-            workingZoneX: currentCnc.workingZoneX || defaultCncConfig.workingZoneX,
-            workingZoneY: currentCnc.workingZoneY || defaultCncConfig.workingZoneY,
-            workingZoneZ: currentCnc.workingZoneZ || defaultCncConfig.workingZoneZ,
-            selectedAxes: currentCnc.selectedAxes || { x: true, y: true, z: true } // Include selectedAxes in config
+            xAxisLength: currentCnc.xAxisLength || currentCnc.x_axis_length || defaultCncConfig.xAxisLength,
+            yAxisLength: currentCnc.yAxisLength || currentCnc.y_axis_length || defaultCncConfig.yAxisLength,
+            zAxisLength: currentCnc.zAxisLength || currentCnc.z_axis_length || defaultCncConfig.zAxisLength,
+            workingZoneX: currentCnc.workingZoneX || currentCnc.working_zone_x || defaultCncConfig.workingZoneX,
+            workingZoneY: currentCnc.workingZoneY || currentCnc.working_zone_y || defaultCncConfig.workingZoneY,
+            workingZoneZ: currentCnc.workingZoneZ || currentCnc.working_zone_z || defaultCncConfig.workingZoneZ
           };
           
-          if (currentCnc.selectedAxes) {
-            selectedAxes.value = { ...selectedAxes.value, ...currentCnc.selectedAxes };
-            
-          }
-          
+          // Handle selected axes (can be from camelCase or snake_case)
+          const backendSelectedAxes = currentCnc.selectedAxes || currentCnc.selected_axes || { x: true, y: true, z: true };
+          selectedAxes.value = { ...selectedAxes.value, ...backendSelectedAxes };
           
           logger.info('CNC 3D config loaded from backend:', cncConfig.value);
           return;
@@ -499,6 +514,35 @@ export default {
       
     }, { deep: true });
 
+    // Check if config exists - looks for 3D configuration in the CNC data
+    const hasConfig = computed(() => {
+      const currentCnc = cncs.value?.find(cnc => cnc.uid === props.axisUid);
+      
+      // Check if CNC exists and has 3D configuration parameters saved
+      // Backend returns snake_case field names (x_axis_length, y_axis_length)
+      return currentCnc && 
+             ((currentCnc.xAxisLength !== undefined && currentCnc.xAxisLength > 0) ||
+              (currentCnc.x_axis_length !== undefined && currentCnc.x_axis_length > 0)) &&
+             ((currentCnc.yAxisLength !== undefined && currentCnc.yAxisLength > 0) ||
+              (currentCnc.y_axis_length !== undefined && currentCnc.y_axis_length > 0));
+    });
+
+    // Handle Setup 3D button click
+    const handleSetup3DClick = () => {
+      showCncSetup.value = true;
+    };
+
+    // Handle 3D CNC button click
+    const handle3DCNCClick = () => {
+      if (hasConfig.value) {
+        // If config exists, open 3D viewer directly
+        show3DViewer.value = true;
+      } else {
+        // If no config, open setup modal
+        showCncSetup.value = true;
+      }
+    };
+
     onMounted(() => {
       logger.lifecycle('mounted', 'PositionDisplay component mounted', { axisUid: props.axisUid });
       loadCncConfig();
@@ -518,6 +562,9 @@ export default {
       isCncConnected,
       simulatedPos,
       cncViewer3D,
+      hasConfig,
+      handleSetup3DClick,
+      handle3DCNCClick,
       // Manual axis selection
       selectedAxes,
       selectedAxesCount,
@@ -621,8 +668,16 @@ export default {
   font-weight: var(--font-weight-bold);
 }
 
-.cnc-setup-button {
+.button-group {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: var(--space-2);
   margin-top: var(--space-2);
+}
+
+.cnc-setup-button,
+.cnc-3d-button {
   background-color: var(--color-primary);
   color: var(--color-text-on-primary);
   border: none;
@@ -638,10 +693,18 @@ export default {
   min-height: var(--touch-target-min);
 }
 
-.cnc-setup-button:hover {
+.cnc-setup-button:hover,
+.cnc-3d-button:hover:not(:disabled) {
   background-color: var(--color-primary-dark);
   transform: translateY(-1px);
   box-shadow: var(--shadow-base);
+}
+
+.cnc-3d-button:disabled {
+  background-color: var(--color-background-secondary);
+  color: var(--color-text-disabled);
+  cursor: not-allowed;
+  opacity: 0.6;
 }
 
 /* Modal Styles */
