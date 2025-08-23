@@ -109,15 +109,18 @@
               v-model="keyboardControlEnabled"
               @change="toggleKeyboardControl"
             />
-            <label for="keyboard-control">Keyboard Control</label>
+            <label for="keyboard-control">
+              <font-awesome-icon icon="keyboard" /> Keyboard Control
+            </label>
           </div>
           <button 
-            v-if="keyboardControlEnabled"
             class="gear-button"
+            :class="{ 'hidden-button': !keyboardControlEnabled }"
             @click="showKeyboardSettings = true"
             title="Keyboard Settings"
+            :disabled="!keyboardControlEnabled"
           >
-            ⚙️
+            <font-awesome-icon icon="gear" />
           </button>
         </div>
       </div>
@@ -195,6 +198,10 @@ import { ref, onMounted, onUnmounted } from "vue";
 import { useCncStore } from '@/composables/useStore';
 import { logger } from '@/utils/logger';
 import { handleApiError } from '@/utils/errorHandler';
+import { library } from '@fortawesome/fontawesome-svg-core';
+import { faKeyboard, faGear } from '@fortawesome/free-solid-svg-icons';
+
+library.add(faKeyboard, faGear);
 
 export default {
   name: "GeneralCommands",
@@ -390,7 +397,7 @@ export default {
   height: 100%;
   margin: auto;
   border-radius: 8px;
-  padding: 0.5rem;
+  padding: 0.1rem 0.5rem 0.5rem 0.5rem;
 }
 
 .title {
@@ -401,6 +408,7 @@ export default {
   padding: 0.5rem;
   text-align: center;
   margin-bottom: 1rem;
+  margin-top: -1rem;
 }
 
 .actions-container {
@@ -408,6 +416,7 @@ export default {
   flex-direction: column;
   width: 100%;
   gap: 0.5rem;
+  margin-top: -2rem;
 }
 
 .flex-row {
@@ -475,7 +484,7 @@ export default {
 
 /* Keyboard Control Styles */
 .keyboard-control-row {
-  margin-top: 0.5rem;
+  margin-top: 1.25rem;
   padding-top: 0.5rem;
   border-top: 1px solid rgba(255, 255, 255, 0.1);
 }
@@ -520,6 +529,10 @@ export default {
 .gear-button:hover {
   background: rgb(204, 161, 82);
   color: rgb(41, 41, 41);
+}
+
+.hidden-button {
+  visibility: hidden;
 }
 
 /* Modal Styles */

@@ -2,25 +2,6 @@
   <div class="positions-grid">
     <div class="axis-info">
       <h3>{{ axisName }}</h3>
-      <div class="button-group">
-        <button 
-          class="cnc-setup-button"
-          @click="handleSetup3DClick"
-          title="Setup 3D Configuration"
-        >
-          <font-awesome-icon icon="cog" />
-          Setup 3D
-        </button>
-        <button 
-          class="cnc-3d-button"
-          @click="handle3DCNCClick"
-          title="3D CNC Viewer"
-          :disabled="!hasConfig"
-        >
-          <font-awesome-icon icon="cube" />
-          3D CNC
-        </button>
-      </div>
     </div>
 
     <div class="position-layout">
@@ -173,6 +154,25 @@
         </div>
       </div>
     </div>
+    
+    <!-- 3D Control Buttons -->
+    <div class="button-group button-group-bottom">
+      <button 
+        class="cnc-3d-button gear-style-button"
+        @click="handle3DCNCClick"
+        title="3D CNC Viewer"
+        :disabled="!hasConfig"
+      >
+        <font-awesome-icon icon="cube" /> 3D CNC
+      </button>
+      <button 
+        class="cnc-setup-button gear-style-button"
+        @click="handleSetup3DClick"
+        title="Setup 3D Configuration"
+      >
+        <font-awesome-icon icon="gear" /> Setup
+      </button>
+    </div>
   </div>
 </template>
 
@@ -183,6 +183,10 @@ import { useCncMovement } from '@/composables/useCncMovement';
 import { formatCoordinate } from '@/utils/validation';
 import { logger } from '@/utils/logger';
 import CncViewer3D from './CncViewer3D.vue';
+import { library } from '@fortawesome/fontawesome-svg-core';
+import { faGear } from '@fortawesome/free-solid-svg-icons';
+
+library.add(faGear);
 
 export default {
   name: "PositionDisplay",
@@ -624,21 +628,21 @@ export default {
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: var(--touch-target-min);
+  min-height: 2rem;
 }
 
 .boxed {
   width: 70%;
   background-color: var(--color-bg-tertiary);
   border-radius: var(--border-radius-lg);
-  padding: var(--space-4);
+  padding: var(--space-2);
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: var(--font-size-2xl);
   font-weight: var(--font-weight-bold);
   font-family: var(--font-family-mono);
-  min-height: var(--touch-target-min);
+  min-height: 2rem;
   box-sizing: border-box;
   color: var(--color-primary-light);
   border: var(--border-width-1) solid var(--color-border-secondary);
@@ -676,6 +680,12 @@ export default {
   margin-top: var(--space-2);
 }
 
+.button-group-bottom {
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  margin-top: var(--space-3);
+  padding-top: var(--space-4);
+}
+
 .cnc-setup-button,
 .cnc-3d-button {
   background-color: var(--color-primary);
@@ -705,6 +715,33 @@ export default {
   color: var(--color-text-disabled);
   cursor: not-allowed;
   opacity: 0.6;
+}
+
+.gear-style-button {
+  background: rgb(41, 41, 41) !important;
+  border: 1px solid rgb(204, 161, 82) !important;
+  color: rgb(204, 161, 82) !important;
+  border-radius: 4px !important;
+  padding: 0.25rem 0.5rem !important;
+  font-size: 1.2rem !important;
+  transition: all 0.2s ease !important;
+  min-height: auto !important;
+  gap: 0 !important;
+}
+
+.gear-style-button:hover:not(:disabled) {
+  background: rgb(204, 161, 82) !important;
+  color: rgb(41, 41, 41) !important;
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+.gear-style-button:disabled {
+  background: rgb(60, 60, 60) !important;
+  border: 1px solid rgba(204, 161, 82, 0.3) !important;
+  color: rgba(204, 161, 82, 0.5) !important;
+  cursor: not-allowed !important;
+  opacity: 0.6 !important;
 }
 
 /* Modal Styles */
