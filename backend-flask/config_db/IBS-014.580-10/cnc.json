@@ -6,7 +6,7 @@
             "selected_axes": {
                 "x": true,
                 "y": true,
-                "z": false
+                "z": true
             },
             "sequences": [
                 {

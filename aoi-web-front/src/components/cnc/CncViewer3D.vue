@@ -104,6 +104,15 @@
           </div>
         </div>
         
+        <!-- Mouse position tooltip -->
+        <div v-if="mouseTooltip.visible" class="mouse-tooltip" :style="mouseTooltipStyle">
+          <div class="tooltip-content">
+            <span class="coord-x">X: {{ formatCoordinate(mouseTooltip.position.x) }}</span>
+            <span class="coord-y">Y: {{ formatCoordinate(mouseTooltip.position.y) }}</span>
+            <span class="coord-z">Z: {{ formatCoordinate(mouseTooltip.position.z) }}</span>
+          </div>
+        </div>
+        
         <!-- Fixed axis legend in top-left corner -->
         <div v-if="isInitialized" class="axis-legend">
           <div class="legend-title">Axes</div>
@@ -144,7 +153,7 @@
           </div>
         </div>
         
-        <div class="target-info" v-if="targetPosition || (targetArrived && lastTargetPosition)">
+        <div class="target-info">
           <h4>Target Position</h4>
           <div v-if="targetArrived && lastTargetPosition">
             <div v-if="cncConfig.selectedAxes?.x === true" class="position-row">
@@ -174,6 +183,20 @@
               <span class="value target">{{ formatCoordinate(targetPosition.z || 0) }}mm</span>
             </div>
           </div>
+          <div v-else>
+            <div v-if="cncConfig.selectedAxes?.x === true" class="position-row">
+              <span class="axis">X:</span>
+              <span class="value">--</span>
+            </div>
+            <div v-if="cncConfig.selectedAxes?.y === true" class="position-row">
+              <span class="axis">Y:</span>
+              <span class="value">--</span>
+            </div>
+            <div v-if="cncConfig.selectedAxes?.z === true" class="position-row">
+              <span class="axis">Z:</span>
+              <span class="value">--</span>
+            </div>
+          </div>
         </div>
         
         <div class="config-info">
@@ -189,6 +212,24 @@
           <div v-if="selectedLinearAxes.length > 0" class="config-row">
             <span class="label">Work Zone:</span>
             <span class="value">{{ workZoneDisplay }}</span>
+          </div>
+        </div>
+        
+        <div class="grid-settings">
+          <h4>Grid Settings</h4>
+          <div class="grid-spacing-control">
+            <label for="grid-spacing">Grid Spacing:</label>
+            <input 
+              id="grid-spacing"
+              type="number" 
+              v-model.number="gridSpacing" 
+              min="5" 
+              max="100" 
+              step="5"
+              @change="regenerateGrids"
+              class="grid-spacing-input"
+            />
+            <span class="unit">mm</span>
           </div>
         </div>
       </div>
@@ -269,6 +310,15 @@ export default {
     let showGrid = true; // Grid visible in fixed views
     const isSimulationMode = ref(false); // Simulation mode for testing without real CNC
     const showBoundingBox = ref(false); // Debug: Show scene bounding box
+    const gridSpacing = ref(10); // Grid spacing in mm (default 10mm)
+    
+    // Mouse tooltip state
+    const mouseTooltip = ref({
+      visible: false,
+      position: { x: 0, y: 0, z: 0 },
+      screenX: 0,
+      screenY: 0
+    });
     
     let boundingBoxMesh = null; // Debug mesh for bounding box visualization
     
@@ -415,6 +465,13 @@ export default {
 
     const selectedAxesDisplay = computed(() => {
       return selectedLinearAxes.value.length > 0 ? selectedLinearAxes.value.join(', ') : 'None';
+    });
+    
+    const mouseTooltipStyle = computed(() => {
+      return {
+        left: `${mouseTooltip.value.screenX + 15}px`,
+        top: `${mouseTooltip.value.screenY - 40}px`
+      };
     });
 
     const axisLengthsDisplay = computed(() => {
@@ -1413,7 +1470,7 @@ export default {
     const createGrid = (gridType) => {
       const config = GRID_CONFIGS[gridType];
       const dimensions = config.dimensions.map(prop => props.cncConfig[prop]);
-      const divisions = dimensions.map(dim => Math.max(Math.floor(dim / 25), 4));
+      const divisions = dimensions.map(dim => Math.max(Math.floor(dim / gridSpacing.value), 4));
       
       const geometry = trackResource(new THREE.BufferGeometry(), 'geometries');
       const vertices = [];
@@ -1763,7 +1820,81 @@ export default {
       // Right mouse rotation removed
     };
 
+    
+    
+    const updateMouseTooltip = (normalizedMouse, screenX, screenY) => {
+      // Only show tooltip in fixed views where clicking is enabled
+      const isFixedView = currentCameraView.value === 'Top' || currentCameraView.value === 'Side';
+      if (!isFixedView || !raycaster || !camera || !scene) {
+        mouseTooltip.value.visible = false;
+        return;
+      }
+      
+      raycaster.setFromCamera(normalizedMouse, camera);
+      
+      // Use raycasting with plane intersection
+      let physicalPosition = null;
+      
+      if (currentCameraView.value === 'Top') {
+        // Top view: intersect with XY plane at Z=0
+        const plane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
+        const intersectionPoint = new THREE.Vector3();
+        if (raycaster.ray.intersectPlane(plane, intersectionPoint)) {
+          // In Top view, visual X maps to physical Y and visual Y maps to physical X
+          physicalPosition = {
+            x: intersectionPoint.y,  // Visual Y becomes physical X
+            y: intersectionPoint.x,  // Visual X becomes physical Y
+            z: targetPosition.value?.z || props.currentPos.z // Keep Z from previous target or current
+          };
+        }
+      } else if (currentCameraView.value === 'Side') {
+        // Side view: intersect with XZ plane at Y=0
+        const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+        const intersectionPoint = new THREE.Vector3();
+        if (raycaster.ray.intersectPlane(plane, intersectionPoint)) {
+          physicalPosition = {
+            x: targetPosition.value?.x || props.currentPos.x, // Keep X from previous target or current
+            y: targetPosition.value?.y || props.currentPos.y, // Keep Y from previous target or current
+            z: intersectionPoint.z   // Only set Z from click
+          };
+        }
+      }
+      
+      if (physicalPosition) {
+        // Snap to 1mm precision - same as clicking would do
+        const snappedPosition = {
+          x: snapToGrid(physicalPosition.x, 1.0), // 1mm precision
+          y: snapToGrid(physicalPosition.y, 1.0), // 1mm precision
+          z: snapToGrid(physicalPosition.z, 1.0)  // 1mm precision
+        };
+        
+        // Check if position is within working zone
+        if (isWithinWorkingZoneLocal(snappedPosition)) {
+          mouseTooltip.value = {
+            visible: true,
+            position: snappedPosition,
+            screenX: screenX,
+            screenY: screenY
+          };
+        } else {
+          mouseTooltip.value.visible = false;
+        }
+      } else {
+        mouseTooltip.value.visible = false;
+      }
+    };
+    
     const handleMouseMove = (mouseState) => (event) => {
+      // Always update mouse position for tooltip
+      const rect = renderer.domElement.getBoundingClientRect();
+      const mouse = new THREE.Vector2(
+        ((event.clientX - rect.left) / rect.width) * 2 - 1,
+        -((event.clientY - rect.top) / rect.height) * 2 + 1
+      );
+      
+      // Update tooltip position
+      updateMouseTooltip(mouse, event.clientX - rect.left, event.clientY - rect.top);
+      
       if (!mouseState.isLeftMouseDown) return;  // Only handle left mouse for panning
       
       const deltaX = event.clientX - mouseState.mouseX;
@@ -1880,16 +2011,17 @@ export default {
       return Math.round(value / precision) * precision;
     };
     
-    const snapToGrid = (value, gridSize = 0.5) => {
-      return Math.round(value / gridSize) * gridSize;
+    const snapToGrid = (value, gridSize = null) => {
+      const actualGridSize = gridSize || gridSpacing.value;
+      return Math.round(value / actualGridSize) * actualGridSize;
     };
     
     const processClickPosition = (position) => {
-      // Apply grid snapping for better accuracy
+      // Apply 1mm snapping for precise positioning (independent of visual grid)
       const snappedPosition = {
-        x: snapToGrid(position.x),
-        y: snapToGrid(position.y),
-        z: snapToGrid(position.z)
+        x: snapToGrid(position.x, 1.0), // 1mm precision
+        y: snapToGrid(position.y, 1.0), // 1mm precision
+        z: snapToGrid(position.z, 1.0)  // 1mm precision
       };
       
       // Apply 2 decimal place rounding (0.01mm precision)
@@ -2113,6 +2245,7 @@ export default {
         ghostToolHead.visible = true;
         // Ghost stays visible until tool reaches exact position
         // No timeout - ghost only disappears when tool arrives
+        
       }
       
       // Set target position and start movement simulation
@@ -2865,8 +2998,8 @@ export default {
         
         const workingX = props.cncConfig.workingZoneY; // Use Y config for X grid lines  
         const workingY = props.cncConfig.workingZoneX; // Use X config for Y grid lines
-        const gridDivisionsX = Math.max(Math.floor(workingX / 25), 4);
-        const gridDivisionsY = Math.max(Math.floor(workingY / 25), 4);
+        const gridDivisionsX = Math.max(Math.floor(workingX / gridSpacing.value), 4);
+        const gridDivisionsY = Math.max(Math.floor(workingY / gridSpacing.value), 4);
         
         const xyGridGeometry = trackResource(new THREE.BufferGeometry(), 'geometries');
         const xyGridVertices = [];
@@ -2904,8 +3037,8 @@ export default {
           // Recreate original XY grid
           const workingX = props.cncConfig.workingZoneX;
           const workingY = props.cncConfig.workingZoneY;
-          const gridDivisionsX = Math.max(Math.floor(workingX / 25), 4);
-          const gridDivisionsY = Math.max(Math.floor(workingY / 25), 4);
+          const gridDivisionsX = Math.max(Math.floor(workingX / gridSpacing.value), 4);
+          const gridDivisionsY = Math.max(Math.floor(workingY / gridSpacing.value), 4);
           
           const xyGridGeometry = trackResource(new THREE.BufferGeometry(), 'geometries');
           const xyGridVertices = [];
@@ -3301,6 +3434,32 @@ export default {
         markDirty('rendering');
       }
     };
+    
+    const regenerateGrids = () => {
+      if (!cncGroup) return;
+      
+      // Remove existing grids
+      if (gridHelper) {
+        cncGroup.remove(gridHelper);
+        gridHelper = null;
+      }
+      if (fineGridHelper) {
+        cncGroup.remove(fineGridHelper);
+        fineGridHelper = null;
+      }
+      
+      // Recreate grids with new spacing
+      if (props.cncConfig.selectedAxes?.x === true && props.cncConfig.selectedAxes?.y === true) {
+        createGrid('xy');
+      }
+      if (props.cncConfig.selectedAxes?.x === true && props.cncConfig.selectedAxes?.z === true) {
+        createGrid('xz');
+      }
+      
+      // Update grid visibility based on current view
+      setGridVisibility(currentCameraView.value);
+      markDirty('rendering');
+    };
 
     const getBoundingBoxForView = (viewType = null) => {
       // Use current view type if not provided
@@ -3685,10 +3844,14 @@ export default {
       isAnimating,
       showWorkingZone,
       showBoundingBox,
+      gridSpacing,
+      mouseTooltip,
+      mouseTooltipStyle,
       currentCameraView,
       resetCamera,
       toggleWorkingZone,
       toggleBoundingBox,
+      regenerateGrids,
       switchCameraView,
       toggleSimulationMode,
       closeViewer,
@@ -3812,6 +3975,38 @@ export default {
   box-shadow: inset 0 0 0 3px rgba(255, 0, 0, 0.5);
 }
 
+.mouse-tooltip {
+  position: absolute;
+  background-color: rgba(0, 0, 0, 0.85);
+  border: 1px solid rgba(0, 255, 0, 0.5);
+  border-radius: 4px;
+  padding: 6px 10px;
+  pointer-events: none;
+  z-index: 1000;
+  font-family: monospace;
+  font-size: 12px;
+  white-space: nowrap;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.mouse-tooltip .tooltip-content {
+  display: flex;
+  gap: 12px;
+  color: #fff;
+}
+
+.mouse-tooltip .coord-x {
+  color: #ff6b6b;
+}
+
+.mouse-tooltip .coord-y {
+  color: #51cf66;
+}
+
+.mouse-tooltip .coord-z {
+  color: #339af0;
+}
+
 .debug-overlay {
   position: absolute;
   top: 0;
@@ -3864,6 +4059,58 @@ export default {
   padding: var(--space-5);
   padding-right: var(--space-6); /* Extra space from scrollbar */
   overflow-y: auto;
+}
+
+.grid-settings {
+  margin-bottom: var(--space-6);
+  max-width: 320px;
+  margin-left: auto;
+  margin-right: auto;
+  padding-bottom: var(--space-4);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.grid-settings h4 {
+  margin: 0 0 var(--space-3) 0;
+  color: var(--color-primary);
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-bold);
+}
+
+.grid-spacing-control {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.grid-spacing-control label {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+  white-space: nowrap;
+  font-weight: var(--font-weight-medium);
+}
+
+.grid-spacing-input {
+  width: 70px;
+  padding: var(--space-2);
+  background-color: var(--color-bg-tertiary);
+  border: 1px solid var(--color-border-secondary);
+  border-radius: var(--border-radius-base);
+  color: var(--color-text-primary);
+  font-size: var(--font-size-sm);
+  text-align: center;
+}
+
+.grid-spacing-input:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 2px rgba(var(--color-primary-rgb), 0.2);
+}
+
+.grid-spacing-control .unit {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
 }
 
 .position-info,
