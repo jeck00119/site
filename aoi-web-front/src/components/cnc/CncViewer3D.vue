@@ -1295,7 +1295,7 @@ export default {
         axisRotation: [0, 0, Math.PI / 2],
         arrowPosition: (length) => [length, 0, 0],
         arrowRotation: [0, 0, -Math.PI / 2],
-        labelPosition: (length) => [length, -50, 40],
+        labelPosition: (length) => [length + 20, 0, 0],
         meshRef: () => ({ axis: 'xAxisMesh', arrow: 'xArrowMesh', label: 'xAxisLabel' })
       },
       y: {
@@ -1307,7 +1307,7 @@ export default {
         axisRotation: [0, 0, 0],
         arrowPosition: (length) => [0, length, 0],
         arrowRotation: [0, 0, 0],
-        labelPosition: (length) => [-50, length, 40],
+        labelPosition: (length) => [0, length + 20, 0],
         meshRef: () => ({ axis: 'yAxisMesh', arrow: 'yArrowMesh', label: 'yAxisLabel' })
       },
       z: {
@@ -1319,7 +1319,7 @@ export default {
         axisRotation: [Math.PI / 2, 0, 0],
         arrowPosition: (length) => [0, 0, length],
         arrowRotation: [Math.PI / 2, 0, 0],
-        labelPosition: (length) => [-50, 40, length],
+        labelPosition: (length) => [0, 0, length + 20],
         meshRef: () => ({ axis: 'zAxisMesh', arrow: 'zArrowMesh', label: 'zAxisLabel' })
       }
     };
@@ -1692,24 +1692,26 @@ export default {
     };
 
     const calculatePanning = (deltaX, deltaY) => {
-      const panSpeed = 2;
+      const panSpeed = 0.5; // Moderate speed - not too fast, not too slow
       
-      // Reuse cached vectors to reduce object creation
-      camera.getWorldDirection(vectorCache.direction);
-      vectorCache.rightVector.crossVectors(camera.up, vectorCache.direction);
-      vectorCache.rightVector.normalize();
+      // Pure screen-space camera movement - ignore 3D axis, just move camera in screen directions
+      // Get camera's right and up vectors from its current orientation
+      const cameraRight = new THREE.Vector3();
+      const cameraUp = new THREE.Vector3();
       
-      // Use camera's up vector directly
-      vectorCache.upVector.copy(camera.up);
+      // Get camera's right vector (screen horizontal)
+      cameraRight.setFromMatrixColumn(camera.matrix, 0); // Right vector from camera matrix
+      cameraRight.normalize();
       
-      // Calculate pan movement using cached vectors
-      vectorCache.panX.copy(vectorCache.rightVector).multiplyScalar(deltaX * panSpeed);
-      vectorCache.panY.copy(vectorCache.upVector).multiplyScalar(deltaY * panSpeed);
+      // Get camera's up vector (screen vertical)  
+      cameraUp.setFromMatrixColumn(camera.matrix, 1); // Up vector from camera matrix
+      cameraUp.normalize();
       
-      return { 
-        panX: vectorCache.panX.clone(), 
-        panY: vectorCache.panY.clone() 
-      };
+      // Calculate movement in screen space
+      const panX = cameraRight.clone().multiplyScalar(-deltaX * panSpeed); // Negative for intuitive left/right
+      const panY = cameraUp.clone().multiplyScalar(deltaY * panSpeed); // Positive for intuitive up/down
+      
+      return { panX, panY };
     };
     
     // Cache panning limits calculations
@@ -1822,12 +1824,36 @@ export default {
 
     
     
-    const updateMouseTooltip = (normalizedMouse, screenX, screenY) => {
+    const updateMouseTooltip = (normalizedMouse, event) => {
       // Only show tooltip in fixed views where clicking is enabled
       const isFixedView = currentCameraView.value === 'Top' || currentCameraView.value === 'Side';
       if (!isFixedView || !raycaster || !camera || !scene) {
         mouseTooltip.value.visible = false;
         return;
+      }
+      
+      // Canvas boundary check with margins to avoid showing tooltip near edges
+      if (event && renderer?.domElement) {
+        const canvasRect = renderer.domElement.getBoundingClientRect();
+        const mouseX = event.clientX;
+        const mouseY = event.clientY;
+        
+        // Add small margin around canvas edges to prevent tooltip near UI elements
+        const margin = 5; // 5px margin from canvas edges
+        
+        // Check if mouse is within canvas boundaries with margins
+        const isInsideCanvasWithMargin = (
+          mouseX >= canvasRect.left + margin &&
+          mouseX <= canvasRect.right - margin &&
+          mouseY >= canvasRect.top + margin &&
+          mouseY <= canvasRect.bottom - margin
+        );
+        
+        // Hide tooltip if mouse is too close to canvas edges
+        if (!isInsideCanvasWithMargin) {
+          mouseTooltip.value.visible = false;
+          return;
+        }
       }
       
       raycaster.setFromCamera(normalizedMouse, camera);
@@ -1861,21 +1887,35 @@ export default {
       }
       
       if (physicalPosition) {
-        // Snap to 1mm precision - same as clicking would do
-        const snappedPosition = {
-          x: snapToGrid(physicalPosition.x, 1.0), // 1mm precision
-          y: snapToGrid(physicalPosition.y, 1.0), // 1mm precision
-          z: snapToGrid(physicalPosition.z, 1.0)  // 1mm precision
-        };
+        // First check if position is within the actual grid boundaries
+        const bounds = getWorkingZoneBounds(props.cncConfig, false);
+        const isWithinGridBounds = (
+          physicalPosition.x >= 0 && physicalPosition.x <= bounds.x &&
+          physicalPosition.y >= 0 && physicalPosition.y <= bounds.y &&
+          physicalPosition.z >= 0 && physicalPosition.z <= bounds.z
+        );
         
-        // Check if position is within working zone
-        if (isWithinWorkingZoneLocal(snappedPosition)) {
-          mouseTooltip.value = {
-            visible: true,
-            position: snappedPosition,
-            screenX: screenX,
-            screenY: screenY
+        if (isWithinGridBounds) {
+          // Snap to 1mm precision - same as clicking would do
+          const snappedPosition = {
+            x: snapToGrid(physicalPosition.x, 1.0), // 1mm precision
+            y: snapToGrid(physicalPosition.y, 1.0), // 1mm precision
+            z: snapToGrid(physicalPosition.z, 1.0)  // 1mm precision
           };
+          
+          // Double-check with working zone validation
+          if (isWithinWorkingZoneLocal(snappedPosition)) {
+            // Calculate screen coordinates relative to canvas
+            const canvasRect = renderer.domElement.getBoundingClientRect();
+            mouseTooltip.value = {
+              visible: true,
+              position: snappedPosition,
+              screenX: event.clientX - canvasRect.left,
+              screenY: event.clientY - canvasRect.top
+            };
+          } else {
+            mouseTooltip.value.visible = false;
+          }
         } else {
           mouseTooltip.value.visible = false;
         }
@@ -1893,7 +1933,7 @@ export default {
       );
       
       // Update tooltip position
-      updateMouseTooltip(mouse, event.clientX - rect.left, event.clientY - rect.top);
+      updateMouseTooltip(mouse, event);
       
       if (!mouseState.isLeftMouseDown) return;  // Only handle left mouse for panning
       
@@ -3093,8 +3133,8 @@ export default {
             xAxisLabel = createTextSprite('X', '#ff1744');
             yAxisLabel = createTextSprite('Y', '#00e676');
             
-            xAxisLabel.position.set(props.cncConfig.xAxisLength, -50, 40);
-            yAxisLabel.position.set(-50, props.cncConfig.yAxisLength, 40);
+            xAxisLabel.position.set(props.cncConfig.xAxisLength + 20, 0, 0);
+            yAxisLabel.position.set(0, props.cncConfig.yAxisLength + 20, 0);
             
             cncGroup.add(xAxisLabel);
             cncGroup.add(yAxisLabel);
@@ -3103,7 +3143,7 @@ export default {
             yAxisLabel.visible = true;
           }
           if (zAxisLabel) {
-            zAxisLabel.position.set(-50, 40, props.cncConfig.zAxisLength);
+            zAxisLabel.position.set(0, 0, props.cncConfig.zAxisLength + 20);
             zAxisLabel.visible = true;
           }
           break;
@@ -3122,9 +3162,9 @@ export default {
             
             // Position labels exactly where the swapped arrowheads are
             // X arrowhead is at (0, xAxisLength, 0), so X label near there
-            tempXLabel.position.set(-20, props.cncConfig.xAxisLength + 20, -10); 
+            tempXLabel.position.set(0, props.cncConfig.xAxisLength + 20, 0); 
             // Y arrowhead is at (yAxisLength, 0, 0), so Y label near there  
-            tempYLabel.position.set(props.cncConfig.yAxisLength + 20, -20, -10);
+            tempYLabel.position.set(props.cncConfig.yAxisLength + 20, 0, 0);
             
             cncGroup.add(tempXLabel);
             cncGroup.add(tempYLabel);
@@ -3137,8 +3177,8 @@ export default {
             yAxisLabel.visible = true;
           }
           if (zAxisLabel) {
-            // Z label near origin to indicate depth axis
-            zAxisLabel.position.set(-20, -20, props.cncConfig.zAxisLength);
+            // Z label near Z arrowhead
+            zAxisLabel.position.set(0, 0, props.cncConfig.zAxisLength + 20);
             zAxisLabel.visible = true;
           }
           break;
@@ -3153,8 +3193,8 @@ export default {
             xAxisLabel = createTextSprite('X', '#ff1744');
             yAxisLabel = createTextSprite('Y', '#00e676');
             
-            xAxisLabel.position.set(props.cncConfig.xAxisLength, 50, -50);
-            yAxisLabel.position.set(-50, props.cncConfig.yAxisLength, 40); // Normal Y position
+            xAxisLabel.position.set(props.cncConfig.xAxisLength + 20, 0, 0);
+            yAxisLabel.position.set(0, props.cncConfig.yAxisLength + 20, 0); // Normal Y position
             
             cncGroup.add(xAxisLabel);
             cncGroup.add(yAxisLabel);
@@ -3163,7 +3203,7 @@ export default {
             yAxisLabel.visible = false; // Hide Y label (behind in side view)
           }
           if (zAxisLabel) {
-            zAxisLabel.position.set(-50, 50, props.cncConfig.zAxisLength);
+            zAxisLabel.position.set(0, 0, props.cncConfig.zAxisLength + 20);
             zAxisLabel.visible = true;
           }
           break;
