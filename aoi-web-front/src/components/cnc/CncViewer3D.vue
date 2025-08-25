@@ -242,7 +242,9 @@ import { ref, onMounted, onUnmounted, watch, computed, nextTick } from 'vue';
 import * as THREE from 'three';
 import { logger } from '@/utils/logger';
 import { useCncStore } from '@/composables/useStore';
-import { formatPrecision, formatCoordinate, formatPosition, getWorkingZoneBounds, isWithinWorkingZone, setTargetForRealMovement } from '@/utils/validation';
+import { formatPrecision, formatCoordinate, formatPosition, getWorkingZoneBounds, isWithinWorkingZone, setTargetForRealMovement, validateCnc3DConfig, requires3DSetup, get3DSetupMessage } from '@/utils/validation';
+import { CncMessages, NotificationType } from '@/constants/notifications';
+import useNotification from '@/hooks/notifications';
 
 export default {
   name: 'CncViewer3D',
@@ -264,8 +266,25 @@ export default {
       default: false
     }
   },
-  emits: ['close', 'moveTo', 'simulateMoveTo', 'positionUpdate', 'targetUpdate', 'simulationModeChanged'],
+  emits: ['close', 'moveTo', 'simulateMoveTo', 'positionUpdate', 'targetUpdate', 'simulationModeChanged', 'initSuccess', 'initFailure'],
   setup(props, { emit }) {
+    // Use centralized notification system
+    const { setTypedNotification } = useNotification();
+    
+    // Validate configuration before initializing 3D viewer
+    if (requires3DSetup(props.cncConfig)) {
+      const errorMessage = get3DSetupMessage(props.cncConfig);
+      logger.error('3D Viewer initialization failed:', errorMessage);
+      setTypedNotification(errorMessage || CncMessages.CONFIG_INCOMPLETE, NotificationType.ERROR);
+      
+      // Emit failure event to parent component
+      emit('initFailure', { error: errorMessage, type: 'config-validation' });
+      
+      // Emit close event to force return to setup
+      emit('close');
+      return {};
+    }
+    
     // DOM reference - needs to be reactive for template ref
     const threeContainer = ref(null);
     
@@ -506,7 +525,6 @@ export default {
     // Click-to-move state
     let raycaster = null;
     let mouse = new THREE.Vector2();
-    let clickTarget = null; // Visual indicator for click target
     
     // WebGL Support Detection
     const checkWebGLSupport = () => {
@@ -517,7 +535,7 @@ export default {
         if (!gl) {
           hasWebglSupport.value = false;
           webglError.value = 'webgl-not-supported';
-          errorMessage.value = 'WebGL is not supported on this device. Please try a different browser or enable hardware acceleration.';
+          errorMessage.value = CncMessages.WEBGL_NOT_SUPPORTED;
           logger.error('WebGL not supported');
           return false;
         }
@@ -571,7 +589,7 @@ export default {
       event.preventDefault();
       
       webglError.value = 'context-lost';
-      errorMessage.value = 'WebGL context was lost. The 3D viewer will attempt to restore automatically.';
+      errorMessage.value = CncMessages.WEBGL_CONTEXT_LOST;
       
       // Stop animation to prevent errors
       stopAnimationLoop();
@@ -598,6 +616,7 @@ export default {
           try {
             initThreeJS();
             logger.info('3D scene successfully restored after context loss');
+            setTypedNotification(CncMessages.WEBGL_CONTEXT_RESTORED, NotificationType.SUCCESS, 3000);
           } catch (error) {
             logger.error('Failed to restore 3D scene after context restoration:', error);
             webglError.value = 'restoration-failed';
@@ -876,7 +895,6 @@ export default {
       zAxisLabel = null;
       boundingBoxMesh = null;
       raycaster = null;
-      clickTarget = null;
       mouse = null;
     };
     
@@ -1089,12 +1107,18 @@ export default {
         isInitialized.value = true;
         logger.info('Three.js CNC viewer initialized successfully');
         
+        // Emit success event to parent component
+        emit('initSuccess');
+        
       } catch (error) {
         logger.error('Failed to initialize Three.js CNC viewer:', error);
         
         // Set error state
         webglError.value = 'initialization-failed';
         errorMessage.value = `Failed to initialize 3D viewer: ${error.message}`;
+        
+        // Emit failure event to parent component
+        emit('initFailure', { error: error.message, type: 'initialization-failed' });
         
         // Clean up any partially created resources
         try {
@@ -1583,7 +1607,7 @@ export default {
       // Create mesh
       workingZoneMesh = trackResource(new THREE.LineSegments(edgesGeometry, material), 'meshes');
       
-      // Position working zone at origin to align with grid (not centered)
+      // Position working zone at center (box geometry is centered around its position)
       workingZoneMesh.position.set(
         dimensions.x / 2,
         dimensions.y / 2,
@@ -1637,7 +1661,6 @@ export default {
       cncGroup.add(ghostToolHead);
       
       // Remove the cyan ring - we don't need extra indicators
-      clickTarget = null;
     };
 
     // Mouse event throttling
@@ -1827,6 +1850,8 @@ export default {
     const updateMouseTooltip = (normalizedMouse, event) => {
       // Only show tooltip in fixed views where clicking is enabled
       const isFixedView = currentCameraView.value === 'Top' || currentCameraView.value === 'Side';
+      
+      
       if (!isFixedView || !raycaster || !camera || !scene) {
         mouseTooltip.value.visible = false;
         return;
@@ -1870,7 +1895,7 @@ export default {
           physicalPosition = {
             x: intersectionPoint.y,  // Visual Y becomes physical X
             y: intersectionPoint.x,  // Visual X becomes physical Y
-            z: targetPosition.value?.z || props.currentPos.z // Keep Z from previous target or current
+            z: 0 // Top view is always Z=0 for tooltip display
           };
         }
       } else if (currentCameraView.value === 'Side') {
@@ -1895,6 +1920,7 @@ export default {
           physicalPosition.z >= 0 && physicalPosition.z <= bounds.z
         );
         
+        
         if (isWithinGridBounds) {
           // Snap to 1mm precision - same as clicking would do
           const snappedPosition = {
@@ -1905,13 +1931,14 @@ export default {
           
           // Double-check with working zone validation
           if (isWithinWorkingZoneLocal(snappedPosition)) {
-            // Calculate screen coordinates relative to canvas
+            // Calculate screen coordinates relative to both canvas and container for positioning
             const canvasRect = renderer.domElement.getBoundingClientRect();
+            const containerRect = threeContainer.value.getBoundingClientRect();
             mouseTooltip.value = {
               visible: true,
               position: snappedPosition,
-              screenX: event.clientX - canvasRect.left,
-              screenY: event.clientY - canvasRect.top
+              screenX: event.clientX - containerRect.left,
+              screenY: event.clientY - containerRect.top
             };
           } else {
             mouseTooltip.value.visible = false;
@@ -2116,30 +2143,28 @@ export default {
       let clickedPosition = null;
       
       if (currentCameraView.value === 'Top') {
-        // Top view: intersect with XY plane at Z=0 for better accuracy
-        const plane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0); // Fixed Z=0 plane
+        // Top view: intersect with XY plane at Z=0 (matches grid positioning)
+        const plane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
         const intersectionPoint = new THREE.Vector3();
         if (raycaster.ray.intersectPlane(plane, intersectionPoint)) {
-          // In Top view, visual X maps to physical Y and visual Y maps to physical X
-          // So we need to swap the coordinates to match the physical CNC axes
+          // In Top view, visual coordinates are swapped for display
+          // Visual Y maps to physical X, Visual X maps to physical Y
           clickedPosition = {
             x: intersectionPoint.y,  // Visual Y becomes physical X
             y: intersectionPoint.x,  // Visual X becomes physical Y
-            z: targetPosition.value?.z || props.currentPos.z // Keep Z from previous target or current
+            z: targetPosition.value?.z || props.currentPos.z
           };
-          
         }
       } else if (currentCameraView.value === 'Side') {
-        // Side view: intersect with XZ plane at Y=0 for better accuracy
-        const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0); // Fixed Y=0 plane
+        // Side view: intersect with XZ plane at Y=0 (matches grid positioning)
+        const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
         const intersectionPoint = new THREE.Vector3();
         if (raycaster.ray.intersectPlane(plane, intersectionPoint)) {
           clickedPosition = {
-            x: targetPosition.value?.x || props.currentPos.x, // Keep X from previous target or current
-            y: targetPosition.value?.y || props.currentPos.y, // Keep Y from previous target or current
-            z: intersectionPoint.z   // Only set Z from click
+            x: targetPosition.value?.x || props.currentPos.x,
+            y: targetPosition.value?.y || props.currentPos.y,
+            z: intersectionPoint.z
           };
-          
         }
       }
       
@@ -4011,6 +4036,14 @@ export default {
   position: relative;
 }
 
+.three-container canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  position: relative;
+  z-index: 1;
+}
+
 .three-container.debug-border {
   box-shadow: inset 0 0 0 3px rgba(255, 0, 0, 0.5);
 }
@@ -4022,11 +4055,13 @@ export default {
   border-radius: 4px;
   padding: 6px 10px;
   pointer-events: none;
-  z-index: 1000;
+  z-index: 10000; /* Increased z-index to ensure it's above canvas */
   font-family: monospace;
   font-size: 12px;
   white-space: nowrap;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  /* Add transition for smooth appearance */
+  transition: opacity 0.15s ease-in-out;
 }
 
 .mouse-tooltip .tooltip-content {

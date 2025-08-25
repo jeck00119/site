@@ -253,6 +253,52 @@ export const GeneralMessages = {
 } as const;
 
 // ============================================
+// CNC MESSAGES
+// ============================================
+export const CncMessages = {
+  // 3D Configuration messages
+  CONFIG_INCOMPLETE: 'CNC 3D configuration is incomplete. Please complete the setup first.',
+  CONFIG_INVALID: 'CNC 3D configuration contains invalid values.',
+  SETUP_REQUIRED: 'Please configure the 3D CNC dimensions and working zones before using the 3D viewer.',
+  SETUP_SUCCESS: 'CNC 3D configuration saved successfully.',
+  SETUP_FAILED: 'Failed to save CNC 3D configuration. Please try again.',
+  CONFIG_NOT_SAVED: 'Configuration was not saved due to 3D viewer generation failure.',
+  
+  // Connection messages
+  NOT_FOUND: 'CNC not found. Please ensure CNC is configured.',
+  NOT_CONNECTED: 'CNC not connected. Please connect first.',
+  ALREADY_MOVING: 'CNC is already moving. Please wait for current movement to complete.',
+  
+  // Movement messages
+  MOVEMENT_STARTED: 'CNC movement started.',
+  MOVEMENT_COMPLETED: 'CNC movement completed successfully.',
+  MOVEMENT_FAILED: 'CNC movement failed.',
+  TARGET_OUTSIDE_ZONE: 'Target position is outside the working zone.',
+  SIMULATION_MODE_ON: 'Simulation mode enabled - movements will not affect real CNC.',
+  SIMULATION_MODE_OFF: 'Simulation mode disabled - movements will control real CNC.',
+  
+  // 3D Viewer messages
+  VIEWER_INITIALIZING: 'Initializing 3D CNC viewer...',
+  VIEWER_READY: '3D CNC viewer ready.',
+  VIEWER_ERROR: 'Failed to initialize 3D viewer. Please try refreshing the page.',
+  WEBGL_NOT_SUPPORTED: 'WebGL is not supported on this device. Please try a different browser or enable hardware acceleration.',
+  WEBGL_CONTEXT_LOST: 'WebGL context lost. Attempting to restore...',
+  WEBGL_CONTEXT_RESTORED: '3D viewer restored successfully.',
+  
+  // Click-to-move messages
+  CLICK_TO_MOVE_DISABLED: 'Click-to-move is disabled when CNC is not connected.',
+  CLICK_OUTSIDE_ZONE: 'Click position is outside the working zone.',
+  PARTIAL_CLICK_INFO: (view: string, remaining: string[]) => `${view} position set. Click in ${remaining.join(' or ')} view to complete movement.`,
+  
+  // Validation messages
+  AXIS_LENGTH_REQUIRED: (axis: string) => `${axis}-axis length is required and must be greater than 0.`,
+  WORKING_ZONE_REQUIRED: (axis: string) => `Working zone ${axis} is required and must be greater than 0.`,
+  WORKING_ZONE_EXCEEDS: (axis: string) => `Working zone ${axis} cannot exceed ${axis}-axis length.`,
+  AXIS_SELECTION_REQUIRED: 'At least one axis must be selected.',
+  DIMENSIONS_INVALID: 'CNC dimensions are invalid. Please check your configuration.'
+} as const;
+
+// ============================================
 // WEBSOCKET MESSAGES
 // ============================================
 export const WebSocketMessages = {
@@ -321,6 +367,7 @@ export const Messages = {
   Component: ComponentMessages,
   File: FileMessages,
   Itac: ItacMessages,
+  Cnc: CncMessages,
   Validation: ValidationMessages,
   General: GeneralMessages,
   WebSocket: WebSocketMessages

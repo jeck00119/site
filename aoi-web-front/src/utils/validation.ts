@@ -402,3 +402,123 @@ export function getFirstValidationError(data: FormData): string | null {
 
     return null; // All valid
 }
+
+/**
+ * 3D CNC Configuration Validation
+ */
+export interface CncConfig3DValidation {
+    isValid: boolean;
+    errors: string[];
+    missingFields: string[];
+}
+
+export function validateCnc3DConfig(config: CncConfig | null | undefined): CncConfig3DValidation {
+    const result: CncConfig3DValidation = {
+        isValid: true,
+        errors: [],
+        missingFields: []
+    };
+
+    if (!config) {
+        result.isValid = false;
+        result.errors.push('CNC configuration is missing.');
+        result.missingFields.push('entire configuration');
+        return result;
+    }
+
+    // Check if at least one axis is selected first
+    const selectedAxes = config.selectedAxes;
+    if (!selectedAxes || (!selectedAxes.x && !selectedAxes.y && !selectedAxes.z)) {
+        result.isValid = false;
+        result.errors.push('At least one axis must be selected.');
+        result.missingFields.push('selectedAxes');
+        return result; // Early return if no axes selected
+    }
+
+    // Check required axis lengths (must be > 0) - only for selected axes
+    if (selectedAxes.x) {
+        if (!config.xAxisLength || config.xAxisLength <= 0) {
+            result.isValid = false;
+            result.errors.push('X-Axis Length must be greater than 0.');
+            result.missingFields.push('xAxisLength');
+        }
+        if (!config.workingZoneX || config.workingZoneX <= 0) {
+            result.isValid = false;
+            result.errors.push('Working Zone X must be greater than 0.');
+            result.missingFields.push('workingZoneX');
+        }
+    }
+
+    if (selectedAxes.y) {
+        if (!config.yAxisLength || config.yAxisLength <= 0) {
+            result.isValid = false;
+            result.errors.push('Y-Axis Length must be greater than 0.');
+            result.missingFields.push('yAxisLength');
+        }
+        if (!config.workingZoneY || config.workingZoneY <= 0) {
+            result.isValid = false;
+            result.errors.push('Working Zone Y must be greater than 0.');
+            result.missingFields.push('workingZoneY');
+        }
+    }
+
+    if (selectedAxes.z) {
+        if (!config.zAxisLength || config.zAxisLength <= 0) {
+            result.isValid = false;
+            result.errors.push('Z-Axis Length must be greater than 0.');
+            result.missingFields.push('zAxisLength');
+        }
+        if (!config.workingZoneZ || config.workingZoneZ <= 0) {
+            result.isValid = false;
+            result.errors.push('Working Zone Z must be greater than 0.');
+            result.missingFields.push('workingZoneZ');
+        }
+    }
+
+    // Validate working zone doesn't exceed axis length - only for selected axes
+    if (selectedAxes.x && config.workingZoneX && config.xAxisLength && config.workingZoneX > config.xAxisLength) {
+        result.isValid = false;
+        result.errors.push('Working Zone X cannot exceed X-Axis Length.');
+    }
+
+    if (selectedAxes.y && config.workingZoneY && config.yAxisLength && config.workingZoneY > config.yAxisLength) {
+        result.isValid = false;
+        result.errors.push('Working Zone Y cannot exceed Y-Axis Length.');
+    }
+
+    if (selectedAxes.z && config.workingZoneZ && config.zAxisLength && config.workingZoneZ > config.zAxisLength) {
+        result.isValid = false;
+        result.errors.push('Working Zone Z cannot exceed Z-Axis Length.');
+    }
+
+    return result;
+}
+
+/**
+ * Check if 3D configuration requires user setup
+ */
+export function requires3DSetup(config: CncConfig | null | undefined): boolean {
+    const validation = validateCnc3DConfig(config);
+    return !validation.isValid;
+}
+
+/**
+ * Get user-friendly setup message for missing 3D config
+ */
+export function get3DSetupMessage(config: CncConfig | null | undefined): string {
+    const validation = validateCnc3DConfig(config);
+    
+    if (validation.isValid) {
+        return '';
+    }
+
+    if (validation.errors.length === 1) {
+        return validation.errors[0];
+    }
+
+    if (validation.errors.length > 1) {
+        return `Configuration issues: ${validation.errors.join(', ')}`;
+    }
+
+    return 'Please configure the 3D CNC dimensions and working zones before using the 3D viewer.';
+}

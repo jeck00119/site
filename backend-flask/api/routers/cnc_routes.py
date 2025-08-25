@@ -272,6 +272,9 @@ async def post_cncs(
     try:
         cnc_models = []
         for cnc in cnc_data.cnc_list:
+            # Extract just the port name without description (e.g., "COM10 (STMicroelectronics)" -> "COM10")
+            if 'port' in cnc and cnc['port'] and '(' in cnc['port']:
+                cnc['port'] = cnc['port'].split('(')[0].strip()
             cnc_models.append(CncModel(**cnc))
         add, update, delete = cnc_service.save_cnc_configurations(cnc_models)
         for cnc_model in cnc_models:

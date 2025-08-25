@@ -18,13 +18,13 @@ class CncModel(CamelModel):
     sequences: List[dict] = Field(default_factory=list)  # List of saved position sequences
     shortcuts: List[dict] = Field(default_factory=list)  # List of saved location shortcuts
     
-    # 3D CNC Setup Configuration
-    x_axis_length: int = Field(default=300)  # X-axis physical travel length in mm
-    y_axis_length: int = Field(default=300)  # Y-axis physical travel length in mm  
-    z_axis_length: int = Field(default=100)  # Z-axis physical travel length in mm
-    working_zone_x: int = Field(default=250)  # Usable X working area in mm
-    working_zone_y: int = Field(default=250)  # Usable Y working area in mm
-    working_zone_z: int = Field(default=80)   # Usable Z working area in mm
+    # 3D CNC Setup Configuration - 0 values force user configuration
+    x_axis_length: int = Field(default=0)  # X-axis physical travel length in mm (REQUIRED)
+    y_axis_length: int = Field(default=0)  # Y-axis physical travel length in mm (REQUIRED)
+    z_axis_length: int = Field(default=0)  # Z-axis physical travel length in mm (REQUIRED)
+    working_zone_x: int = Field(default=0)  # Usable X working area in mm (REQUIRED)
+    working_zone_y: int = Field(default=0)  # Usable Y working area in mm (REQUIRED)
+    working_zone_z: int = Field(default=0)  # Usable Z working area in mm (REQUIRED)
     selected_axes: dict = Field(default_factory=lambda: {"x": True, "y": True, "z": True})  # Active axes selection
 
 

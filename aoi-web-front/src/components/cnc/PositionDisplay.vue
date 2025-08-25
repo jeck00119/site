@@ -33,6 +33,8 @@
       @moveTo="handleMoveTo"
       @simulateMoveTo="handleSimulateMoveTo"
       @simulationModeChanged="handleSimulationModeChanged"
+      @initSuccess="on3DViewerSuccess"
+      @initFailure="on3DViewerFailure"
     />
 
     <!-- CNC Setup Modal -->
@@ -46,6 +48,19 @@
         <div class="modal-body">
           <div class="setup-form">
             <h4>CNC Rig Parameters</h4>
+            
+            <!-- Validation Errors Display -->
+            <div v-if="currentValidationErrors.length > 0" class="validation-errors">
+              <div class="error-header">
+                <font-awesome-icon icon="exclamation-triangle" />
+                <span>Please fix the following issues:</span>
+              </div>
+              <ul class="error-list">
+                <li v-for="error in currentValidationErrors" :key="error" class="error-item">
+                  {{ error }}
+                </li>
+              </ul>
+            </div>
             
             <!-- Manual Axis Selection -->
             <div class="axis-selection">
@@ -148,7 +163,12 @@
         
         <div class="modal-footer">
           <button class="cancel-button" @click="closeCncSetupModal">Cancel</button>
-          <button class="save-button" @click="saveCncConfigAndOpen3D">
+          <button 
+            class="save-button" 
+            @click="saveCncConfigAndOpen3D"
+            :disabled="currentValidationErrors.length > 0"
+            :class="{ 'disabled': currentValidationErrors.length > 0 }"
+          >
             Generate 3D Model
           </button>
         </div>
@@ -180,13 +200,16 @@
 import { computed, onMounted, ref, watch, nextTick } from "vue";
 import { useCncStore } from '@/composables/useStore';
 import { useCncMovement } from '@/composables/useCncMovement';
-import { formatCoordinate } from '@/utils/validation';
+import { formatCoordinate, validateCnc3DConfig, requires3DSetup, get3DSetupMessage } from '@/utils/validation';
 import { logger } from '@/utils/logger';
+import { formatValidationError } from '@/utils/errorHandler';
+import { CncMessages, NotificationType, createNotification } from '@/constants/notifications';
+import useNotification from '@/hooks/notifications';
 import CncViewer3D from './CncViewer3D.vue';
 import { library } from '@fortawesome/fontawesome-svg-core';
-import { faGear, faCube } from '@fortawesome/free-solid-svg-icons';
+import { faGear, faCube, faExclamationTriangle } from '@fortawesome/free-solid-svg-icons';
 
-library.add(faGear, faCube);
+library.add(faGear, faCube, faExclamationTriangle);
 
 export default {
   name: "PositionDisplay",
@@ -211,8 +234,23 @@ export default {
     // Use CNC movement composable for click-to-move functionality
     const { executeMovementToPosition, isMoving } = useCncMovement(props.axisUid);
     
+    // Use centralized notification system
+    const { setTypedNotification } = useNotification();
+    
+    // Default CNC configuration - now defaults to 0 to force user setup
+    const defaultCncConfig = {
+      xAxisLength: 0,
+      yAxisLength: 0,
+      zAxisLength: 0,
+      workingZoneX: 0,
+      workingZoneY: 0,
+      workingZoneZ: 0
+    };
+    
     // CNC Setup Modal state
     const showCncSetup = ref(false);
+    const lastSavedConfig = ref({ ...defaultCncConfig });
+    const lastSavedSelectedAxes = ref({ x: true, y: true, z: true });
     
     // 3D Viewer state
     const show3DViewer = ref(false);
@@ -221,181 +259,186 @@ export default {
     // Simulated position for testing (starts with real position)
     const simulatedPos = ref({ ...pos.value });
     
-    // Default CNC configuration
-    const defaultCncConfig = {
-      xAxisLength: 300,
-      yAxisLength: 300,
-      zAxisLength: 100,
-      workingZoneX: 250,
-      workingZoneY: 250,
-      workingZoneZ: 80
-    };
-    
     const cncConfig = ref({ ...defaultCncConfig });
     
-    // Load saved configuration if available
-    const configKey = `cnc-3d-config-${props.axisUid}`;
+    // Load saved configuration from database only (not localStorage)
     const loadCncConfig = () => {
       try {
-        // First, try to load from backend CNC configuration
+        // Only load from backend CNC configuration (database)
         const currentCnc = cncs.value?.find(cnc => cnc.uid === props.axisUid);
         
-        // Check if backend has 3D config (either camelCase or snake_case field names)
-        const hasBackendConfig = currentCnc && (
-          (currentCnc.xAxisLength !== undefined && currentCnc.xAxisLength > 0) ||
-          (currentCnc.x_axis_length !== undefined && currentCnc.x_axis_length > 0)
+        // Check if backend has valid 3D config (values > 0)
+        const hasValidBackendConfig = currentCnc && (
+          (currentCnc.xAxisLength > 0 || currentCnc.x_axis_length > 0) ||
+          (currentCnc.yAxisLength > 0 || currentCnc.y_axis_length > 0) ||
+          (currentCnc.zAxisLength > 0 || currentCnc.z_axis_length > 0)
         );
         
-        if (hasBackendConfig) {
+        if (hasValidBackendConfig) {
           // Load from backend CNC config - handle both camelCase and snake_case
-          cncConfig.value = {
-            xAxisLength: currentCnc.xAxisLength || currentCnc.x_axis_length || defaultCncConfig.xAxisLength,
-            yAxisLength: currentCnc.yAxisLength || currentCnc.y_axis_length || defaultCncConfig.yAxisLength,
-            zAxisLength: currentCnc.zAxisLength || currentCnc.z_axis_length || defaultCncConfig.zAxisLength,
-            workingZoneX: currentCnc.workingZoneX || currentCnc.working_zone_x || defaultCncConfig.workingZoneX,
-            workingZoneY: currentCnc.workingZoneY || currentCnc.working_zone_y || defaultCncConfig.workingZoneY,
-            workingZoneZ: currentCnc.workingZoneZ || currentCnc.working_zone_z || defaultCncConfig.workingZoneZ
+          const loadedConfig = {
+            xAxisLength: currentCnc.xAxisLength || currentCnc.x_axis_length || 0,
+            yAxisLength: currentCnc.yAxisLength || currentCnc.y_axis_length || 0,
+            zAxisLength: currentCnc.zAxisLength || currentCnc.z_axis_length || 0,
+            workingZoneX: currentCnc.workingZoneX || currentCnc.working_zone_x || 0,
+            workingZoneY: currentCnc.workingZoneY || currentCnc.working_zone_y || 0,
+            workingZoneZ: currentCnc.workingZoneZ || currentCnc.working_zone_z || 0
           };
           
-          // Handle selected axes (can be from camelCase or snake_case)
-          const backendSelectedAxes = currentCnc.selectedAxes || currentCnc.selected_axes || { x: true, y: true, z: true };
-          selectedAxes.value = { ...selectedAxes.value, ...backendSelectedAxes };
+          // Handle selected axes
+          const loadedSelectedAxes = currentCnc.selectedAxes || currentCnc.selected_axes || { x: true, y: true, z: true };
           
-          logger.info('CNC 3D config loaded from backend:', cncConfig.value);
-          return;
+          // Set both current and last saved (since this came from database)
+          cncConfig.value = { ...loadedConfig };
+          selectedAxes.value = { ...loadedSelectedAxes };
+          lastSavedConfig.value = { ...loadedConfig };
+          lastSavedSelectedAxes.value = { ...loadedSelectedAxes };
+          
+          logger.info('CNC 3D config loaded from database:', loadedConfig);
+        } else {
+          // No valid config in database, use defaults
+          cncConfig.value = { ...defaultCncConfig };
+          selectedAxes.value = { x: true, y: true, z: true };
+          lastSavedConfig.value = { ...defaultCncConfig };
+          lastSavedSelectedAxes.value = { x: true, y: true, z: true };
+          
+          logger.info('No valid CNC 3D config in database, using defaults');
         }
         
-        // Fallback to localStorage if backend doesn't have config
-        const saved = localStorage.getItem(configKey);
-        if (saved) {
-          const parsed = JSON.parse(saved);
-          cncConfig.value = { ...defaultCncConfig, ...parsed };
-          
-          // Load selected axes if saved
-          if (parsed.selectedAxes) {
-            selectedAxes.value = { ...selectedAxes.value, ...parsed.selectedAxes };
-          }
-          
-          logger.info('CNC 3D config loaded from localStorage:', cncConfig.value);
-        }
       } catch (error) {
         logger.warn('Failed to load CNC 3D config:', error);
+        
+        // Fallback to defaults on error
+        cncConfig.value = { ...defaultCncConfig };
+        selectedAxes.value = { x: true, y: true, z: true };
+        lastSavedConfig.value = { ...defaultCncConfig };
+        lastSavedSelectedAxes.value = { x: true, y: true, z: true };
       }
     };
     
-    // Save configuration to backend CNC config
+    // Save configuration to database only (no localStorage persistence)
     const saveCncConfig = async () => {
-      try {
-        
-        const configToSave = {
-          xAxisLength: cncConfig.value.xAxisLength,
-          yAxisLength: cncConfig.value.yAxisLength,
-          zAxisLength: cncConfig.value.zAxisLength,
-          workingZoneX: cncConfig.value.workingZoneX,
-          workingZoneY: cncConfig.value.workingZoneY,
-          workingZoneZ: cncConfig.value.workingZoneZ,
-          selectedAxes: selectedAxes.value
-        };
-        
-        
-        // Save to backend CNC configuration
-        const result = await saveCNC3DConfig(props.axisUid, configToSave);
-        
-        if (result.success) {
-          logger.info('CNC 3D configuration saved to backend:', configToSave);
-          
-          // Also save to localStorage as backup
-          localStorage.setItem(configKey, JSON.stringify({
-            ...cncConfig.value,
-            selectedAxes: selectedAxes.value
-          }));
-        } else {
-          logger.warn('Failed to save CNC 3D config to backend, saving to localStorage only');
-          // Save to localStorage as fallback
-          localStorage.setItem(configKey, JSON.stringify({
-            ...cncConfig.value,
-            selectedAxes: selectedAxes.value
-          }));
-        }
-      } catch (error) {
-        logger.error('Failed to save CNC 3D config:', error);
-        
-        // Try to save to localStorage as last resort
-        try {
-          localStorage.setItem(configKey, JSON.stringify({
-            ...cncConfig.value,
-            selectedAxes: selectedAxes.value
-          }));
-          logger.info('CNC 3D config saved to localStorage as fallback');
-        } catch (localError) {
-          logger.error('Failed to save to localStorage as well:', localError);
-        }
+      const configToSave = {
+        xAxisLength: cncConfig.value.xAxisLength,
+        yAxisLength: cncConfig.value.yAxisLength,
+        zAxisLength: cncConfig.value.zAxisLength,
+        workingZoneX: cncConfig.value.workingZoneX,
+        workingZoneY: cncConfig.value.workingZoneY,
+        workingZoneZ: cncConfig.value.workingZoneZ,
+        selectedAxes: selectedAxes.value
+      };
+      
+      // Save only to backend CNC configuration (database)
+      const result = await saveCNC3DConfig(props.axisUid, configToSave);
+      
+      if (result.success) {
+        logger.info('CNC 3D configuration saved to database:', configToSave);
+      } else {
+        // Throw error to be caught by caller - don't save to localStorage as fallback
+        const error = new Error('Failed to save CNC 3D configuration to database');
+        logger.error(error.message, result);
+        throw error;
       }
     };
     
     // Modal functions
     const closeCncSetupModal = () => {
       showCncSetup.value = false;
+      
+      // Reset form to last saved configuration (don't remember unsaved changes)
+      cncConfig.value = { ...lastSavedConfig.value };
+      selectedAxes.value = { ...lastSavedSelectedAxes.value };
+      
+      logger.info('Setup modal closed, form reset to last saved configuration', lastSavedConfig.value);
     };
     
-    // Enhanced validation for selected axes
+    // Use centralized validation from utils
     const validateConfiguration = () => {
-      const errors = [];
+      const configToValidate = {
+        ...cncConfig.value,
+        selectedAxes: selectedAxes.value
+      };
       
-      // Check if at least one axis is selected
-      if (selectedAxesCount.value === 0) {
-        errors.push('Please select at least one axis');
-        return errors;
-      }
-      
-      // Validate required linear axes
-      if (selectedAxes.value.x && (!cncConfig.value.xAxisLength || cncConfig.value.xAxisLength <= 0)) {
-        errors.push('X-axis length is required and must be greater than 0');
-      }
-      if (selectedAxes.value.y && (!cncConfig.value.yAxisLength || cncConfig.value.yAxisLength <= 0)) {
-        errors.push('Y-axis length is required and must be greater than 0');
-      }
-      if (selectedAxes.value.z && (!cncConfig.value.zAxisLength || cncConfig.value.zAxisLength <= 0)) {
-        errors.push('Z-axis length is required and must be greater than 0');
-      }
-      
-      
-      // Validate working zones don't exceed axis lengths
-      if (selectedAxes.value.x && cncConfig.value.workingZoneX > cncConfig.value.xAxisLength) {
-        errors.push('X working zone cannot exceed X-axis length');
-      }
-      if (selectedAxes.value.y && cncConfig.value.workingZoneY > cncConfig.value.yAxisLength) {
-        errors.push('Y working zone cannot exceed Y-axis length');
-      }
-      if (selectedAxes.value.z && cncConfig.value.workingZoneZ > cncConfig.value.zAxisLength) {
-        errors.push('Z working zone cannot exceed Z-axis length');
-      }
-      
-      return errors;
+      const validation = validateCnc3DConfig(configToValidate);
+      return validation.errors;
     };
     
-    // Main function to save config and open 3D viewer
+    // Real-time validation - shows errors immediately as user types
+    const currentValidationErrors = computed(() => {
+      return validateConfiguration();
+    });
+    
+    // Main function to validate and test 3D viewer generation
     const saveCncConfigAndOpen3D = async () => {
-      // Validate configuration based on selected axes
+      // Double-check validation (button should be disabled if there are errors)
       const validationErrors = validateConfiguration();
       if (validationErrors.length > 0) {
-        alert(`Configuration errors:\n${validationErrors.join('\n')}`);
+        const formattedError = formatValidationError(validationErrors, 'Configuration');
+        setTypedNotification(formattedError, NotificationType.ERROR);
         return;
       }
       
       try {
+        logger.info('Testing 3D viewer generation with new configuration...');
+        setTypedNotification(CncMessages.VIEWER_INITIALIZING, NotificationType.INFO);
+        
+        // First, try to open the 3D viewer with the current configuration
+        // The 3D viewer will validate the config and fail if there are issues
+        open3DViewer();
+        
+        // If we reach here, the 3D viewer opened successfully
+        // Now we can save the configuration and close the modal
+        // Note: We'll save after 3D viewer confirms successful initialization
+      } catch (error) {
+        logger.error('Error testing 3D viewer generation:', error);
+        setTypedNotification(CncMessages.VIEWER_ERROR, NotificationType.ERROR);
+      }
+    };
+    
+    // Called when 3D viewer successfully initializes
+    const on3DViewerSuccess = async () => {
+      try {
+        logger.info('3D viewer generated successfully, saving configuration to database...');
+        
         // Save configuration including selected axes
         await saveCncConfig();
         
-        // Close modal
+        // Remember the successfully saved configuration
+        lastSavedConfig.value = { ...cncConfig.value };
+        lastSavedSelectedAxes.value = { ...selectedAxes.value };
+        
+        // Close modal (this will reset form, but that's ok since we just saved)
         closeCncSetupModal();
         
-        // Open 3D viewer
-        open3DViewer();
+        setTypedNotification(CncMessages.SETUP_SUCCESS, NotificationType.SUCCESS);
+        logger.info('CNC 3D configuration saved successfully after viewer generation');
       } catch (error) {
-        logger.error('Error saving 3D configuration:', error);
-        alert('Failed to save configuration. Please try again.');
+        logger.error('Error saving 3D configuration after successful generation:', error);
+        setTypedNotification(CncMessages.SETUP_FAILED, NotificationType.ERROR);
       }
+    };
+    
+    // Called when 3D viewer fails to initialize
+    const on3DViewerFailure = (failureInfo) => {
+      logger.error('3D viewer generation failed:', failureInfo);
+      
+      // Close the 3D viewer since it failed
+      show3DViewer.value = false;
+      
+      // Show specific error message based on failure type
+      let errorMessage = CncMessages.VIEWER_ERROR;
+      if (failureInfo?.type === 'config-validation') {
+        errorMessage = failureInfo.error || CncMessages.CONFIG_INCOMPLETE;
+        // Reopen setup modal since config is invalid
+        showCncSetup.value = true;
+      } else if (failureInfo?.error?.includes('WebGL')) {
+        errorMessage = CncMessages.WEBGL_NOT_SUPPORTED;
+      }
+      
+      setTypedNotification(errorMessage, NotificationType.ERROR);
+      
+      // Configuration is NOT saved since 3D viewer failed to generate
+      logger.warn('CNC configuration was not saved due to 3D viewer generation failure');
     };
     
     // Function to open 3D viewer
@@ -518,17 +561,24 @@ export default {
       
     }, { deep: true });
 
-    // Check if config exists - looks for 3D configuration in the CNC data
+    // Check if config exists - uses centralized validation
     const hasConfig = computed(() => {
       const currentCnc = cncs.value?.find(cnc => cnc.uid === props.axisUid);
       
-      // Check if CNC exists and has 3D configuration parameters saved
-      // Backend returns snake_case field names (x_axis_length, y_axis_length)
-      return currentCnc && 
-             ((currentCnc.xAxisLength !== undefined && currentCnc.xAxisLength > 0) ||
-              (currentCnc.x_axis_length !== undefined && currentCnc.x_axis_length > 0)) &&
-             ((currentCnc.yAxisLength !== undefined && currentCnc.yAxisLength > 0) ||
-              (currentCnc.y_axis_length !== undefined && currentCnc.y_axis_length > 0));
+      if (!currentCnc) return false;
+      
+      // Convert backend format to frontend format for validation
+      const configForValidation = {
+        xAxisLength: currentCnc.xAxisLength || currentCnc.x_axis_length || 0,
+        yAxisLength: currentCnc.yAxisLength || currentCnc.y_axis_length || 0,
+        zAxisLength: currentCnc.zAxisLength || currentCnc.z_axis_length || 0,
+        workingZoneX: currentCnc.workingZoneX || currentCnc.working_zone_x || 0,
+        workingZoneY: currentCnc.workingZoneY || currentCnc.working_zone_y || 0,
+        workingZoneZ: currentCnc.workingZoneZ || currentCnc.working_zone_z || 0,
+        selectedAxes: currentCnc.selectedAxes || currentCnc.selected_axes || { x: true, y: true, z: true }
+      };
+      
+      return !requires3DSetup(configForValidation);
     });
 
     // Handle Setup 3D button click
@@ -538,12 +588,33 @@ export default {
 
     // Handle 3D CNC button click
     const handle3DCNCClick = () => {
-      if (hasConfig.value) {
-        // If config exists, open 3D viewer directly
-        show3DViewer.value = true;
-      } else {
-        // If no config, open setup modal
+      const currentCnc = cncs.value?.find(cnc => cnc.uid === props.axisUid);
+      
+      if (!currentCnc) {
+        setTypedNotification(CncMessages.NOT_FOUND, NotificationType.ERROR);
+        return;
+      }
+      
+      // Convert backend format for validation
+      const configForValidation = {
+        xAxisLength: currentCnc.xAxisLength || currentCnc.x_axis_length || 0,
+        yAxisLength: currentCnc.yAxisLength || currentCnc.y_axis_length || 0,
+        zAxisLength: currentCnc.zAxisLength || currentCnc.z_axis_length || 0,
+        workingZoneX: currentCnc.workingZoneX || currentCnc.working_zone_x || 0,
+        workingZoneY: currentCnc.workingZoneY || currentCnc.working_zone_y || 0,
+        workingZoneZ: currentCnc.workingZoneZ || currentCnc.working_zone_z || 0,
+        selectedAxes: currentCnc.selectedAxes || currentCnc.selected_axes || { x: true, y: true, z: true }
+      };
+      
+      if (requires3DSetup(configForValidation)) {
+        // Show error message and force setup
+        const errorMessage = get3DSetupMessage(configForValidation);
+        setTypedNotification(errorMessage || CncMessages.CONFIG_INCOMPLETE, NotificationType.WARNING);
         showCncSetup.value = true;
+      } else {
+        // Config is valid, open 3D viewer
+        show3DViewer.value = true;
+        setTypedNotification(CncMessages.VIEWER_READY, NotificationType.INFO, 2000);
       }
     };
 
@@ -557,8 +628,13 @@ export default {
       showCncSetup,
       show3DViewer,
       cncConfig,
+      currentValidationErrors,
+      lastSavedConfig,
+      lastSavedSelectedAxes,
       closeCncSetupModal,
       saveCncConfigAndOpen3D,
+      on3DViewerSuccess,
+      on3DViewerFailure,
       handleMoveTo,
       handleSimulateMoveTo,
       handleSimulationModeChanged,
@@ -909,10 +985,20 @@ export default {
   transition: var(--transition-hover);
 }
 
-.save-button:hover {
+.save-button:hover:not(:disabled) {
   background-color: var(--color-primary-dark);
   transform: translateY(-1px);
   box-shadow: var(--shadow-base);
+}
+
+.save-button:disabled,
+.save-button.disabled {
+  background-color: var(--color-background-secondary);
+  color: var(--color-text-disabled);
+  cursor: not-allowed;
+  opacity: 0.6;
+  transform: none;
+  box-shadow: none;
 }
 
 /* Manual Axis Selection Styles */
@@ -990,6 +1076,41 @@ export default {
   color: var(--color-primary);
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-bold);
+}
+
+/* Validation Errors Styles */
+.validation-errors {
+  margin-bottom: var(--space-4);
+  padding: var(--space-3);
+  background-color: rgba(220, 53, 69, 0.1);
+  border: var(--border-width-1) solid rgba(220, 53, 69, 0.3);
+  border-radius: var(--border-radius-base);
+  color: #dc3545;
+}
+
+.error-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+  font-weight: var(--font-weight-bold);
+  font-size: var(--font-size-sm);
+}
+
+.error-list {
+  margin: 0;
+  padding-left: var(--space-4);
+  list-style-type: disc;
+}
+
+.error-item {
+  margin-bottom: var(--space-1);
+  font-size: var(--font-size-sm);
+  line-height: 1.4;
+}
+
+.error-item:last-child {
+  margin-bottom: 0;
 }
 
 /* Working Zone Configuration Styles */

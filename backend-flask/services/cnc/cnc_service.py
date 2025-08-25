@@ -77,6 +77,7 @@ class CncService(metaclass=Singleton):
                     break
             
             if port_device:
+                result['port_exists'] = True  # Mark that port exists
                 device_types = port_device['device_types']
                 result['actual_device_types'] = device_types
                 result['device_description'] = port_device['description']
@@ -87,28 +88,36 @@ class CncService(metaclass=Singleton):
                     result['is_correct_device_type'] = True
                     result['error_message'] = f"Port {actual_port} validated as {expected_name}"
                 else:
-                    result['is_valid'] = False
-                    result['is_correct_device_type'] = False
-                    
-                    # Determine what device type is actually connected
-                    if 'dmc_readers' in device_types:
-                        result['actual_device_name'] = 'DMC reader (Cognex)'
-                    elif 'cncs' in device_types:
-                        result['actual_device_name'] = 'CNC machine'
-                    elif 'ultra_arm_robots' in device_types:
-                        result['actual_device_name'] = 'Ultra Arm robot'
-                    elif 'profilometers' in device_types:
-                        result['actual_device_name'] = 'profilometer (Keyence/SICK)'
-                    elif 'cameras' in device_types:
-                        result['actual_device_name'] = 'camera device'
+                    # Port exists but not classified as expected type - for CNCs, we'll be lenient
+                    if expected_device_type == 'cncs':
+                        # For CNC devices, if the port exists at all, consider it valid
+                        # Many CNC devices aren't properly classified by the system
+                        result['is_valid'] = True
+                        result['is_correct_device_type'] = False
+                        result['error_message'] = f"Port {actual_port} found (unclassified device) - attempting CNC connection"
                     else:
-                        result['actual_device_name'] = ', '.join(device_types) if device_types else 'unknown device'
-                    
-                    result['error_message'] = (
-                        f"Configuration mismatch: Expected {expected_name} on port {actual_port}, "
-                        f"but found {result['actual_device_name']} instead"
-                    )
-                    result['suggested_action'] = f"Please update configuration to use the correct port for {expected_name}"
+                        result['is_valid'] = False
+                        result['is_correct_device_type'] = False
+                        
+                        # Determine what device type is actually connected
+                        if 'dmc_readers' in device_types:
+                            result['actual_device_name'] = 'DMC reader (Cognex)'
+                        elif 'cncs' in device_types:
+                            result['actual_device_name'] = 'CNC machine'
+                        elif 'ultra_arm_robots' in device_types:
+                            result['actual_device_name'] = 'Ultra Arm robot'
+                        elif 'profilometers' in device_types:
+                            result['actual_device_name'] = 'profilometer (Keyence/SICK)'
+                        elif 'cameras' in device_types:
+                            result['actual_device_name'] = 'camera device'
+                        else:
+                            result['actual_device_name'] = ', '.join(device_types) if device_types else 'unknown device'
+                        
+                        result['error_message'] = (
+                            f"Configuration mismatch: Expected {expected_name} on port {actual_port}, "
+                            f"but found {result['actual_device_name']} instead"
+                        )
+                        result['suggested_action'] = f"Please update configuration to use the correct port for {expected_name}"
             else:
                 result['error_message'] = f"Port {actual_port} not found or not connected"
                 result['suggested_action'] = f"Check if {expected_name} is connected and try again"
@@ -351,38 +360,18 @@ class CncService(metaclass=Singleton):
         # VALIDATE PORT TYPE BEFORE CONNECTION
         try:
             from services.port_manager.port_manager import UnifiedUSBManager
-            import asyncio
             
             port_manager = UnifiedUSBManager()
             
-            # Use the existing event loop if available, otherwise create a new one
-            try:
-                # Try to get current event loop
-                loop = asyncio.get_running_loop()
-                # If we have a running loop, use asyncio.create_task (but we can't await here)
-                # So we'll use a synchronous approach instead
-                raise RuntimeError("Running loop detected, use sync approach")
-            except RuntimeError:
-                # No running loop, we can create one
-                try:
-                    loop = asyncio.new_event_loop()
-                    asyncio.set_event_loop(loop)
-                    try:
-                        validation_result = loop.run_until_complete(port_manager.validate_port_for_device_type(cnc_model.port, 'cncs'))
-                    finally:
-                        # Properly close the loop to prevent warnings
-                        loop.close()
-                        asyncio.set_event_loop(None)
-                except Exception as async_error:
-                    self.logger.warning(f"CNC {cnc_model.uid}: Async validation failed ({async_error}), using sync validation")
-                    # Fall back to synchronous validation
-                    validation_result = self._sync_validate_port(port_manager, cnc_model.port, 'cncs')
+            # Always use sync validation to avoid async context issues
+            validation_result = self._sync_validate_port(port_manager, cnc_model.port, 'cncs')
             
-            self.logger.info(f"CNC {cnc_model.uid}: {validation_result['error_message']}")
+            self.logger.info(f"CNC {cnc_model.uid}: Port validation - {validation_result['error_message']}")
             
             if not validation_result['is_valid']:
+                # Port doesn't exist or is definitely the wrong type
                 error_msg = f"{validation_result['error_message']}. {validation_result['suggested_action']}"
-                self.logger.warning(f"CNC {cnc_model.uid}: {error_msg}")
+                self.logger.error(f"CNC {cnc_model.uid}: Port validation failed - {error_msg}")
                 self._callback(cnc_model.uid, ('connection_error', error_msg, True, cnc_model.uid))
                 
                 # Store connection error and set mock object
