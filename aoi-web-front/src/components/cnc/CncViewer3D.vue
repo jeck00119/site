@@ -19,6 +19,10 @@
           <font-awesome-icon icon="eye" />
           {{ currentCameraView }}
         </button>
+        <button @click="openMappingDialog" class="control-button mapping-button" :disabled="!canStartMapping">
+          <font-awesome-icon icon="camera" />
+          Map Working Area
+        </button>
         <button @click="toggleSimulationMode" class="control-button simulation-button" :class="{ 'simulation-active': isSimulationMode }" :disabled="isCncMoving">
           <font-awesome-icon icon="cog" />
           Simulation
@@ -235,6 +239,20 @@
       </div>
     </div>
   </div>
+
+  <!-- Mapping Configuration Dialog -->
+  <MappingConfigDialog
+    :show="showMappingDialog"
+    :cnc-config="cncConfig"
+    :is-mapping-in-progress="isMappingInProgress"
+    :mapping-progress="mappingProgress"
+    :mapping-status="mappingStatus"
+    :current-grid-position="currentGridPosition"
+    :total-grid-points="totalGridPoints"
+    :completed-points="completedPoints"
+    @close="closeMappingDialog"
+    @start-mapping="startMappingProcess"
+  />
 </template>
 
 <script>
@@ -245,9 +263,21 @@ import { useCncStore } from '@/composables/useStore';
 import { formatPrecision, formatCoordinate, formatPosition, getWorkingZoneBounds, isWithinWorkingZone, setTargetForRealMovement, validateCnc3DConfig, requires3DSetup, get3DSetupMessage } from '@/utils/validation';
 import { CncMessages, NotificationType } from '@/constants/notifications';
 import useNotification from '@/hooks/notifications';
+import MappingConfigDialog from './MappingConfigDialog.vue';
+import useCncMovement from '@/composables/useCncMovement';
+import { 
+  createStitchingSession, 
+  captureImageAtPosition, 
+  startStitchingProcess,
+  generateSessionId,
+  getStitchingResultUrl 
+} from '@/api/imageStitchingApi';
 
 export default {
   name: 'CncViewer3D',
+  components: {
+    MappingConfigDialog
+  },
   props: {
     cncConfig: {
       type: Object,
@@ -346,6 +376,16 @@ export default {
     const hasWebglSupport = ref(true);
     const isInitialized = ref(false);
     const errorMessage = ref('');
+    
+    // Working Area Mapping state
+    const showMappingDialog = ref(false);
+    const isMappingInProgress = ref(false);
+    const mappingProgress = ref(0);
+    const mappingStatus = ref('');
+    const capturedImages = ref([]);
+    const currentGridPosition = ref({ x: 0, y: 0 });
+    const totalGridPoints = ref(0);
+    const completedPoints = ref(0);
     
     // Optimization: Dirty flags for performance
     const dirtyFlags = {
@@ -520,6 +560,17 @@ export default {
         zones.push(`Z:${props.cncConfig.workingZoneZ}mm`);
       }
       return zones.join(' × ');
+    });
+    
+    // Mapping computed properties
+    const canStartMapping = computed(() => {
+      return !isCncMoving.value && 
+             !isMappingInProgress.value && 
+             hasWebglSupport.value && 
+             isInitialized.value &&
+             props.cncConfig &&
+             props.cncConfig.xAxisLength &&
+             props.cncConfig.yAxisLength;
     });
     
     // Click-to-move state
@@ -3500,6 +3551,205 @@ export default {
       }
     };
     
+    // Mapping dialog handlers
+    const openMappingDialog = () => {
+      showMappingDialog.value = true;
+    };
+    
+    const closeMappingDialog = () => {
+      showMappingDialog.value = false;
+    };
+    
+    const startMappingProcess = async (mappingConfig) => {
+      console.log('Starting mapping process with config:', mappingConfig);
+      
+      if (!props.cncConfig || !props.axisUid) {
+        setTypedNotification('CNC configuration or axis UID not available', NotificationType.ERROR);
+        return;
+      }
+      
+      const movement = useCncMovement(props.axisUid);
+      
+      if (!movement.canExecuteMovement()) {
+        setTypedNotification('CNC is not ready for movement', NotificationType.ERROR);
+        return;
+      }
+      
+      isMappingInProgress.value = true;
+      mappingProgress.value = 0;
+      mappingStatus.value = 'Creating stitching session...';
+      capturedImages.value = [];
+      
+      try {
+        // Create stitching session on backend
+        const sessionId = generateSessionId();
+        const stitchingConfig = {
+          uid: sessionId,
+          step_size_x: mappingConfig.stepSize.x,
+          step_size_y: mappingConfig.stepSize.y,
+          z_height: mappingConfig.zHeight,
+          overlap_percent: mappingConfig.overlapPercent,
+          pattern: mappingConfig.pattern,
+          working_area_x: getWorkingZoneBounds(props.cncConfig, false).x,
+          working_area_y: getWorkingZoneBounds(props.cncConfig, false).y,
+          camera_uid: getCameraUidFromConfig()
+        };
+        
+        const sessionResponse = await createStitchingSession(stitchingConfig);
+        mappingStatus.value = 'Session created, generating grid pattern...';
+        
+        // Generate grid pattern
+        const gridPositions = generateGridPattern(mappingConfig);
+        totalGridPoints.value = gridPositions.length;
+        completedPoints.value = 0;
+        
+        console.log(`Generated ${gridPositions.length} grid positions`);
+        
+        setTypedNotification(
+          `Starting mapping scan of ${gridPositions.length} positions`,
+          NotificationType.INFO
+        );
+        
+        // Execute grid movement pattern
+        for (let i = 0; i < gridPositions.length; i++) {
+          const position = gridPositions[i];
+          currentGridPosition.value = { x: position.x, y: position.y };
+          
+          mappingStatus.value = `Moving to grid position ${i + 1}/${gridPositions.length} (${position.x.toFixed(1)}, ${position.y.toFixed(1)})`;
+          
+          // Move to position
+          await movement.executeMovementToPosition({
+            x: position.x,
+            y: position.y,
+            z: mappingConfig.zHeight,
+            name: `Grid-${i + 1}`,
+            uid: `grid-${i}`
+          });
+          
+          // Capture image at this position using backend
+          mappingStatus.value = `Capturing image at position ${i + 1}/${gridPositions.length}`;
+          
+          const captureResult = await captureImageAtPosition(sessionId, {
+            x: position.x,
+            y: position.y,
+            z: mappingConfig.zHeight,
+            sequence_index: i
+          });
+          
+          if (captureResult.success) {
+            capturedImages.value.push(captureResult.captured_image_uid);
+          }
+          
+          // Wait for camera to stabilize
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          
+          completedPoints.value = i + 1;
+          mappingProgress.value = Math.round((completedPoints.value / totalGridPoints.value) * 90); // Reserve 10% for stitching
+        }
+        
+        mappingStatus.value = 'Processing captured images...';
+        mappingProgress.value = 90;
+        
+        // Start stitching process on backend
+        const stitchingResult = await startStitchingProcess(sessionId);
+        
+        mappingProgress.value = 100;
+        mappingStatus.value = `Mapping completed! Stitched ${capturedImages.value.length} images.`;
+        
+        setTypedNotification(
+          `Mapping scan completed successfully! Stitched ${capturedImages.value.length} images.`,
+          NotificationType.SUCCESS
+        );
+        
+        // Store result for potential overlay application
+        capturedImages.value = {
+          sessionId: sessionId,
+          resultPath: stitchingResult.result_image_path,
+          resultUrl: stitchingResult.result_image_url,
+          downloadUrl: getStitchingResultUrl(sessionId)
+        };
+        
+        // Close dialog after successful completion
+        setTimeout(() => {
+          closeMappingDialog();
+          isMappingInProgress.value = false;
+          mappingProgress.value = 0;
+          mappingStatus.value = '';
+        }, 3000);
+        
+      } catch (error) {
+        console.error('Mapping failed:', error);
+        mappingStatus.value = `Mapping failed: ${error.message || error}`;
+        isMappingInProgress.value = false;
+        
+        setTypedNotification(
+          `Mapping scan failed: ${error.message || error}`,
+          NotificationType.ERROR
+        );
+      }
+    };
+    
+    // Generate grid pattern based on configuration
+    const generateGridPattern = (config) => {
+      const bounds = getWorkingZoneBounds(props.cncConfig, false);
+      const positions = [];
+      
+      const stepsX = Math.ceil(bounds.x / config.stepSize.x);
+      const stepsY = Math.ceil(bounds.y / config.stepSize.y);
+      
+      console.log(`Grid dimensions: ${stepsX} x ${stepsY} steps`);
+      
+      for (let row = 0; row <= stepsY; row++) {
+        const y = row * config.stepSize.y;
+        if (y > bounds.y) break;
+        
+        for (let col = 0; col <= stepsX; col++) {
+          let x = col * config.stepSize.x;
+          if (x > bounds.x) break;
+          
+          // Apply zigzag pattern for efficiency
+          if (config.pattern === 'zigzag' && row % 2 === 1) {
+            x = bounds.x - x; // Reverse direction on odd rows
+          }
+          
+          positions.push({
+            x: formatPrecision(x),
+            y: formatPrecision(y),
+            z: config.zHeight
+          });
+        }
+      }
+      
+      return positions;
+    };
+    
+    // Capture current camera view
+    const captureCurrentView = async () => {
+      try {
+        // Find the camera canvas in the 3D viewer
+        const cameraCanvas = document.querySelector('#camera-canvas canvas');
+        if (!cameraCanvas) {
+          console.warn('Camera canvas not found for capture');
+          return null;
+        }
+        
+        // Convert canvas to data URL
+        const imageData = cameraCanvas.toDataURL('image/jpeg', 0.8);
+        return imageData;
+      } catch (error) {
+        console.error('Error capturing camera view:', error);
+        return null;
+      }
+    };
+    
+    // Helper function to get camera UID from current configuration
+    const getCameraUidFromConfig = () => {
+      // This would need to be implemented based on how camera UIDs are stored
+      // For now, return a default or try to find from the current setup
+      // This should be adapted based on the actual camera configuration structure
+      return 'camera_uid_placeholder'; // TODO: Implement proper camera UID retrieval
+    };
+    
     const regenerateGrids = () => {
       if (!cncGroup) return;
       
@@ -3950,6 +4200,19 @@ export default {
       topViewPosition,
       sideViewPosition,
       cameraViews,
+      // Mapping functionality
+      canStartMapping,
+      showMappingDialog,
+      openMappingDialog,
+      closeMappingDialog,
+      startMappingProcess,
+      isMappingInProgress,
+      mappingProgress,
+      mappingStatus,
+      capturedImages,
+      currentGridPosition,
+      totalGridPoints,
+      completedPoints,
       // Utilities
       formatCoordinate
     };

@@ -18,6 +18,7 @@ from services.media.pygame_audio_service import PygameAudioService
 from services.port_manager.port_manager import UnifiedUSBManager
 from services.processing.process_service import ProcessService
 from services.robot.robot_service import RobotService
+from services.image_stitching.image_stitching_service import ImageStitchingService
 
 
 class ServiceManager:
@@ -36,6 +37,7 @@ class ServiceManager:
     app_log: Union[None, AppLogger] = None
     masks_service: Union[None, MasksService] = None
     inspection_list_service: Union[None, InspectionListService] = None
+    image_stitching_service: Union[None, ImageStitchingService] = None
 
     def __init__(self):
         pass
@@ -65,6 +67,7 @@ class ServiceManager:
         cls.app_log.create_handler()
         cls.masks_service = MasksService(cls.image_source_service, cls.load_image_service)
         cls.inspection_list_service = InspectionListService()
+        cls.image_stitching_service = ImageStitchingService()
         # image_generator = ImageGeneratorService()
         # image_generator.initialize_image_generator()
 

@@ -15,7 +15,7 @@ from api.routers import camera_routes, camera_settings_routes, image_source_rout
     references_routes, identifications_routes, algorithm_routes, cnc_routes, locations_routes, \
     custom_components_routes, itac_routes, robot_routes, profilometer_routes, inspection_list_routes, process_routes, \
     configuration_routes, media_routes, authentication_routes, log_routes, mask_routes, help_routes, peripheral_routes, \
-    camera_calibration_routes, stereo_callibration_routes, annotation_routes
+    camera_calibration_routes, stereo_callibration_routes, annotation_routes, image_stitching_routes
 from api.routers import image_generator_routes  
 from services.service_manager import ServiceManager
 from services.logger.logger_model import AppEntry
@@ -247,6 +247,7 @@ app.include_router(peripheral_routes.router)
 app.include_router(camera_calibration_routes.router)
 app.include_router(stereo_callibration_routes.router)
 app.include_router(annotation_routes.router)
+app.include_router(image_stitching_routes.router)
 
 if __name__ == "__main__":
     # Get server configuration from centralized settings
